@@ -472,6 +472,43 @@ app.delete('/api/access/:id', requireAdmin, (req, res) => {
     res.json({ success: true });
 });
 
+// Temporary seed endpoint for initial deployment (call once then remove)
+app.post('/api/seed-database', async (req, res) => {
+    try {
+        // Check if admin already exists
+        const existingAdmin = db.prepare('SELECT * FROM users WHERE email = ?').get('admin@taskmanager.com');
+        if (existingAdmin) {
+            return res.json({ message: 'Database already seeded', users: ['admin@taskmanager.com', 'member@taskmanager.com'] });
+        }
+
+        // Create admin user
+        const adminPassword = await bcrypt.hash('admin123', 10);
+        db.prepare(`
+            INSERT INTO users (email, password, name, role)
+            VALUES (?, ?, ?, ?)
+        `).run('admin@taskmanager.com', adminPassword, 'Admin User', 'admin');
+
+        // Create member user
+        const memberPassword = await bcrypt.hash('member123', 10);
+        db.prepare(`
+            INSERT INTO users (email, password, name, role)
+            VALUES (?, ?, ?, ?)
+        `).run('member@taskmanager.com', memberPassword, 'Team Member', 'member');
+
+        res.json({
+            success: true,
+            message: 'Database seeded successfully!',
+            users: [
+                { email: 'admin@taskmanager.com', password: 'admin123', role: 'admin' },
+                { email: 'member@taskmanager.com', password: 'member123', role: 'member' }
+            ]
+        });
+    } catch (error) {
+        console.error('Seed error:', error);
+        res.status(500).json({ error: 'Failed to seed database', details: error.message });
+    }
+});
+
 // Start server
 app.listen(PORT, () => {
     console.log(`\n🚀 Task Manager server running on http://localhost:${PORT}`);
