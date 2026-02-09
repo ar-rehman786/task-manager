@@ -14,6 +14,14 @@ initializeDatabase();
 // Middleware
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+// Debug middleware
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+    if (req.method === 'POST') console.log('Body:', req.body);
+    next();
+});
+
 app.use(session({
     secret: 'task-manager-secret-key-change-in-production',
     resave: false,
@@ -43,15 +51,18 @@ function requireAdmin(req, res, next) {
 
 app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
+    console.log('Login attempt:', { email, passwordProvided: !!password });
 
     try {
         const user = db.prepare('SELECT * FROM users WHERE email = ? AND active = 1').get(email);
+        console.log('User found:', user ? { id: user.id, email: user.email, role: user.role } : 'No user found');
 
         if (!user) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
         const validPassword = await bcrypt.compare(password, user.password);
+        console.log('Password valid:', validPassword);
 
         if (!validPassword) {
             return res.status(401).json({ error: 'Invalid credentials' });
