@@ -15,12 +15,7 @@ initializeDatabase();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Debug middleware
-app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
-    if (req.method === 'POST') console.log('Body:', req.body);
-    next();
-});
+
 
 app.use(session({
     secret: 'task-manager-secret-key-change-in-production',
@@ -51,11 +46,9 @@ function requireAdmin(req, res, next) {
 
 app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
-    console.log('Login attempt:', { email, passwordProvided: !!password });
 
     try {
         const user = db.prepare('SELECT * FROM users WHERE email = ? AND active = 1').get(email);
-        console.log('User found:', user ? { id: user.id, email: user.email, role: user.role } : 'No user found');
 
         if (!user) {
             return res.status(401).json({ error: 'Invalid credentials' });
@@ -523,52 +516,45 @@ app.post('/api/seed-database', async (req, res) => {
 // GET version for easy browser access
 app.get('/api/seed-database', async (req, res) => {
     try {
-        // Check if admin already exists
-        const existingAdmin = db.prepare('SELECT * FROM users WHERE email = ?').get('admin@taskmanager.com');
-        if (existingAdmin) {
-            return res.send(`
-                <html>
-                <head><title>Database Already Seeded</title></head>
-                <body style="font-family: Arial; padding: 50px; text-align: center;">
-                    <h1>✅ Database Already Seeded</h1>
-                    <p>Users already exist in the database.</p>
-                    <h3>Login Credentials:</h3>
-                    <p><strong>Admin:</strong> admin@taskmanager.com / admin123</p>
-                    <p><strong>Member:</strong> member@taskmanager.com / member123</p>
-                    <br>
-                    <a href="/" style="background: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Go to Login</a>
-                </body>
-                </html>
-            `);
-        }
-
-        // Create admin user
+        // Create/Update admin user
         const adminPassword = await bcrypt.hash('admin123', 10);
         db.prepare(`
-            INSERT INTO users (email, password, name, role)
+            INSERT OR IGNORE INTO users (email, password, name, role)
             VALUES (?, ?, ?, ?)
         `).run('admin@taskmanager.com', adminPassword, 'Admin User', 'admin');
 
-        // Create member user
+        // Force update password
+        db.prepare('UPDATE users SET password = ? WHERE email = ?').run(adminPassword, 'admin@taskmanager.com');
+
+        // Create/Update member user
         const memberPassword = await bcrypt.hash('member123', 10);
         db.prepare(`
-            INSERT INTO users (email, password, name, role)
+            INSERT OR IGNORE INTO users (email, password, name, role)
             VALUES (?, ?, ?, ?)
         `).run('member@taskmanager.com', memberPassword, 'Team Member', 'member');
+
+        // Force update password
+        db.prepare('UPDATE users SET password = ? WHERE email = ?').run(memberPassword, 'member@taskmanager.com');
+
+        // Ensure default board exists
+        db.prepare(`
+            INSERT OR IGNORE INTO boards (workspace, name, type)
+            VALUES (?, ?, ?)
+        `).run('tasks', 'All Tasks', 'ALL_TASKS');
 
         res.send(`
             <html>
             <head><title>Database Seeded Successfully</title></head>
             <body style="font-family: Arial; padding: 50px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
                 <div style="background: white; color: #333; padding: 40px; border-radius: 10px; max-width: 600px; margin: 0 auto;">
-                    <h1 style="color: #667eea;">🎉 Database Seeded Successfully!</h1>
-                    <p>Your admin and member users have been created.</p>
+                    <h1 style="color: #667eea;">🎉 Database Seeded & Passwords Reset!</h1>
+                    <p>Your users have been created/updated with default credentials.</p>
                     <div style="background: #f0f0f0; padding: 20px; border-radius: 5px; margin: 20px 0;">
                         <h3>Login Credentials:</h3>
                         <p><strong>Admin:</strong><br>admin@taskmanager.com / admin123</p>
                         <p><strong>Member:</strong><br>member@taskmanager.com / member123</p>
                     </div>
-                    <p style="color: #d9534f; font-size: 14px;">⚠️ Important: Change the admin password after first login!</p>
+                    <p style="color: #d9534f; font-size: 14px;">⚠️ Passwords have been reset to defaults.</p>
                     <br>
                     <a href="/" style="background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Go to Login Page</a>
                 </div>
