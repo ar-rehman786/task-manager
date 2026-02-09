@@ -353,4 +353,4 @@ function showError(message) {
 }
 
 // Initialize on page load
-initAttendance();
+

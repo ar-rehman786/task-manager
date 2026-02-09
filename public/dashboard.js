@@ -367,4 +367,4 @@ function showNotification(message, type = 'info') {
 }
 
 // Initialize on page load
-initDashboard();
+
