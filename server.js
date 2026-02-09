@@ -51,14 +51,13 @@ app.post('/api/auth/login', async (req, res) => {
         const user = db.prepare('SELECT * FROM users WHERE email = ? AND active = 1').get(email);
 
         if (!user) {
-            return res.status(401).json({ error: 'Invalid credentials' });
+            return res.status(401).json({ error: 'User not found' });
         }
 
         const validPassword = await bcrypt.compare(password, user.password);
-        console.log('Password valid:', validPassword);
 
         if (!validPassword) {
-            return res.status(401).json({ error: 'Invalid credentials' });
+            return res.status(401).json({ error: 'Invalid password' });
         }
 
         req.session.userId = user.id;
