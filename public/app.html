@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Manager</title>
+    <title>SloraAI Task Manager</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,12 +16,16 @@
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h1>Task Manager</h1>
+                <h1>SloraAI Task Manager</h1>
             </div>
             <nav class="sidebar-nav">
                 <div class="nav-section">
                     <div class="nav-section-title">Workspaces</div>
-                    <div class="nav-item active" data-workspace="tasks">
+                    <div class="nav-item active" data-workspace="dashboard">
+                        <span class="nav-item-icon">🏠</span>
+                        <span>Dashboard</span>
+                    </div>
+                    <div class="nav-item" data-workspace="tasks">
                         <span class="nav-item-icon">📋</span>
                         <span>Tasks</span>
                     </div>
@@ -68,6 +72,7 @@
     </div>
 
     <script src="app.js"></script>
+    <script src="dashboard.js"></script>
     <script src="tasks.js"></script>
     <script src="projects.js"></script>
     <script src="team.js"></script>

@@ -579,8 +579,119 @@ app.get('/api/seed-database', async (req, res) => {
     }
 });
 
+// ============= DASHBOARD ROUTES =============
+
+// Get dashboard statistics
+app.get('/api/dashboard/stats', requireAuth, (req, res) => {
+    const userId = req.session.userId;
+    const isAdmin = req.session.userRole === 'admin';
+
+    try {
+        // Get task statistics
+        let taskQuery = 'SELECT status, priority, COUNT(*) as count FROM tasks';
+        let taskParams = [];
+
+        if (!isAdmin) {
+            taskQuery += ' WHERE assignedUserId = ?';
+            taskParams.push(userId);
+        }
+
+        taskQuery += ' GROUP BY status, priority';
+        const taskStats = db.prepare(taskQuery).all(...taskParams);
+
+        // Get total counts
+        let totalQuery = 'SELECT COUNT(*) as total FROM tasks';
+        let totalParams = [];
+        if (!isAdmin) {
+            totalQuery += ' WHERE assignedUserId = ?';
+            totalParams.push(userId);
+        }
+        const totalTasks = db.prepare(totalQuery).get(...totalParams).total;
+
+        // Get upcoming tasks (next 7 days)
+        const upcomingQuery = isAdmin
+            ? `SELECT t.*, u.name as assignedUserName 
+               FROM tasks t 
+               LEFT JOIN users u ON t.assignedUserId = u.id 
+               WHERE t.status != 'done' AND t.dueDate IS NOT NULL 
+               AND date(t.dueDate) BETWEEN date('now') AND date('now', '+7 days')
+               ORDER BY t.dueDate ASC LIMIT 10`
+            : `SELECT t.*, u.name as assignedUserName 
+               FROM tasks t 
+               LEFT JOIN users u ON t.assignedUserId = u.id 
+               WHERE t.assignedUserId = ? AND t.status != 'done' AND t.dueDate IS NOT NULL 
+               AND date(t.dueDate) BETWEEN date('now') AND date('now', '+7 days')
+               ORDER BY t.dueDate ASC LIMIT 10`;
+
+        const upcomingTasks = isAdmin
+            ? db.prepare(upcomingQuery).all()
+            : db.prepare(upcomingQuery).all(userId);
+
+        // Get completed tasks (last 10)
+        const completedQuery = isAdmin
+            ? `SELECT t.*, u.name as assignedUserName 
+               FROM tasks t 
+               LEFT JOIN users u ON t.assignedUserId = u.id 
+               WHERE t.status = 'done' 
+               ORDER BY t.updatedAt DESC LIMIT 10`
+            : `SELECT t.*, u.name as assignedUserName 
+               FROM tasks t 
+               LEFT JOIN users u ON t.assignedUserId = u.id 
+               WHERE t.assignedUserId = ? AND t.status = 'done' 
+               ORDER BY t.updatedAt DESC LIMIT 10`;
+
+        const completedTasks = isAdmin
+            ? db.prepare(completedQuery).all()
+            : db.prepare(completedQuery).all(userId);
+
+        // Get attendance summary for today
+        const attendanceQuery = isAdmin
+            ? `SELECT COUNT(*) as total, 
+               SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active
+               FROM attendance WHERE date(clockInTime) = date('now')`
+            : `SELECT * FROM attendance 
+               WHERE userId = ? AND date(clockInTime) = date('now')
+               ORDER BY clockInTime DESC LIMIT 1`;
+
+        const attendanceSummary = isAdmin
+            ? db.prepare(attendanceQuery).get()
+            : db.prepare(attendanceQuery).get(userId);
+
+        // Calculate task breakdown by status
+        const statusBreakdown = {
+            todo: 0,
+            in_progress: 0,
+            blocked: 0,
+            done: 0
+        };
+
+        const priorityBreakdown = {
+            low: 0,
+            medium: 0,
+            high: 0
+        };
+
+        taskStats.forEach(stat => {
+            statusBreakdown[stat.status] = (statusBreakdown[stat.status] || 0) + stat.count;
+            priorityBreakdown[stat.priority] = (priorityBreakdown[stat.priority] || 0) + stat.count;
+        });
+
+        res.json({
+            totalTasks,
+            statusBreakdown,
+            priorityBreakdown,
+            upcomingTasks,
+            completedTasks,
+            attendanceSummary
+        });
+    } catch (error) {
+        console.error('Dashboard stats error:', error);
+        res.status(500).json({ error: 'Failed to load dashboard statistics' });
+    }
+});
+
 // Start server
 app.listen(PORT, () => {
-    console.log(`\n🚀 Task Manager server running on http://localhost:${PORT}`);
+    console.log(`\n🚀 SloraAI Task Manager server running on http://localhost:${PORT}`);
     console.log(`📝 Login at http://localhost:${PORT}\n`);
 });

@@ -1,7 +1,7 @@
 {
-  "name": "task-project-manager",
+  "name": "sloraai-task-manager",
   "version": "1.0.0",
-  "description": "A simple, clean Task + Project Manager web app with Kanban boards and project tracking",
+  "description": "SloraAI Task Manager - Task and project management with attendance tracking",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

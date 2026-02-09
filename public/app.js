@@ -33,7 +33,7 @@ async function initApp() {
         setupSearch();
 
         // Load initial workspace
-        loadWorkspace('tasks');
+        loadWorkspace('dashboard');
     } catch (error) {
         console.error('Init error:', error);
         window.location.href = '/';
@@ -59,6 +59,9 @@ function loadWorkspace(workspace) {
     const contentArea = document.getElementById('content-area');
 
     switch (workspace) {
+        case 'dashboard':
+            loadDashboardWorkspace();
+            break;
         case 'tasks':
             loadTasksWorkspace();
             break;
@@ -127,6 +130,68 @@ function showModal(content) {
 function closeModal(overlay) {
     if (overlay) {
         overlay.remove();
+    }
+}
+
+function loadDashboardWorkspace() {
+    const contentArea = document.getElementById('content-area');
+    contentArea.innerHTML = `
+        <div class="workspace-header">
+            <h2>Dashboard</h2>
+            <p>Welcome back, ${currentUser.name}!</p>
+        </div>
+        
+        <!-- Quick Clock-In Widget -->
+        <div id="clock-in-widget"></div>
+        
+        <!-- Stat Cards -->
+        <div class="dashboard-stats">
+            <div id="stat-cards" class="stat-cards-grid"></div>
+        </div>
+        
+        <!-- Main Content Grid -->
+        <div class="dashboard-grid">
+            <!-- Upcoming Tasks -->
+            <div class="dashboard-card">
+                <div class="dashboard-card-header">
+                    <h3>📅 Upcoming Tasks</h3>
+                    <span class="card-subtitle">Next 7 days</span>
+                </div>
+                <div id="upcoming-tasks" class="task-list"></div>
+            </div>
+            
+            <!-- Task Status Chart -->
+            <div class="dashboard-card">
+                <div class="dashboard-card-header">
+                    <h3>📊 Task Status</h3>
+                    <span class="card-subtitle">Overview</span>
+                </div>
+                <div id="status-chart" class="chart-container"></div>
+            </div>
+            
+            <!-- Completed Tasks -->
+            <div class="dashboard-card">
+                <div class="dashboard-card-header">
+                    <h3>✅ Recently Completed</h3>
+                    <span class="card-subtitle">Last 10 tasks</span>
+                </div>
+                <div id="completed-tasks" class="task-list"></div>
+            </div>
+            
+            <!-- Priority Breakdown -->
+            <div class="dashboard-card">
+                <div class="dashboard-card-header">
+                    <h3>🎯 Priority Breakdown</h3>
+                    <span class="card-subtitle">By priority level</span>
+                </div>
+                <div id="priority-chart" class="chart-container"></div>
+            </div>
+        </div>
+    `;
+
+    // Initialize dashboard after DOM is ready
+    if (typeof initDashboard === 'function') {
+        initDashboard();
     }
 }
 
