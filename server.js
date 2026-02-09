@@ -769,8 +769,41 @@ app.get('/api/dashboard/stats', requireAuth, (req, res) => {
     }
 });
 
+// Auto-seed function
+async function seedDatabase() {
+    try {
+        const admin = db.prepare('SELECT * FROM users WHERE email = ?').get('admin@taskmanager.com');
+        if (!admin) {
+            console.log('🌱 Database appears empty. Auto-seeding default users...');
+
+            const adminPassword = await bcrypt.hash('admin123', 10);
+            db.prepare(`
+                INSERT OR IGNORE INTO users (email, password, name, role, active)
+                VALUES (?, ?, ?, ?, 1)
+            `).run('admin@taskmanager.com', adminPassword, 'Admin User', 'admin');
+
+            const memberPassword = await bcrypt.hash('member123', 10);
+            db.prepare(`
+                INSERT OR IGNORE INTO users (email, password, name, role, active)
+                VALUES (?, ?, ?, ?, 1)
+            `).run('member@taskmanager.com', memberPassword, 'Team Member', 'member');
+
+            // Default board
+            db.prepare(`
+                INSERT OR IGNORE INTO boards (workspace, name, type)
+                VALUES (?, ?, ?)
+            `).run('tasks', 'All Tasks', 'ALL_TASKS');
+
+            console.log('✅ Auto-seed complete.');
+        }
+    } catch (error) {
+        console.error('Auto-seed failed:', error);
+    }
+}
+
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
+    await seedDatabase();
     console.log(`\n🚀 SloraAI Task Manager server running on http://localhost:${PORT}`);
     console.log(`📝 Login at http://localhost:${PORT}\n`);
 });
