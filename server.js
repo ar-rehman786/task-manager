@@ -523,7 +523,8 @@ app.get('/api/seed-database', async (req, res) => {
         `).run('admin@taskmanager.com', adminPassword, 'Admin User', 'admin');
 
         // Force update password
-        db.prepare('UPDATE users SET password = ? WHERE email = ?').run(adminPassword, 'admin@taskmanager.com');
+        // Force update password and ensure active
+        db.prepare('UPDATE users SET password = ?, active = 1 WHERE email = ?').run(adminPassword, 'admin@taskmanager.com');
 
         // Create/Update member user
         const memberPassword = await bcrypt.hash('member123', 10);
@@ -533,7 +534,8 @@ app.get('/api/seed-database', async (req, res) => {
         `).run('member@taskmanager.com', memberPassword, 'Team Member', 'member');
 
         // Force update password
-        db.prepare('UPDATE users SET password = ? WHERE email = ?').run(memberPassword, 'member@taskmanager.com');
+        // Force update password and ensure active
+        db.prepare('UPDATE users SET password = ?, active = 1 WHERE email = ?').run(memberPassword, 'member@taskmanager.com');
 
         // Ensure default board exists
         db.prepare(`
