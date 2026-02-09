@@ -8,8 +8,8 @@ const { pool, query, initializeDatabase } = require('./database');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Initialize database
-initializeDatabase();
+// Database initialization will be called on startup
+
 
 // Middleware
 app.use(bodyParser.json());
@@ -870,7 +870,16 @@ async function seedDatabase() {
 }
 
 app.listen(PORT, async () => {
-    await seedDatabase();
-    console.log(`\n🚀 SloraAI Task Manager (PostgreSQL) running on http://localhost:${PORT}`);
-    console.log(`📝 Login at http://localhost:${PORT}\n`);
+    try {
+        console.log('🔄 Initializing database...');
+        await initializeDatabase();
+        console.log('✅ Database initialized.');
+
+        await seedDatabase();
+        console.log(`\n🚀 SloraAI Task Manager (PostgreSQL) running on http://localhost:${PORT}`);
+        console.log(`📝 Login at http://localhost:${PORT}\n`);
+    } catch (error) {
+        console.error('❌ Failed to start server:', error);
+        process.exit(1);
+    }
 });
