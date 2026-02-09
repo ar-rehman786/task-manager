@@ -1,5 +1,14 @@
 const { Pool } = require('pg');
 
+// Debug connection (Safe logging)
+const dbUrl = process.env.DATABASE_URL;
+if (!dbUrl) {
+  console.error('❌ CRITICAL: DATABASE_URL is undefined or empty!');
+} else {
+  console.log(`ℹ️ DATABASE_URL detected. Length: ${dbUrl.length}`);
+  console.log(`ℹ️ Starts with: ${dbUrl.substring(0, 15)}...`);
+}
+
 // Create a new pool using the connection string (from environment variable)
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
