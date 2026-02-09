@@ -140,6 +140,21 @@ function initializeDatabase() {
     )
   `);
 
+  // Attendance tracking table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS attendance (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL,
+      clockInTime DATETIME NOT NULL,
+      clockOutTime DATETIME,
+      workDuration INTEGER,
+      status TEXT DEFAULT 'active' CHECK(status IN ('active', 'completed')),
+      notes TEXT,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
   // Create indexes for performance
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assignedUserId);
@@ -148,6 +163,8 @@ function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_boards_owner ON boards(ownerUserId);
     CREATE INDEX IF NOT EXISTS idx_milestones_project ON milestones(projectId);
     CREATE INDEX IF NOT EXISTS idx_access_items_project ON project_access_items(projectId);
+    CREATE INDEX IF NOT EXISTS idx_attendance_user ON attendance(userId);
+    CREATE INDEX IF NOT EXISTS idx_attendance_status ON attendance(status);
   `);
 
   console.log('✅ Database initialized successfully');

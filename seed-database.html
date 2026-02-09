@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seed Task Manager Database</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .container {
+            background: white;
+            padding: 3rem;
+            border-radius: 1rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            max-width: 500px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 1rem;
+        }
+
+        p {
+            color: #666;
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result {
+            margin-top: 2rem;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            display: none;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .credentials {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            text-align: left;
+        }
+
+        .credentials h3 {
+            margin-top: 0;
+            color: #856404;
+        }
+
+        .credentials code {
+            background: #fff;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.25rem;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🚀 Seed Task Manager Database</h1>
+        <p>Click the button below to create the admin and member users in your Railway database.</p>
+
+        <button id="seedBtn" onclick="seedDatabase()">Seed Database Now</button>
+
+        <div id="result" class="result"></div>
+
+        <div class="credentials">
+            <h3>📋 Login Credentials (After Seeding)</h3>
+            <p><strong>Admin:</strong><br>
+                Email: <code>admin@taskmanager.com</code><br>
+                Password: <code>admin123</code></p>
+
+            <p><strong>Member:</strong><br>
+                Email: <code>member@taskmanager.com</code><br>
+                Password: <code>member123</code></p>
+
+            <p style="color: #856404; font-size: 0.9rem; margin-top: 1rem;">
+                ⚠️ <strong>Important:</strong> Change the admin password after first login!
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://task-manager-production-563b.up.railway.app';
+
+        async function seedDatabase() {
+            const btn = document.getElementById('seedBtn');
+            const result = document.getElementById('result');
+
+            btn.disabled = true;
+            btn.textContent = 'Seeding Database...';
+            result.style.display = 'none';
+
+            try {
+                const response = await fetch(`${API_URL}/api/seed-database`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success || data.message) {
+                    result.className = 'result success';
+                    result.style.display = 'block';
+                    result.innerHTML = `
+                        <h3>✅ Success!</h3>
+                        <p>${data.message || 'Database seeded successfully!'}</p>
+                        <p><strong>You can now login with the credentials shown below.</strong></p>
+                        <p><a href="${API_URL}" target="_blank" style="color: #667eea; font-weight: 600;">Open Task Manager →</a></p>
+                    `;
+                    btn.textContent = 'Database Seeded ✓';
+                } else {
+                    throw new Error(data.error || 'Unknown error');
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.style.display = 'block';
+                result.innerHTML = `
+                    <h3>❌ Error</h3>
+                    <p>${error.message}</p>
+                    <p style="font-size: 0.9rem;">Make sure the Railway app is deployed and running.</p>
+                `;
+                btn.disabled = false;
+                btn.textContent = 'Try Again';
+            }
+        }
+    </script>
+</body>
+
+</html>

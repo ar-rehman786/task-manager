@@ -70,6 +70,9 @@ function loadWorkspace(workspace) {
                 loadTeamWorkspace();
             }
             break;
+        case 'attendance':
+            loadAttendanceWorkspace();
+            break;
     }
 }
 
@@ -124,6 +127,60 @@ function showModal(content) {
 function closeModal(overlay) {
     if (overlay) {
         overlay.remove();
+    }
+}
+
+function loadAttendanceWorkspace() {
+    const contentArea = document.getElementById('content-area');
+    contentArea.innerHTML = `
+        <div class="workspace-header">
+            <h2>Attendance</h2>
+            <p>Track your work hours and attendance</p>
+        </div>
+        
+        <div id="attendance-widget"></div>
+        
+        <div class="attendance-history">
+            <h3>Attendance History</h3>
+            <table class="data-table" id="history-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Clock In</th>
+                        <th>Clock Out</th>
+                        <th>Duration</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="5" style="text-align: center; padding: 2rem;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div id="admin-section" style="display: none; margin-top: 2rem;">
+            <h3>Team Attendance Today</h3>
+            <table class="data-table" id="today-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Clock In</th>
+                        <th>Clock Out</th>
+                        <th>Duration</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="6" style="text-align: center; padding: 2rem;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    // Initialize attendance after DOM is ready
+    if (typeof initAttendance === 'function') {
+        initAttendance();
     }
 }
 
