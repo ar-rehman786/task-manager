@@ -509,6 +509,76 @@ app.post('/api/seed-database', async (req, res) => {
     }
 });
 
+// GET version for easy browser access
+app.get('/api/seed-database', async (req, res) => {
+    try {
+        // Check if admin already exists
+        const existingAdmin = db.prepare('SELECT * FROM users WHERE email = ?').get('admin@taskmanager.com');
+        if (existingAdmin) {
+            return res.send(`
+                <html>
+                <head><title>Database Already Seeded</title></head>
+                <body style="font-family: Arial; padding: 50px; text-align: center;">
+                    <h1>✅ Database Already Seeded</h1>
+                    <p>Users already exist in the database.</p>
+                    <h3>Login Credentials:</h3>
+                    <p><strong>Admin:</strong> admin@taskmanager.com / admin123</p>
+                    <p><strong>Member:</strong> member@taskmanager.com / member123</p>
+                    <br>
+                    <a href="/" style="background: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Go to Login</a>
+                </body>
+                </html>
+            `);
+        }
+
+        // Create admin user
+        const adminPassword = await bcrypt.hash('admin123', 10);
+        db.prepare(`
+            INSERT INTO users (email, password, name, role)
+            VALUES (?, ?, ?, ?)
+        `).run('admin@taskmanager.com', adminPassword, 'Admin User', 'admin');
+
+        // Create member user
+        const memberPassword = await bcrypt.hash('member123', 10);
+        db.prepare(`
+            INSERT INTO users (email, password, name, role)
+            VALUES (?, ?, ?, ?)
+        `).run('member@taskmanager.com', memberPassword, 'Team Member', 'member');
+
+        res.send(`
+            <html>
+            <head><title>Database Seeded Successfully</title></head>
+            <body style="font-family: Arial; padding: 50px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div style="background: white; color: #333; padding: 40px; border-radius: 10px; max-width: 600px; margin: 0 auto;">
+                    <h1 style="color: #667eea;">🎉 Database Seeded Successfully!</h1>
+                    <p>Your admin and member users have been created.</p>
+                    <div style="background: #f0f0f0; padding: 20px; border-radius: 5px; margin: 20px 0;">
+                        <h3>Login Credentials:</h3>
+                        <p><strong>Admin:</strong><br>admin@taskmanager.com / admin123</p>
+                        <p><strong>Member:</strong><br>member@taskmanager.com / member123</p>
+                    </div>
+                    <p style="color: #d9534f; font-size: 14px;">⚠️ Important: Change the admin password after first login!</p>
+                    <br>
+                    <a href="/" style="background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Go to Login Page</a>
+                </div>
+            </body>
+            </html>
+        `);
+    } catch (error) {
+        console.error('Seed error:', error);
+        res.status(500).send(`
+            <html>
+            <head><title>Seed Error</title></head>
+            <body style="font-family: Arial; padding: 50px; text-align: center;">
+                <h1 style="color: red;">❌ Error Seeding Database</h1>
+                <p>${error.message}</p>
+                <a href="/" style="background: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Go Back</a>
+            </body>
+            </html>
+        `);
+    }
+});
+
 // Start server
 app.listen(PORT, () => {
     console.log(`\n🚀 Task Manager server running on http://localhost:${PORT}`);
