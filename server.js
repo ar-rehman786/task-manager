@@ -3,7 +3,7 @@ const session = require('express-session');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
 const path = require('path');
-const { db, initializeDatabase } = require('./database');
+const { pool, query, initializeDatabase } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,8 +14,6 @@ initializeDatabase();
 // Middleware
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-
-
 
 app.use(session({
     secret: 'task-manager-secret-key-change-in-production',
@@ -48,7 +46,8 @@ app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        const user = db.prepare('SELECT * FROM users WHERE email = ? AND active = 1').get(email);
+        const result = await query('SELECT * FROM users WHERE email = $1 AND active = 1', [email]);
+        const user = result.rows[0];
 
         if (!user) {
             return res.status(401).json({ error: 'User not found' });
@@ -81,16 +80,24 @@ app.post('/api/auth/logout', (req, res) => {
     res.json({ success: true });
 });
 
-app.get('/api/auth/me', requireAuth, (req, res) => {
-    const user = db.prepare('SELECT id, name, email, role FROM users WHERE id = ?').get(req.session.userId);
-    res.json(user);
+app.get('/api/auth/me', requireAuth, async (req, res) => {
+    try {
+        const result = await query('SELECT id, name, email, role FROM users WHERE id = $1', [req.session.userId]);
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Server error' });
+    }
 });
 
 // ============= USER ROUTES =============
 
-app.get('/api/users', requireAuth, (req, res) => {
-    const users = db.prepare('SELECT id, name, email, role, active FROM users WHERE active = 1').all();
-    res.json(users);
+app.get('/api/users', requireAuth, async (req, res) => {
+    try {
+        const result = await query('SELECT id, name, email, role, active FROM users WHERE active = 1');
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Server error' });
+    }
 });
 
 app.post('/api/users', requireAdmin, async (req, res) => {
@@ -99,90 +106,101 @@ app.post('/api/users', requireAdmin, async (req, res) => {
     try {
         const hashedPassword = await bcrypt.hash(password || 'member123', 10);
 
-        const result = db.prepare('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)').run(
-            name, email, hashedPassword, 'member'
+        const userResult = await query(
+            'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING *',
+            [name, email, hashedPassword, 'member']
         );
+        const user = userResult.rows[0];
 
         // Auto-create member board
-        db.prepare('INSERT INTO boards (workspace, name, type, ownerUserId) VALUES (?, ?, ?, ?)').run(
-            'tasks', `${name}'s Board`, 'MEMBER_BOARD', result.lastInsertRowid
+        await query(
+            'INSERT INTO boards (workspace, name, type, "ownerUserId") VALUES ($1, $2, $3, $4)',
+            ['tasks', `${name}'s Board`, 'MEMBER_BOARD', user.id]
         );
 
-        const user = db.prepare('SELECT id, name, email, role FROM users WHERE id = ?').get(result.lastInsertRowid);
-        res.json(user);
+        res.json({ id: user.id, name: user.name, email: user.email, role: user.role });
     } catch (error) {
         console.error('Create user error:', error);
         res.status(500).json({ error: 'Failed to create user' });
     }
 });
 
-app.delete('/api/users/:id', requireAdmin, (req, res) => {
+app.delete('/api/users/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
 
-    // Unassign all tasks
-    db.prepare('UPDATE tasks SET assignedUserId = NULL WHERE assignedUserId = ?').run(id);
+    try {
+        // Unassign all tasks
+        await query('UPDATE tasks SET "assignedUserId" = NULL WHERE "assignedUserId" = $1', [id]);
 
-    // Deactivate user
-    db.prepare('UPDATE users SET active = 0 WHERE id = ?').run(id);
+        // Deactivate user
+        await query('UPDATE users SET active = 0 WHERE id = $1', [id]);
 
-    res.json({ success: true });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete user' });
+    }
 });
 
 // ============= BOARD ROUTES =============
 
-app.get('/api/boards', requireAuth, (req, res) => {
-    let boards;
-
-    if (req.session.userRole === 'admin') {
-        boards = db.prepare('SELECT * FROM boards WHERE workspace = ? ORDER BY type, name').all('tasks');
-    } else {
-        // Members only see All Tasks board and their own board
-        boards = db.prepare(`
-      SELECT * FROM boards 
-      WHERE workspace = ? AND (type = ? OR ownerUserId = ?)
-      ORDER BY type, name
-    `).all('tasks', 'ALL_TASKS', req.session.userId);
+app.get('/api/boards', requireAuth, async (req, res) => {
+    try {
+        let result;
+        if (req.session.userRole === 'admin') {
+            result = await query('SELECT * FROM boards WHERE workspace = $1 ORDER BY type, name', ['tasks']);
+        } else {
+            // Members only see All Tasks board and their own board
+            result = await query(`
+                SELECT * FROM boards 
+                WHERE workspace = $1 AND (type = $2 OR "ownerUserId" = $3)
+                ORDER BY type, name
+            `, ['tasks', 'ALL_TASKS', req.session.userId]);
+        }
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Server error' });
     }
-
-    res.json(boards);
 });
 
 // ============= TASK ROUTES =============
 
-app.get('/api/tasks', requireAuth, (req, res) => {
-    let tasks;
-
-    if (req.session.userRole === 'admin') {
-        tasks = db.prepare(`
-      SELECT t.*, u.name as assignedUserName, c.name as createdByName
-      FROM tasks t
-      LEFT JOIN users u ON t.assignedUserId = u.id
-      LEFT JOIN users c ON t.createdBy = c.id
-      ORDER BY t.createdAt DESC
-    `).all();
-    } else {
-        // Members only see tasks assigned to them
-        tasks = db.prepare(`
-      SELECT t.*, u.name as assignedUserName, c.name as createdByName
-      FROM tasks t
-      LEFT JOIN users u ON t.assignedUserId = u.id
-      LEFT JOIN users c ON t.createdBy = c.id
-      WHERE t.assignedUserId = ?
-      ORDER BY t.createdAt DESC
-    `).all(req.session.userId);
+app.get('/api/tasks', requireAuth, async (req, res) => {
+    try {
+        let result;
+        if (req.session.userRole === 'admin') {
+            result = await query(`
+                SELECT t.*, u.name as "assignedUserName", c.name as "createdByName"
+                FROM tasks t
+                LEFT JOIN users u ON t."assignedUserId" = u.id
+                LEFT JOIN users c ON t."createdBy" = c.id
+                ORDER BY t."createdAt" DESC
+            `);
+        } else {
+            result = await query(`
+                SELECT t.*, u.name as "assignedUserName", c.name as "createdByName"
+                FROM tasks t
+                LEFT JOIN users u ON t."assignedUserId" = u.id
+                LEFT JOIN users c ON t."createdBy" = c.id
+                WHERE t."assignedUserId" = $1
+                ORDER BY t."createdAt" DESC
+            `, [req.session.userId]);
+        }
+        res.json(result.rows);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
     }
-
-    res.json(tasks);
 });
 
-app.post('/api/tasks', requireAuth, (req, res) => {
+app.post('/api/tasks', requireAuth, async (req, res) => {
     const { title, description, status, priority, dueDate, assignedUserId, labels } = req.body;
 
     try {
-        const result = db.prepare(`
-      INSERT INTO tasks (title, description, status, priority, dueDate, assignedUserId, createdBy, labels)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+        const result = await query(`
+            INSERT INTO tasks (title, description, status, priority, "dueDate", "assignedUserId", "createdBy", labels)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING *
+        `, [
             title,
             description || null,
             status || 'todo',
@@ -191,394 +209,475 @@ app.post('/api/tasks', requireAuth, (req, res) => {
             assignedUserId || null,
             req.session.userId,
             labels || null
-        );
+        ]);
+
+        const task = result.rows[0];
 
         // Log activity
-        db.prepare('INSERT INTO task_activity (taskId, message, createdBy) VALUES (?, ?, ?)').run(
-            result.lastInsertRowid,
+        await query('INSERT INTO task_activity ("taskId", message, "createdBy") VALUES ($1, $2, $3)', [
+            task.id,
             'Task created',
             req.session.userId
-        );
+        ]);
 
-        const task = db.prepare(`
-      SELECT t.*, u.name as assignedUserName, c.name as createdByName
-      FROM tasks t
-      LEFT JOIN users u ON t.assignedUserId = u.id
-      LEFT JOIN users c ON t.createdBy = c.id
-      WHERE t.id = ?
-    `).get(result.lastInsertRowid);
+        // Get full task details with names
+        const fullTask = await query(`
+            SELECT t.*, u.name as "assignedUserName", c.name as "createdByName"
+            FROM tasks t
+            LEFT JOIN users u ON t."assignedUserId" = u.id
+            LEFT JOIN users c ON t."createdBy" = c.id
+            WHERE t.id = $1
+        `, [task.id]);
 
-        res.json(task);
+        res.json(fullTask.rows[0]);
     } catch (error) {
         console.error('Create task error:', error);
         res.status(500).json({ error: 'Failed to create task' });
     }
 });
 
-app.put('/api/tasks/:id', requireAuth, (req, res) => {
+app.put('/api/tasks/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     const { title, description, status, priority, dueDate, assignedUserId, labels } = req.body;
 
     try {
-        db.prepare(`
-      UPDATE tasks 
-      SET title = ?, description = ?, status = ?, priority = ?, dueDate = ?, 
-          assignedUserId = ?, labels = ?, updatedAt = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(title, description, status, priority, dueDate, assignedUserId, labels, id);
+        await query(`
+            UPDATE tasks 
+            SET title = $1, description = $2, status = $3, priority = $4, "dueDate" = $5, 
+                "assignedUserId" = $6, labels = $7, "updatedAt" = CURRENT_TIMESTAMP
+            WHERE id = $8
+        `, [title, description, status, priority, dueDate, assignedUserId, labels, id]);
 
-        const task = db.prepare(`
-      SELECT t.*, u.name as assignedUserName, c.name as createdByName
-      FROM tasks t
-      LEFT JOIN users u ON t.assignedUserId = u.id
-      LEFT JOIN users c ON t.createdBy = c.id
-      WHERE t.id = ?
-    `).get(id);
+        const task = await query(`
+            SELECT t.*, u.name as "assignedUserName", c.name as "createdByName"
+            FROM tasks t
+            LEFT JOIN users u ON t."assignedUserId" = u.id
+            LEFT JOIN users c ON t."createdBy" = c.id
+            WHERE t.id = $1
+        `, [id]);
 
-        res.json(task);
+        res.json(task.rows[0]);
     } catch (error) {
         console.error('Update task error:', error);
         res.status(500).json({ error: 'Failed to update task' });
     }
 });
 
-app.delete('/api/tasks/:id', requireAuth, (req, res) => {
+app.delete('/api/tasks/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
-    db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
-    res.json({ success: true });
+    try {
+        await query('DELETE FROM tasks WHERE id = $1', [id]);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting task' });
+    }
 });
 
-app.get('/api/tasks/:id/activity', requireAuth, (req, res) => {
+app.get('/api/tasks/:id/activity', requireAuth, async (req, res) => {
     const { id } = req.params;
-    const activity = db.prepare(`
-    SELECT a.*, u.name as userName
-    FROM task_activity a
-    JOIN users u ON a.createdBy = u.id
-    WHERE a.taskId = ?
-    ORDER BY a.createdAt DESC
-  `).all(id);
-    res.json(activity);
+    try {
+        const activity = await query(`
+            SELECT a.*, u.name as "userName"
+            FROM task_activity a
+            JOIN users u ON a."createdBy" = u.id
+            WHERE a."taskId" = $1
+            ORDER BY a."createdAt" DESC
+        `, [id]);
+        res.json(activity.rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Error fetching activity' });
+    }
 });
 
-app.post('/api/tasks/:id/activity', requireAuth, (req, res) => {
+app.post('/api/tasks/:id/activity', requireAuth, async (req, res) => {
     const { id } = req.params;
     const { message } = req.body;
 
-    const result = db.prepare('INSERT INTO task_activity (taskId, message, createdBy) VALUES (?, ?, ?)').run(
-        id, message, req.session.userId
-    );
+    try {
+        const result = await query(
+            'INSERT INTO task_activity ("taskId", message, "createdBy") VALUES ($1, $2, $3) RETURNING *',
+            [id, message, req.session.userId]
+        );
+        const newActivity = result.rows[0];
 
-    const activity = db.prepare(`
-    SELECT a.*, u.name as userName
-    FROM task_activity a
-    JOIN users u ON a.createdBy = u.id
-    WHERE a.id = ?
-  `).get(result.lastInsertRowid);
+        const fullActivity = await query(`
+            SELECT a.*, u.name as "userName"
+            FROM task_activity a
+            JOIN users u ON a."createdBy" = u.id
+            WHERE a.id = $1
+        `, [newActivity.id]);
 
-    res.json(activity);
+        res.json(fullActivity.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error adding activity' });
+    }
 });
 
 // ============= PROJECT ROUTES =============
 
-app.get('/api/projects', requireAuth, (req, res) => {
-    const projects = db.prepare('SELECT * FROM projects ORDER BY createdAt DESC').all();
-    res.json(projects);
+app.get('/api/projects', requireAuth, async (req, res) => {
+    try {
+        const projects = await query('SELECT * FROM projects ORDER BY "createdAt" DESC');
+        res.json(projects.rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Error fetching projects' });
+    }
 });
 
-app.post('/api/projects', requireAdmin, (req, res) => {
+app.post('/api/projects', requireAdmin, async (req, res) => {
     const { name, client, status, startDate, endDate, description } = req.body;
 
-    const result = db.prepare(`
-    INSERT INTO projects (name, client, status, startDate, endDate, description)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(name, client, status || 'active', startDate, endDate, description);
-
-    const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(result.lastInsertRowid);
-    res.json(project);
+    try {
+        const result = await query(`
+            INSERT INTO projects (name, client, status, "startDate", "endDate", description)
+            VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
+        `, [name, client, status || 'active', startDate, endDate, description]);
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error creating project' });
+    }
 });
 
-app.put('/api/projects/:id', requireAdmin, (req, res) => {
+app.put('/api/projects/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { name, client, status, startDate, endDate, description } = req.body;
 
-    db.prepare(`
-    UPDATE projects 
-    SET name = ?, client = ?, status = ?, startDate = ?, endDate = ?, description = ?, updatedAt = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).run(name, client, status, startDate, endDate, description, id);
+    try {
+        await query(`
+            UPDATE projects 
+            SET name = $1, client = $2, status = $3, "startDate" = $4, "endDate" = $5, description = $6, "updatedAt" = CURRENT_TIMESTAMP
+            WHERE id = $7
+        `, [name, client, status, startDate, endDate, description, id]);
 
-    const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
-    res.json(project);
+        const project = await query('SELECT * FROM projects WHERE id = $1', [id]);
+        res.json(project.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error updating project' });
+    }
 });
 
-app.delete('/api/projects/:id', requireAdmin, (req, res) => {
+app.delete('/api/projects/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
-    db.prepare('DELETE FROM projects WHERE id = ?').run(id);
-    res.json({ success: true });
+    try {
+        await query('DELETE FROM projects WHERE id = $1', [id]);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting project' });
+    }
 });
 
 // ============= MILESTONE ROUTES =============
 
-app.get('/api/projects/:projectId/milestones', requireAuth, (req, res) => {
+app.get('/api/projects/:projectId/milestones', requireAuth, async (req, res) => {
     const { projectId } = req.params;
-    const milestones = db.prepare('SELECT * FROM milestones WHERE projectId = ? ORDER BY orderIndex').all(projectId);
-    res.json(milestones);
+    try {
+        const milestones = await query('SELECT * FROM milestones WHERE "projectId" = $1 ORDER BY "orderIndex"', [projectId]);
+        res.json(milestones.rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Error fetching milestones' });
+    }
 });
 
-app.post('/api/projects/:projectId/milestones', requireAdmin, (req, res) => {
+app.post('/api/projects/:projectId/milestones', requireAdmin, async (req, res) => {
     const { projectId } = req.params;
     const { title, dueDate, status, details } = req.body;
 
-    const maxOrder = db.prepare('SELECT MAX(orderIndex) as max FROM milestones WHERE projectId = ?').get(projectId);
-    const orderIndex = (maxOrder.max || -1) + 1;
+    try {
+        const maxOrderResult = await query('SELECT MAX("orderIndex") as max FROM milestones WHERE "projectId" = $1', [projectId]);
+        const orderIndex = (maxOrderResult.rows[0].max || -1) + 1;
 
-    const result = db.prepare(`
-    INSERT INTO milestones (projectId, title, dueDate, status, details, orderIndex)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(projectId, title, dueDate, status || 'not_started', details, orderIndex);
-
-    const milestone = db.prepare('SELECT * FROM milestones WHERE id = ?').get(result.lastInsertRowid);
-    res.json(milestone);
+        const result = await query(`
+            INSERT INTO milestones ("projectId", title, "dueDate", status, details, "orderIndex")
+            VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
+        `, [projectId, title, dueDate, status || 'not_started', details, orderIndex]);
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error creating milestone' });
+    }
 });
 
-app.put('/api/milestones/:id', requireAdmin, (req, res) => {
+app.put('/api/milestones/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { title, dueDate, status, details } = req.body;
 
-    db.prepare(`
-    UPDATE milestones SET title = ?, dueDate = ?, status = ?, details = ? WHERE id = ?
-  `).run(title, dueDate, status, details, id);
-
-    const milestone = db.prepare('SELECT * FROM milestones WHERE id = ?').get(id);
-    res.json(milestone);
+    try {
+        await query(`
+            UPDATE milestones SET title = $1, "dueDate" = $2, status = $3, details = $4 WHERE id = $5
+        `, [title, dueDate, status, details, id]);
+        const milestone = await query('SELECT * FROM milestones WHERE id = $1', [id]);
+        res.json(milestone.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error updating milestone' });
+    }
 });
 
-app.delete('/api/milestones/:id', requireAdmin, (req, res) => {
+app.delete('/api/milestones/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
-    db.prepare('DELETE FROM milestones WHERE id = ?').run(id);
-    res.json({ success: true });
+    try {
+        await query('DELETE FROM milestones WHERE id = $1', [id]);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting milestone' });
+    }
 });
 
 // ============= CHECKLIST ROUTES =============
 
-app.get('/api/milestones/:milestoneId/checklist', requireAuth, (req, res) => {
+app.get('/api/milestones/:milestoneId/checklist', requireAuth, async (req, res) => {
     const { milestoneId } = req.params;
-    const items = db.prepare('SELECT * FROM milestone_checklist_items WHERE milestoneId = ? ORDER BY orderIndex').all(milestoneId);
-    res.json(items);
+    try {
+        const items = await query('SELECT * FROM milestone_checklist_items WHERE "milestoneId" = $1 ORDER BY "orderIndex"', [milestoneId]);
+        res.json(items.rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Error fetching checklist' });
+    }
 });
 
-app.post('/api/milestones/:milestoneId/checklist', requireAdmin, (req, res) => {
+app.post('/api/milestones/:milestoneId/checklist', requireAdmin, async (req, res) => {
     const { milestoneId } = req.params;
     const { text } = req.body;
 
-    const maxOrder = db.prepare('SELECT MAX(orderIndex) as max FROM milestone_checklist_items WHERE milestoneId = ?').get(milestoneId);
-    const orderIndex = (maxOrder.max || -1) + 1;
+    try {
+        const maxOrderResult = await query('SELECT MAX("orderIndex") as max FROM milestone_checklist_items WHERE "milestoneId" = $1', [milestoneId]);
+        const orderIndex = (maxOrderResult.rows[0].max || -1) + 1;
 
-    const result = db.prepare(`
-    INSERT INTO milestone_checklist_items (milestoneId, text, orderIndex)
-    VALUES (?, ?, ?)
-  `).run(milestoneId, text, orderIndex);
-
-    const item = db.prepare('SELECT * FROM milestone_checklist_items WHERE id = ?').get(result.lastInsertRowid);
-    res.json(item);
+        const result = await query(`
+            INSERT INTO milestone_checklist_items ("milestoneId", text, "orderIndex")
+            VALUES ($1, $2, $3) RETURNING *
+        `, [milestoneId, text, orderIndex]);
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error creating checklist item' });
+    }
 });
 
-app.put('/api/checklist/:id', requireAdmin, (req, res) => {
+app.put('/api/checklist/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { text, isDone } = req.body;
 
-    db.prepare('UPDATE milestone_checklist_items SET text = ?, isDone = ? WHERE id = ?').run(text, isDone, id);
-
-    const item = db.prepare('SELECT * FROM milestone_checklist_items WHERE id = ?').get(id);
-    res.json(item);
+    try {
+        await query('UPDATE milestone_checklist_items SET text = $1, "isDone" = $2 WHERE id = $3', [text, isDone ? 1 : 0, id]);
+        const item = await query('SELECT * FROM milestone_checklist_items WHERE id = $1', [id]);
+        res.json(item.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error updating checklist item' });
+    }
 });
 
-app.delete('/api/checklist/:id', requireAdmin, (req, res) => {
+app.delete('/api/checklist/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
-    db.prepare('DELETE FROM milestone_checklist_items WHERE id = ?').run(id);
-    res.json({ success: true });
+    try {
+        await query('DELETE FROM milestone_checklist_items WHERE id = $1', [id]);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting checklist item' });
+    }
 });
 
 // ============= PROJECT LOGS ROUTES =============
 
-app.get('/api/projects/:projectId/logs', requireAuth, (req, res) => {
+app.get('/api/projects/:projectId/logs', requireAuth, async (req, res) => {
     const { projectId } = req.params;
-    const logs = db.prepare(`
-    SELECT l.*, u.name as userName
-    FROM project_logs l
-    JOIN users u ON l.createdBy = u.id
-    WHERE l.projectId = ?
-    ORDER BY l.createdAt DESC
-  `).all(projectId);
-    res.json(logs);
+    try {
+        const logs = await query(`
+            SELECT l.*, u.name as "userName"
+            FROM project_logs l
+            JOIN users u ON l."createdBy" = u.id
+            WHERE l."projectId" = $1
+            ORDER BY l."createdAt" DESC
+        `, [projectId]);
+        res.json(logs.rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Error fetching logs' });
+    }
 });
 
-app.post('/api/projects/:projectId/logs', requireAdmin, (req, res) => {
+app.post('/api/projects/:projectId/logs', requireAdmin, async (req, res) => {
     const { projectId } = req.params;
     const { type, message } = req.body;
 
-    const result = db.prepare(`
-    INSERT INTO project_logs (projectId, type, message, createdBy)
-    VALUES (?, ?, ?, ?)
-  `).run(projectId, type, message, req.session.userId);
+    try {
+        const result = await query(`
+            INSERT INTO project_logs ("projectId", type, message, "createdBy")
+            VALUES ($1, $2, $3, $4) RETURNING *
+        `, [projectId, type, message, req.session.userId]);
 
-    const log = db.prepare(`
-    SELECT l.*, u.name as userName
-    FROM project_logs l
-    JOIN users u ON l.createdBy = u.id
-    WHERE l.id = ?
-  `).get(result.lastInsertRowid);
+        const log = await query(`
+            SELECT l.*, u.name as "userName"
+            FROM project_logs l
+            JOIN users u ON l."createdBy" = u.id
+            WHERE l.id = $1
+        `, [result.rows[0].id]);
 
-    res.json(log);
+        res.json(log.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error creating log' });
+    }
 });
 
 // ============= PROJECT ACCESS ITEMS ROUTES =============
 
-app.get('/api/projects/:projectId/access', requireAuth, (req, res) => {
+app.get('/api/projects/:projectId/access', requireAuth, async (req, res) => {
     const { projectId } = req.params;
-    const items = db.prepare('SELECT * FROM project_access_items WHERE projectId = ? ORDER BY requestedAt').all(projectId);
-    res.json(items);
+    try {
+        const items = await query('SELECT * FROM project_access_items WHERE "projectId" = $1 ORDER BY "requestedAt"', [projectId]);
+        res.json(items.rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Error fetching access items' });
+    }
 });
 
-app.post('/api/projects/:projectId/access', requireAdmin, (req, res) => {
+app.post('/api/projects/:projectId/access', requireAdmin, async (req, res) => {
     const { projectId } = req.params;
     const { platform, description, notes } = req.body;
 
-    const result = db.prepare(`
-    INSERT INTO project_access_items (projectId, platform, description, notes)
-    VALUES (?, ?, ?, ?)
-  `).run(projectId, platform, description || null, notes || null);
-
-    const item = db.prepare('SELECT * FROM project_access_items WHERE id = ?').get(result.lastInsertRowid);
-    res.json(item);
+    try {
+        const result = await query(`
+            INSERT INTO project_access_items ("projectId", platform, description, notes)
+            VALUES ($1, $2, $3, $4) RETURNING *
+        `, [projectId, platform, description || null, notes || null]);
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error creating access item' });
+    }
 });
 
-app.put('/api/access/:id', requireAdmin, (req, res) => {
+app.put('/api/access/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { platform, description, isGranted, grantedEmail, notes } = req.body;
 
     const grantedAt = isGranted ? new Date().toISOString() : null;
 
-    db.prepare(`
-    UPDATE project_access_items 
-    SET platform = ?, description = ?, isGranted = ?, grantedAt = ?, grantedEmail = ?, notes = ?
-    WHERE id = ?
-  `).run(platform, description, isGranted ? 1 : 0, grantedAt, grantedEmail || null, notes, id);
+    try {
+        await query(`
+            UPDATE project_access_items 
+            SET platform = $1, description = $2, "isGranted" = $3, "grantedAt" = $4, "grantedEmail" = $5, notes = $6
+            WHERE id = $7
+        `, [platform, description, isGranted ? 1 : 0, grantedAt, grantedEmail || null, notes, id]);
 
-    const item = db.prepare('SELECT * FROM project_access_items WHERE id = ?').get(id);
-    res.json(item);
+        const item = await query('SELECT * FROM project_access_items WHERE id = $1', [id]);
+        res.json(item.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error updating access item' });
+    }
 });
 
-app.delete('/api/access/:id', requireAdmin, (req, res) => {
+app.delete('/api/access/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
-    db.prepare('DELETE FROM project_access_items WHERE id = ?').run(id);
-    res.json({ success: true });
+    try {
+        await query('DELETE FROM project_access_items WHERE id = $1', [id]);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting access item' });
+    }
 });
 
 // ============= ATTENDANCE ROUTES =============
 
-// Get current attendance status (active session)
-app.get('/api/attendance/status', requireAuth, (req, res) => {
-    const userId = req.session.userId;
-    const activeSession = db.prepare('SELECT * FROM attendance WHERE userId = ? AND status = "active"').get(userId);
-    res.json(activeSession || null);
+app.get('/api/attendance/status', requireAuth, async (req, res) => {
+    try {
+        const result = await query('SELECT * FROM attendance WHERE "userId" = $1 AND status = \'active\'', [req.session.userId]);
+        res.json(result.rows[0] || null);
+    } catch (error) {
+        res.status(500).json({ error: 'Server error' });
+    }
 });
 
-// Clock In
-app.post('/api/attendance/clock-in', requireAuth, (req, res) => {
+app.post('/api/attendance/clock-in', requireAuth, async (req, res) => {
     const userId = req.session.userId;
     const { notes } = req.body;
 
-    // Check if already clocked in
-    const activeSession = db.prepare('SELECT * FROM attendance WHERE userId = ? AND status = "active"').get(userId);
-    if (activeSession) {
-        return res.status(400).json({ error: 'You are already clocked in' });
+    try {
+        const activeSessionResult = await query('SELECT * FROM attendance WHERE "userId" = $1 AND status = \'active\'', [userId]);
+        if (activeSessionResult.rows[0]) {
+            return res.status(400).json({ error: 'You are already clocked in' });
+        }
+
+        const result = await query(`
+            INSERT INTO attendance ("userId", "clockInTime", status, notes)
+            VALUES ($1, $2, 'active', $3) RETURNING *
+        `, [userId, new Date().toISOString(), notes]);
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Clock in error' });
     }
-
-    const result = db.prepare(`
-        INSERT INTO attendance (userId, clockInTime, status, notes)
-        VALUES (?, ?, 'active', ?)
-    `).run(userId, new Date().toISOString(), notes);
-
-    const session = db.prepare('SELECT * FROM attendance WHERE id = ?').get(result.lastInsertRowid);
-    res.json(session);
 });
 
-// Clock Out
-app.post('/api/attendance/clock-out', requireAuth, (req, res) => {
+app.post('/api/attendance/clock-out', requireAuth, async (req, res) => {
     const userId = req.session.userId;
     const { notes } = req.body;
 
-    const activeSession = db.prepare('SELECT * FROM attendance WHERE userId = ? AND status = "active"').get(userId);
-    if (!activeSession) {
-        return res.status(400).json({ error: 'You are not clocked in' });
+    try {
+        const activeSessionResult = await query('SELECT * FROM attendance WHERE "userId" = $1 AND status = \'active\'', [userId]);
+        const activeSession = activeSessionResult.rows[0];
+
+        if (!activeSession) {
+            return res.status(400).json({ error: 'You are not clocked in' });
+        }
+
+        const clockOutTime = new Date();
+        const clockInTime = new Date(activeSession.clockInTime);
+        const workDuration = Math.round((clockOutTime - clockInTime) / 1000 / 60);
+
+        await query(`
+            UPDATE attendance 
+            SET "clockOutTime" = $1, status = 'completed', "workDuration" = $2, notes = $3
+            WHERE id = $4
+        `, [
+            clockOutTime.toISOString(),
+            workDuration,
+            notes ? (activeSession.notes + '\n' + notes) : activeSession.notes,
+            activeSession.id
+        ]);
+
+        const session = await query('SELECT * FROM attendance WHERE id = $1', [activeSession.id]);
+        res.json(session.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Clock out error' });
     }
-
-    const clockOutTime = new Date();
-    const clockInTime = new Date(activeSession.clockInTime);
-    const workDuration = Math.round((clockOutTime - clockInTime) / 1000 / 60); // minutes
-
-    db.prepare(`
-        UPDATE attendance 
-        SET clockOutTime = ?, status = 'completed', workDuration = ?, notes = ?
-        WHERE id = ?
-    `).run(clockOutTime.toISOString(), workDuration, notes ? (activeSession.notes + '\n' + notes) : activeSession.notes, activeSession.id);
-
-    const session = db.prepare('SELECT * FROM attendance WHERE id = ?').get(activeSession.id);
-    res.json(session);
 });
 
-// Get attendance history
-app.get('/api/attendance/history', requireAuth, (req, res) => {
+app.get('/api/attendance/history', requireAuth, async (req, res) => {
     const userId = req.session.userId;
     const { limit = 30 } = req.query;
 
-    const history = db.prepare(`
-        SELECT * FROM attendance 
-        WHERE userId = ? 
-        ORDER BY clockInTime DESC 
-        LIMIT ?
-    `).all(userId, limit);
-
-    res.json(history);
+    try {
+        const history = await query(`
+            SELECT * FROM attendance 
+            WHERE "userId" = $1 
+            ORDER BY "clockInTime" DESC 
+            LIMIT $2
+        `, [userId, limit]);
+        res.json(history.rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Error fetching history' });
+    }
 });
 
-// Get today's attendance for all users (Admin only)
-app.get('/api/attendance/today', requireAdmin, (req, res) => {
-    const records = db.prepare(`
-        SELECT a.*, u.name as userName, u.email as userEmail
-        FROM attendance a
-        JOIN users u ON a.userId = u.id
-        WHERE date(a.clockInTime) = date('now')
-        ORDER BY a.clockInTime DESC
-    `).all();
-
-    res.json(records);
+app.get('/api/attendance/today', requireAdmin, async (req, res) => {
+    try {
+        const records = await query(`
+            SELECT a.*, u.name as "userName", u.email as "userEmail"
+            FROM attendance a
+            JOIN users u ON a."userId" = u.id
+            WHERE date(a."clockInTime") = CURRENT_DATE
+            ORDER BY a."clockInTime" DESC
+        `);
+        res.json(records.rows);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error fetching today attendance' });
+    }
 });
 
-// Temporary seed endpoint for initial deployment (call once then remove)
+// Seed endpoint (Postgres Version)
 app.post('/api/seed-database', async (req, res) => {
     try {
-        // Check if admin already exists
-        const existingAdmin = db.prepare('SELECT * FROM users WHERE email = ?').get('admin@taskmanager.com');
-        if (existingAdmin) {
-            return res.json({ message: 'Database already seeded', users: ['admin@taskmanager.com', 'member@taskmanager.com'] });
-        }
+        // Run the seed logic
+        await seedDatabase();
 
-        // Create admin user
-        const adminPassword = await bcrypt.hash('admin123', 10);
-        db.prepare(`
-            INSERT INTO users (email, password, name, role)
-            VALUES (?, ?, ?, ?)
-        `).run('admin@taskmanager.com', adminPassword, 'Admin User', 'admin');
-
-        // Create member user
-        const memberPassword = await bcrypt.hash('member123', 10);
-        db.prepare(`
-            INSERT INTO users (email, password, name, role)
-            VALUES (?, ?, ?, ?)
-        `).run('member@taskmanager.com', memberPassword, 'Team Member', 'member');
-
+        // Return default success message (users might already exist)
         res.json({
             success: true,
             message: 'Database seeded successfully!',
@@ -593,75 +692,27 @@ app.post('/api/seed-database', async (req, res) => {
     }
 });
 
-// GET version for easy browser access
 app.get('/api/seed-database', async (req, res) => {
     try {
-        // Create/Update admin user
-        const adminPassword = await bcrypt.hash('admin123', 10);
-        db.prepare(`
-            INSERT OR IGNORE INTO users (email, password, name, role)
-            VALUES (?, ?, ?, ?)
-        `).run('admin@taskmanager.com', adminPassword, 'Admin User', 'admin');
-
-        // Force update password
-        // Force update password and ensure active
-        db.prepare('UPDATE users SET password = ?, active = 1 WHERE email = ?').run(adminPassword, 'admin@taskmanager.com');
-
-        // Create/Update member user
-        const memberPassword = await bcrypt.hash('member123', 10);
-        db.prepare(`
-            INSERT OR IGNORE INTO users (email, password, name, role)
-            VALUES (?, ?, ?, ?)
-        `).run('member@taskmanager.com', memberPassword, 'Team Member', 'member');
-
-        // Force update password
-        // Force update password and ensure active
-        db.prepare('UPDATE users SET password = ?, active = 1 WHERE email = ?').run(memberPassword, 'member@taskmanager.com');
-
-        // Ensure default board exists
-        db.prepare(`
-            INSERT OR IGNORE INTO boards (workspace, name, type)
-            VALUES (?, ?, ?)
-        `).run('tasks', 'All Tasks', 'ALL_TASKS');
-
+        await seedDatabase();
         res.send(`
             <html>
-            <head><title>Database Seeded Successfully</title></head>
-            <body style="font-family: Arial; padding: 50px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-                <div style="background: white; color: #333; padding: 40px; border-radius: 10px; max-width: 600px; margin: 0 auto;">
-                    <h1 style="color: #667eea;">🎉 Database Seeded & Passwords Reset!</h1>
-                    <p>Your users have been created/updated with default credentials.</p>
-                    <div style="background: #f0f0f0; padding: 20px; border-radius: 5px; margin: 20px 0;">
-                        <h3>Login Credentials:</h3>
-                        <p><strong>Admin:</strong><br>admin@taskmanager.com / admin123</p>
-                        <p><strong>Member:</strong><br>member@taskmanager.com / member123</p>
-                    </div>
-                    <p style="color: #d9534f; font-size: 14px;">⚠️ Passwords have been reset to defaults.</p>
-                    <br>
-                    <a href="/" style="background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Go to Login Page</a>
-                </div>
+            <head><title>Database Seeded</title></head>
+            <body style="font-family: Arial; padding: 50px; text-align: center;">
+                <h1 style="color: #667eea;">PostgreSQL Database Initialized</h1>
+                <p>Default users ensured.</p>
+                <a href="/">Go to Login</a>
             </body>
             </html>
         `);
     } catch (error) {
-        console.error('Seed error:', error);
-        res.status(500).send(`
-            <html>
-            <head><title>Seed Error</title></head>
-            <body style="font-family: Arial; padding: 50px; text-align: center;">
-                <h1 style="color: red;">❌ Error Seeding Database</h1>
-                <p>${error.message}</p>
-                <a href="/" style="background: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Go Back</a>
-            </body>
-            </html>
-        `);
+        res.status(500).send('Error seeding');
     }
 });
 
 // ============= DASHBOARD ROUTES =============
 
-// Get dashboard statistics
-app.get('/api/dashboard/stats', requireAuth, (req, res) => {
+app.get('/api/dashboard/stats', requireAuth, async (req, res) => {
     const userId = req.session.userId;
     const isAdmin = req.session.userRole === 'admin';
 
@@ -671,88 +722,98 @@ app.get('/api/dashboard/stats', requireAuth, (req, res) => {
         let taskParams = [];
 
         if (!isAdmin) {
-            taskQuery += ' WHERE assignedUserId = ?';
+            taskQuery += ' WHERE "assignedUserId" = $1';
             taskParams.push(userId);
         }
 
         taskQuery += ' GROUP BY status, priority';
-        const taskStats = db.prepare(taskQuery).all(...taskParams);
+        const taskStatsResult = await query(taskQuery, taskParams);
+        const taskStats = taskStatsResult.rows;
 
         // Get total counts
         let totalQuery = 'SELECT COUNT(*) as total FROM tasks';
         let totalParams = [];
         if (!isAdmin) {
-            totalQuery += ' WHERE assignedUserId = ?';
+            totalQuery += ' WHERE "assignedUserId" = $1';
             totalParams.push(userId);
         }
-        const totalTasks = db.prepare(totalQuery).get(...totalParams).total;
+        const totalResult = await query(totalQuery, totalParams);
+        const totalTasks = parseInt(totalResult.rows[0].total);
 
-        // Get upcoming tasks (next 7 days)
-        const upcomingQuery = isAdmin
-            ? `SELECT t.*, u.name as assignedUserName 
-               FROM tasks t 
-               LEFT JOIN users u ON t.assignedUserId = u.id 
-               WHERE t.status != 'done' AND t.dueDate IS NOT NULL 
-               AND date(t.dueDate) BETWEEN date('now') AND date('now', '+7 days')
-               ORDER BY t.dueDate ASC LIMIT 10`
-            : `SELECT t.*, u.name as assignedUserName 
-               FROM tasks t 
-               LEFT JOIN users u ON t.assignedUserId = u.id 
-               WHERE t.assignedUserId = ? AND t.status != 'done' AND t.dueDate IS NOT NULL 
-               AND date(t.dueDate) BETWEEN date('now') AND date('now', '+7 days')
-               ORDER BY t.dueDate ASC LIMIT 10`;
+        // Get upcoming tasks
+        let upcomingResult;
+        if (isAdmin) {
+            upcomingResult = await query(`
+                SELECT t.*, u.name as "assignedUserName"
+                FROM tasks t 
+                LEFT JOIN users u ON t."assignedUserId" = u.id 
+                WHERE t.status != 'done' AND t."dueDate" IS NOT NULL 
+                AND t."dueDate" BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '7 days')
+                ORDER BY t."dueDate" ASC LIMIT 10
+            `);
+        } else {
+            upcomingResult = await query(`
+                SELECT t.*, u.name as "assignedUserName"
+                FROM tasks t 
+                LEFT JOIN users u ON t."assignedUserId" = u.id 
+                WHERE t."assignedUserId" = $1 AND t.status != 'done' AND t."dueDate" IS NOT NULL 
+                AND t."dueDate" BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '7 days')
+                ORDER BY t."dueDate" ASC LIMIT 10
+            `, [userId]);
+        }
+        const upcomingTasks = upcomingResult.rows;
 
-        const upcomingTasks = isAdmin
-            ? db.prepare(upcomingQuery).all()
-            : db.prepare(upcomingQuery).all(userId);
+        // Get completed tasks
+        let completedResult;
+        if (isAdmin) {
+            completedResult = await query(`
+                SELECT t.*, u.name as "assignedUserName"
+                FROM tasks t 
+                LEFT JOIN users u ON t."assignedUserId" = u.id 
+                WHERE t.status = 'done' 
+                ORDER BY t."updatedAt" DESC LIMIT 10
+            `);
+        } else {
+            completedResult = await query(`
+                SELECT t.*, u.name as "assignedUserName"
+                FROM tasks t 
+                LEFT JOIN users u ON t."assignedUserId" = u.id 
+                WHERE t."assignedUserId" = $1 AND t.status = 'done' 
+                ORDER BY t."updatedAt" DESC LIMIT 10
+            `, [userId]);
+        }
+        const completedTasks = completedResult.rows;
 
-        // Get completed tasks (last 10)
-        const completedQuery = isAdmin
-            ? `SELECT t.*, u.name as assignedUserName 
-               FROM tasks t 
-               LEFT JOIN users u ON t.assignedUserId = u.id 
-               WHERE t.status = 'done' 
-               ORDER BY t.updatedAt DESC LIMIT 10`
-            : `SELECT t.*, u.name as assignedUserName 
-               FROM tasks t 
-               LEFT JOIN users u ON t.assignedUserId = u.id 
-               WHERE t.assignedUserId = ? AND t.status = 'done' 
-               ORDER BY t.updatedAt DESC LIMIT 10`;
+        // Get attendance summary
+        let attendanceSummary;
+        if (isAdmin) {
+            const summaryResult = await query(`
+                SELECT COUNT(*) as total, 
+                SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active
+                FROM attendance WHERE date("clockInTime") = CURRENT_DATE
+            `);
+            attendanceSummary = summaryResult.rows[0];
+            // Fix parseInt for postgres counts which return strings
+            attendanceSummary = {
+                total: parseInt(attendanceSummary.total || 0),
+                active: parseInt(attendanceSummary.active || 0)
+            };
+        } else {
+            const summaryResult = await query(`
+                SELECT * FROM attendance 
+                WHERE "userId" = $1 AND date("clockInTime") = CURRENT_DATE
+                ORDER BY "clockInTime" DESC LIMIT 1
+            `, [userId]);
+            attendanceSummary = summaryResult.rows[0];
+        }
 
-        const completedTasks = isAdmin
-            ? db.prepare(completedQuery).all()
-            : db.prepare(completedQuery).all(userId);
-
-        // Get attendance summary for today
-        const attendanceQuery = isAdmin
-            ? `SELECT COUNT(*) as total, 
-               SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active
-               FROM attendance WHERE date(clockInTime) = date('now')`
-            : `SELECT * FROM attendance 
-               WHERE userId = ? AND date(clockInTime) = date('now')
-               ORDER BY clockInTime DESC LIMIT 1`;
-
-        const attendanceSummary = isAdmin
-            ? db.prepare(attendanceQuery).get()
-            : db.prepare(attendanceQuery).get(userId);
-
-        // Calculate task breakdown by status
-        const statusBreakdown = {
-            todo: 0,
-            in_progress: 0,
-            blocked: 0,
-            done: 0
-        };
-
-        const priorityBreakdown = {
-            low: 0,
-            medium: 0,
-            high: 0
-        };
+        // Calculate breakdown
+        const statusBreakdown = { todo: 0, in_progress: 0, blocked: 0, done: 0 };
+        const priorityBreakdown = { low: 0, medium: 0, high: 0 };
 
         taskStats.forEach(stat => {
-            statusBreakdown[stat.status] = (statusBreakdown[stat.status] || 0) + stat.count;
-            priorityBreakdown[stat.priority] = (priorityBreakdown[stat.priority] || 0) + stat.count;
+            statusBreakdown[stat.status] = (statusBreakdown[stat.status] || 0) + parseInt(stat.count);
+            priorityBreakdown[stat.priority] = (priorityBreakdown[stat.priority] || 0) + parseInt(stat.count);
         });
 
         res.json({
@@ -769,41 +830,47 @@ app.get('/api/dashboard/stats', requireAuth, (req, res) => {
     }
 });
 
-// Auto-seed function
+// Auto-seed function (Postgres)
 async function seedDatabase() {
     try {
-        const admin = db.prepare('SELECT * FROM users WHERE email = ?').get('admin@taskmanager.com');
-        if (!admin) {
-            console.log('🌱 Database appears empty. Auto-seeding default users...');
-
+        const adminResult = await query('SELECT * FROM users WHERE email = $1', ['admin@taskmanager.com']);
+        if (!adminResult.rows[0]) {
+            console.log('🌱 Seed: Creating Admin...');
             const adminPassword = await bcrypt.hash('admin123', 10);
-            db.prepare(`
-                INSERT OR IGNORE INTO users (email, password, name, role, active)
-                VALUES (?, ?, ?, ?, 1)
-            `).run('admin@taskmanager.com', adminPassword, 'Admin User', 'admin');
+            const adminUserResult = await query(`
+                INSERT INTO users (email, password, name, role, active)
+                VALUES ($1, $2, $3, $4, 1) RETURNING *
+            `, ['admin@taskmanager.com', adminPassword, 'Admin User', 'admin']);
+            const adminUser = adminUserResult.rows[0];
 
+            console.log('🌱 Seed: Creating Member...');
             const memberPassword = await bcrypt.hash('member123', 10);
-            db.prepare(`
-                INSERT OR IGNORE INTO users (email, password, name, role, active)
-                VALUES (?, ?, ?, ?, 1)
-            `).run('member@taskmanager.com', memberPassword, 'Team Member', 'member');
+            await query(`
+                INSERT INTO users (email, password, name, role, active)
+                VALUES ($1, $2, $3, $4, 1)
+            `, ['member@taskmanager.com', memberPassword, 'Team Member', 'member']);
 
             // Default board
-            db.prepare(`
-                INSERT OR IGNORE INTO boards (workspace, name, type)
-                VALUES (?, ?, ?)
-            `).run('tasks', 'All Tasks', 'ALL_TASKS');
+            await query(`
+                INSERT INTO boards (workspace, name, type)
+                VALUES ($1, $2, $3)
+                ON CONFLICT DO NOTHING
+            `, ['tasks', 'All Tasks', 'ALL_TASKS']);
 
             console.log('✅ Auto-seed complete.');
+        } else {
+            // Check if active is 0, if so, reactivate
+            if (adminResult.rows[0].active === 0) {
+                await query('UPDATE users SET active = 1 WHERE email = $1', ['admin@taskmanager.com']);
+            }
         }
     } catch (error) {
         console.error('Auto-seed failed:', error);
     }
 }
 
-// Start server
 app.listen(PORT, async () => {
     await seedDatabase();
-    console.log(`\n🚀 SloraAI Task Manager server running on http://localhost:${PORT}`);
+    console.log(`\n🚀 SloraAI Task Manager (PostgreSQL) running on http://localhost:${PORT}`);
     console.log(`📝 Login at http://localhost:${PORT}\n`);
 });

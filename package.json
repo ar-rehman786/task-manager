@@ -18,9 +18,9 @@
   "dependencies": {
     "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.6.2",
     "body-parser": "^2.2.2",
     "express": "^5.2.1",
-    "express-session": "^1.19.0"
+    "express-session": "^1.19.0",
+    "pg": "^8.18.0"
   }
 }
