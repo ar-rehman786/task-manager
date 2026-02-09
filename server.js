@@ -475,6 +475,87 @@ app.delete('/api/access/:id', requireAdmin, (req, res) => {
     res.json({ success: true });
 });
 
+// ============= ATTENDANCE ROUTES =============
+
+// Get current attendance status (active session)
+app.get('/api/attendance/status', requireAuth, (req, res) => {
+    const userId = req.session.userId;
+    const activeSession = db.prepare('SELECT * FROM attendance WHERE userId = ? AND status = "active"').get(userId);
+    res.json(activeSession || null);
+});
+
+// Clock In
+app.post('/api/attendance/clock-in', requireAuth, (req, res) => {
+    const userId = req.session.userId;
+    const { notes } = req.body;
+
+    // Check if already clocked in
+    const activeSession = db.prepare('SELECT * FROM attendance WHERE userId = ? AND status = "active"').get(userId);
+    if (activeSession) {
+        return res.status(400).json({ error: 'You are already clocked in' });
+    }
+
+    const result = db.prepare(`
+        INSERT INTO attendance (userId, clockInTime, status, notes)
+        VALUES (?, ?, 'active', ?)
+    `).run(userId, new Date().toISOString(), notes);
+
+    const session = db.prepare('SELECT * FROM attendance WHERE id = ?').get(result.lastInsertRowid);
+    res.json(session);
+});
+
+// Clock Out
+app.post('/api/attendance/clock-out', requireAuth, (req, res) => {
+    const userId = req.session.userId;
+    const { notes } = req.body;
+
+    const activeSession = db.prepare('SELECT * FROM attendance WHERE userId = ? AND status = "active"').get(userId);
+    if (!activeSession) {
+        return res.status(400).json({ error: 'You are not clocked in' });
+    }
+
+    const clockOutTime = new Date();
+    const clockInTime = new Date(activeSession.clockInTime);
+    const workDuration = Math.round((clockOutTime - clockInTime) / 1000 / 60); // minutes
+
+    db.prepare(`
+        UPDATE attendance 
+        SET clockOutTime = ?, status = 'completed', workDuration = ?, notes = ?
+        WHERE id = ?
+    `).run(clockOutTime.toISOString(), workDuration, notes ? (activeSession.notes + '\n' + notes) : activeSession.notes, activeSession.id);
+
+    const session = db.prepare('SELECT * FROM attendance WHERE id = ?').get(activeSession.id);
+    res.json(session);
+});
+
+// Get attendance history
+app.get('/api/attendance/history', requireAuth, (req, res) => {
+    const userId = req.session.userId;
+    const { limit = 30 } = req.query;
+
+    const history = db.prepare(`
+        SELECT * FROM attendance 
+        WHERE userId = ? 
+        ORDER BY clockInTime DESC 
+        LIMIT ?
+    `).all(userId, limit);
+
+    res.json(history);
+});
+
+// Get today's attendance for all users (Admin only)
+app.get('/api/attendance/today', requireAdmin, (req, res) => {
+    const records = db.prepare(`
+        SELECT a.*, u.name as userName, u.email as userEmail
+        FROM attendance a
+        JOIN users u ON a.userId = u.id
+        WHERE date(a.clockInTime) = date('now')
+        ORDER BY a.clockInTime DESC
+    `).all();
+
+    res.json(records);
+});
+
 // Temporary seed endpoint for initial deployment (call once then remove)
 app.post('/api/seed-database', async (req, res) => {
     try {
