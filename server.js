@@ -61,13 +61,20 @@ io.on('connection', (socket) => {
 // Helper function to send notifications
 async function sendNotification(userId, type, message, data = {}) {
     try {
-        console.log(`[NOTIFICATION] Sending to user ${userId}: ${message}`);
+        console.log(`[NOTIFICATION] ======================================`);
+        console.log(`[NOTIFICATION] Sending to user ${userId}`);
+        console.log(`[NOTIFICATION] Type: ${type}`);
+        console.log(`[NOTIFICATION] Message: ${message}`);
+        console.log(`[NOTIFICATION] Data:`, data);
 
         // 1. Save to database
-        await query(`
+        const result = await query(`
             INSERT INTO notifications ("userId", type, message, data)
             VALUES ($1, $2, $3, $4)
+            RETURNING id
         `, [userId, type, message, JSON.stringify(data)]);
+
+        console.log(`[NOTIFICATION] Saved to DB with ID: ${result.rows[0].id}`);
 
         // 2. Emit via Socket.io
         const notification = {
@@ -78,10 +85,15 @@ async function sendNotification(userId, type, message, data = {}) {
         };
 
         io.to(`user:${userId}`).emit('notification', notification);
-        console.log(`[NOTIFICATION] Emitted to user:${userId}`);
+        console.log(`[NOTIFICATION] Emitted to room: user:${userId}`);
+        console.log(`[NOTIFICATION] Socket.io rooms count: ${io.sockets.adapter.rooms.size}`);
+        console.log(`[NOTIFICATION] ======================================`);
 
     } catch (error) {
+        console.error('[NOTIFICATION ERROR] ======================================');
+        console.error('[NOTIFICATION ERROR] Failed to send notification');
         console.error('[NOTIFICATION ERROR]', error);
+        console.error('[NOTIFICATION ERROR] ======================================');
     }
 }
 
@@ -623,34 +635,55 @@ app.put('/api/tasks/:id', requireAuth, async (req, res) => {
 
         // --- Notification Logic ---
         let notificationMessage = '';
+        let notifyUserId = null;
         const targetUserId = Number(assignedUserId);
 
         // 1. Assignment Change
         if (oldTask.assignedUserId != assignedUserId) {
             if (targetUserId && targetUserId !== currentUserId) {
                 notificationMessage = `${currentUserName} assigned you to task: ${newTask.title}`;
+                notifyUserId = targetUserId;
             }
         }
-        // 2. Status Change
+        // 2. Status Change (notify current assignee or creator)
         else if (oldTask.status !== status) {
             const statusMap = { todo: 'To Do', in_progress: 'In Progress', blocked: 'Blocked', done: 'Done' };
             notificationMessage = `${currentUserName} moved task '${newTask.title}' from ${statusMap[oldTask.status]} to ${statusMap[status]}`;
+
+            // Notify the currently assigned user, or creator if unassigned
+            if (oldTask.assignedUserId && oldTask.assignedUserId !== currentUserId) {
+                notifyUserId = oldTask.assignedUserId;
+            } else if (!oldTask.assignedUserId && oldTask.createdBy !== currentUserId) {
+                notifyUserId = oldTask.createdBy;
+            }
         }
-        // 3. Priority Change
+        // 3. Priority Change (notify current assignee or creator)
         else if (oldTask.priority !== priority) {
             notificationMessage = `${currentUserName} changed priority of '${newTask.title}' to ${priority}`;
+
+            if (oldTask.assignedUserId && oldTask.assignedUserId !== currentUserId) {
+                notifyUserId = oldTask.assignedUserId;
+            } else if (!oldTask.assignedUserId && oldTask.createdBy !== currentUserId) {
+                notifyUserId = oldTask.createdBy;
+            }
         }
-        // 4. Content Update (Title/Description) - only if no other major change
+        // 4. Content Update (Title/Description) - notify current assignee or creator
         else if (oldTask.title !== title || oldTask.description !== description) {
             notificationMessage = `${currentUserName} updated details for task: ${newTask.title}`;
+
+            if (oldTask.assignedUserId && oldTask.assignedUserId !== currentUserId) {
+                notifyUserId = oldTask.assignedUserId;
+            } else if (!oldTask.assignedUserId && oldTask.createdBy !== currentUserId) {
+                notifyUserId = oldTask.createdBy;
+            }
         }
 
-        // Send Notification if message exists and user is not assigning to themselves
-        if (notificationMessage && targetUserId && targetUserId !== currentUserId) {
-            sendNotification(targetUserId, 'info', notificationMessage, { taskId: id });
-        } else if (notificationMessage && !targetUserId && oldTask.createdBy !== currentUserId) {
-            // Notify creator if unassigned and someone else updates it
-            sendNotification(oldTask.createdBy, 'info', notificationMessage, { taskId: id });
+        // Send Notification if we have a message and a target user
+        if (notificationMessage && notifyUserId) {
+            console.log(`[TASK_UPDATE] Sending notification to user ${notifyUserId}: ${notificationMessage}`);
+            sendNotification(notifyUserId, 'info', notificationMessage, { taskId: id });
+        } else if (notificationMessage) {
+            console.log(`[TASK_UPDATE] Notification message created but no target user: "${notificationMessage}"`);
         }
 
         res.json(newTask);

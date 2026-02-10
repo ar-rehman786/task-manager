@@ -81,6 +81,7 @@ f596b6f - Initial deployment with tasks, projects, and team management
   - Fixed critical missing `sendNotification()` function (notifications were completely broken)
   - Enhanced toast styling with type-based colors
   - Verified all notification components working
+  - **Fixed notification delivery**: Status/priority/content changes now properly notify assigned users
 
 ---
 
