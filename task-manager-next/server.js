@@ -1499,7 +1499,7 @@ app.put('/api/notifications/read', requireAuth, async (req, res) => {
 });
 
 // Next.js Request Handler
-app.all('*', (req, res) => {
+app.all(/(.*)/, (req, res) => {
     return handle(req, res);
 });
 
