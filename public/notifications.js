@@ -72,7 +72,7 @@ async function initNotifications() {
     socket.on('notification', (data) => {
         console.log(`[DEEP_DEBUG] RECEIVED NOTIFICATION:`, data);
         playNotificationSound(data.type);
-        showToast(data.message, data.type);
+        showToast(data.message, data.type, data.data); // data.data contains the payload like taskId
         showSystemNotification(data); // Add system notification support
         addNotificationToDropdown(data);
         incrementBadge();
@@ -121,20 +121,7 @@ async function loadNotificationHistory() {
     }
 }
 
-function createNotificationItem(n) {
-    const div = document.createElement('div');
-    div.className = `notification-item ${n.isRead ? 'read' : 'unread'}`;
-    div.innerHTML = `
-        <div class="notification-icon ${n.type}">
-            ${getIconForType(n.type)}
-        </div>
-        <div class="notification-content">
-            <p class="notification-message">${n.message}</p>
-            <span class="notification-time">${formatTimeAgo(n.createdAt)}</span>
-        </div>
-    `;
-    return div;
-}
+
 
 function addNotificationToDropdown(n) {
     const list = document.getElementById('notification-list');
@@ -213,20 +200,7 @@ function playNotificationSound(type) {
     oscillator.stop(audioContext.currentTime + 0.1);
 }
 
-function showToast(message, type = 'info') {
-    // Use existing toast logic or create new
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    setTimeout(() => {
-        toast.classList.add('show');
-        setTimeout(() => {
-            toast.classList.remove('show');
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
-    }, 100);
-}
+
 
 // Original createToastContainer is now unused
 // function createToastContainer() {
@@ -269,6 +243,9 @@ function showSystemNotification(data) {
     if (!('Notification' in window)) {
         console.log('This browser does not support system notifications');
         return;
+    }
+
+    if (Notification.permission === 'granted') {
         const notification = new Notification('Task Manager', {
             body: data.message,
             tag: 'task-manager-notification'
@@ -277,8 +254,72 @@ function showSystemNotification(data) {
         notification.onclick = function () {
             window.focus();
             notification.close();
+            handleNotificationClick(data);
         };
     }
+}
+
+// Handle notification click to open task
+function handleNotificationClick(n) {
+    let taskId = null;
+    try {
+        const data = typeof n.data === 'string' ? JSON.parse(n.data) : n.data;
+        if (data && data.taskId) {
+            taskId = data.taskId;
+        }
+    } catch (e) {
+        console.error('Error parsing notification data', e);
+    }
+
+    if (taskId && window.showTaskDetails) {
+        window.showTaskDetails(taskId);
+    } else if (taskId) {
+        console.warn('showTaskDetails not available, navigating to tasks...');
+        // Fallback: navigate to tasks and let it handle opening
+        sessionStorage.setItem('openTaskId', taskId);
+        loadWorkspace('tasks'); // Assuming loadWorkspace is global from app.js
+    }
+}
+
+function createNotificationItem(n) {
+    const div = document.createElement('div');
+    div.className = `notification-item ${n.isRead ? 'read' : 'unread'}`;
+    div.style.cursor = 'pointer'; // Make clickable
+    div.onclick = () => handleNotificationClick(n); // Add click handler
+
+    div.innerHTML = `
+        <div class="notification-icon ${n.type}">
+            ${getIconForType(n.type)}
+        </div>
+        <div class="notification-content">
+            <p class="notification-message">${n.message}</p>
+            <span class="notification-time">${formatTimeAgo(n.createdAt)}</span>
+        </div>
+    `;
+    return div;
+}
+
+// ... inside showToast ...
+function showToast(message, type = 'info', data = null) {
+    // Use existing toast logic or create new
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+
+    // Add click handling if data exists
+    if (data) {
+        toast.style.cursor = 'pointer';
+        toast.onclick = () => handleNotificationClick({ data });
+    }
+
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }, 100);
 }
 
 // Expose global for onclick
@@ -309,6 +350,7 @@ style.textContent = `
         border-left: 4px solid var(--primary, #6366f1);
         animation: slideIn 0.3s ease-out;
         transition: opacity 0.3s ease;
+        cursor: pointer;
     }
     .toast-content {
         display: flex;

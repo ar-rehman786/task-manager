@@ -433,8 +433,25 @@ function showQuickAddTask() {
   });
 }
 
-function showTaskDetails(taskId) {
-  const task = allTasks.find(t => t.id == taskId);
+window.showTaskDetails = async function (taskId) { // Expose globally and make async
+  let task = allTasks.find(t => t.id == taskId);
+
+  // If task not found in local state (e.g. on Dashboard), fetch it
+  if (!task) {
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`);
+      if (res.ok) {
+        task = await res.json();
+      } else {
+        console.error('Task not found via API');
+        return;
+      }
+    } catch (e) {
+      console.error('Error fetching task details:', e);
+      return;
+    }
+  }
+
   if (!task) return;
 
   const modalContent = `
