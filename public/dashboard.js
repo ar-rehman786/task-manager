@@ -330,6 +330,7 @@ function renderClockInWidget(activeSession) {
 // ... Keep existing Clock In/Out logic ...
 
 // View task details
+// View task details
 function viewTask(taskId) {
     sessionStorage.setItem('openTaskId', taskId);
     loadWorkspace('tasks');
@@ -429,11 +430,7 @@ function formatMinutes(minutes) {
     return `${hours}h ${mins}m`;
 }
 
-// View task details
-function viewTask(taskId) {
-    loadWorkspace('tasks');
-    // Note: In a full app, this would open the specific task modal
-}
+
 
 // Show notification
 function showNotification(message, type = 'info') {

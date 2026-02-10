@@ -633,6 +633,45 @@ app.put('/api/tasks/:id', requireAuth, async (req, res) => {
     }
 });
 
+app.get('/api/tasks/:id', requireAuth, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await query(`
+            SELECT t.*, u.name as "assignedUserName", c.name as "createdByName", p.name as "projectName"
+            FROM tasks t
+            LEFT JOIN users u ON t."assignedUserId" = u.id
+            LEFT JOIN users c ON t."createdBy" = c.id
+            LEFT JOIN projects p ON t."projectId" = p.id
+            WHERE t.id = $1
+        `, [id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Task not found' });
+        }
+
+        const task = result.rows[0];
+
+        // Members can only see tasks assigned to them, created by them, or if they are admin
+        if (req.session.userRole !== 'admin' &&
+            task.assignedUserId !== req.session.userId &&
+            task.createdBy !== req.session.userId) {
+            // Optional: Allow viewing unassigned tasks? Or project tasks?
+            // valuable context: existing `GET /api/tasks` filters by assignment/creation.
+            // Sticking to strict access for now.
+            // actually, "All Tasks" board implies visibility?
+            // Let's mirror the `GET /api/tasks` logic essentially:
+            // Member sees: assigned to them OR created by them.
+            // What about project tasks?
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        res.json(task);
+    } catch (error) {
+        console.error('Get task error:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 app.delete('/api/tasks/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     try {

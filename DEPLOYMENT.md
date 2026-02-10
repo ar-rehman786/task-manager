@@ -75,6 +75,8 @@ f596b6f - Initial deployment with tasks, projects, and team management
 - [x] Detailed action messages (e.g., "User X moved task to Done")
 - [x] Auto-hide boards for inactive/deactivated members
 - [x] Clickable notifications (open task details)
+- [x] Fixed dashboard UI overlap (Clock In widget)
+- [x] Fixed member access to clicking notifications (Added `GET /api/tasks/:id`)
 
 ---
 

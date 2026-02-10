@@ -392,15 +392,16 @@
 }
 
 /* Effects */
---shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-0 2px 4px -1px rgba(0, 0, 0, 0.06);
---shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
-0 4px 6px -2px rgba(0, 0, 0, 0.05);
---shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
-0 10px 10px -5px rgba(0, 0, 0, 0.04);
---shadow-glow: 0 0 20px rgba(99, 102, 241, 0.15);
---backdrop-blur: blur(12px);
---transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+:root {
+  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.15);
+  --backdrop-blur: blur(12px);
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * {
@@ -689,6 +690,121 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
+}
+
+/* Clock In Widget */
+.clock-in-widget-container {
+  grid-column: 1 / -1;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-lg) var(--spacing-xl);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  margin-bottom: var(--spacing-lg);
+  z-index: 10;
+  /* Ensure lower than dropdown */
+}
+
+.clock-in-widget-container::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 6px;
+  background: var(--gradient-primary);
+}
+
+.clock-status-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 0.25rem;
+}
+
+.clock-status-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.clock-timer-display {
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--primary-light);
+  text-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+}
+
+.btn-clock-in-large,
+.btn-clock-out-large {
+  padding: 0.75rem 2rem;
+  font-size: 1.1rem;
+  border-radius: 50px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-clock-in-large {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+}
+
+.btn-clock-in-large:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6);
+}
+
+.btn-clock-out-large {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.btn-clock-out-large:hover {
+  background: rgba(239, 68, 68, 0.2);
+  transform: translateY(-2px);
+}
+
+.clock-action-area {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.pulse-dot-large {
+  width: 12px;
+  height: 12px;
+  background: #10b981;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 0 rgba(16, 185, 129, 0.4);
+  animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+
+  70% {
+    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
 }
 
 .chart-container-card {
@@ -1087,9 +1203,10 @@ body {
   }
 }
 
-padding: var(--spacing-md);
-min-height: 200px;
-border: 1px solid var(--border);
+.kanban-column {
+  padding: var(--spacing-md);
+  min-height: 200px;
+  border: 1px solid var(--border);
 }
 
 .column-header {
