@@ -5,8 +5,7 @@ const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const { pool, query, initializeDatabase } = require('./database');
-
-
+const http = require('http');
 
 // Start Server
 const { Server } = require('socket.io');
