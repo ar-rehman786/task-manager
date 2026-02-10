@@ -467,3 +467,47 @@ function showError(message) {
     }
     alert('Error: ' + message);
 }
+
+// Load all attendance history (admin)
+async function loadAllAttendanceHistory() {
+    try {
+        const timestamp = Date.now();
+        const response = await fetch(`/api/attendance/admin/history?t=${timestamp}`);
+        const records = await response.json();
+        renderAllAttendanceHistory(records);
+    } catch (error) {
+        console.error('Load all history error:', error);
+    }
+}
+
+// Render all attendance history (admin)
+function renderAllAttendanceHistory(records) {
+    const tbody = document.querySelector('#admin-history-table tbody');
+    if (!tbody) return;
+
+    if (records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #999;">No attendance records found</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = records.map(record => {
+        const clockIn = new Date(record.clockInTime);
+        const clockOut = record.clockOutTime ? new Date(record.clockOutTime) : null;
+        const duration = record.workDuration ? formatDuration(record.workDuration) : calculateDuration(record.clockInTime);
+        const status = record.status === 'active' ? '<span class="badge badge-success">🟢 Working</span>' : '<span class="badge badge-secondary">Completed</span>';
+
+        return `
+            <tr>
+                <td>
+                    <strong>${record.userName}</strong><br>
+                    <small style="color: var(--text-muted)">${record.userEmail}</small>
+                </td>
+                <td>${clockIn.toLocaleDateString()}</td>
+                <td>${clockIn.toLocaleTimeString()}</td>
+                <td>${clockOut ? clockOut.toLocaleTimeString() : '--:--'}</td>
+                <td><strong>${duration}</strong></td>
+                <td>${status}</td>
+            </tr>
+        `;
+    }).join('');
+}
