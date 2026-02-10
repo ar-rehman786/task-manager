@@ -1,3 +1,26 @@
+// Theme Management
+function initTheme() {
+    // Get saved theme preference or default to light mode
+    const savedTheme = localStorage.getItem('theme') || 'light';
+
+    if (savedTheme === 'dark') {
+        document.body.classList.add('dark-theme');
+    } else {
+        document.body.classList.remove('dark-theme');
+    }
+}
+
+function toggleTheme() {
+    const isDark = document.body.classList.toggle('dark-theme');
+    const theme = isDark ? 'dark' : 'light';
+    localStorage.setItem('theme', theme);
+
+    console.log(`Theme switched to: ${theme}`);
+}
+
+// Initialize theme immediately (before DOM loads)
+initTheme();
+
 // Global state
 let currentUser = null;
 let currentWorkspace = 'tasks';
@@ -28,6 +51,12 @@ async function initApp() {
 
         // Setup logout
         document.getElementById('logout-btn').addEventListener('click', logout);
+
+        // Setup theme toggle
+        const themeToggle = document.getElementById('theme-toggle');
+        if (themeToggle) {
+            themeToggle.addEventListener('click', toggleTheme);
+        }
 
         // Setup search
         setupSearch();
