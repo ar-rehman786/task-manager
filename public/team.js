@@ -2,14 +2,14 @@
 let teamMembers = [];
 
 async function loadTeamWorkspace() {
-    if (currentUser.role !== 'admin') {
-        showError('Access denied');
-        return;
-    }
+  if (currentUser.role !== 'admin') {
+    showError('Access denied');
+    return;
+  }
 
-    const contentArea = document.getElementById('content-area');
+  const contentArea = document.getElementById('content-area');
 
-    contentArea.innerHTML = `
+  contentArea.innerHTML = `
     <div class="board-header">
       <h2 class="board-title">Team Members</h2>
       <div class="board-actions">
@@ -19,21 +19,21 @@ async function loadTeamWorkspace() {
     <div id="team-members-list"></div>
   `;
 
-    await loadTeamMembers();
-    renderTeamMembers();
+  await loadTeamMembers();
+  renderTeamMembers();
 
-    document.getElementById('add-member-btn').addEventListener('click', showAddMember);
+  document.getElementById('add-member-btn').addEventListener('click', showAddMember);
 }
 
 async function loadTeamMembers() {
-    const response = await fetch('/api/users');
-    teamMembers = await response.json();
+  const response = await fetch('/api/users');
+  teamMembers = await response.json();
 }
 
 function renderTeamMembers() {
-    const container = document.getElementById('team-members-list');
+  const container = document.getElementById('team-members-list');
 
-    container.innerHTML = `
+  container.innerHTML = `
     <div style="display: grid; gap: 1rem;">
       ${teamMembers.map(member => `
         <div class="card">
@@ -60,7 +60,7 @@ function renderTeamMembers() {
 }
 
 function showAddMember() {
-    const modalContent = `
+  const modalContent = `
     <div class="modal-header">
       <h3 class="modal-title">Add Team Member</h3>
       <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
@@ -88,68 +88,75 @@ function showAddMember() {
     </form>
   `;
 
-    const modal = showModal(modalContent);
+  const modal = showModal(modalContent);
 
-    document.getElementById('add-member-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
+  document.getElementById('add-member-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
 
-        const memberData = {
-            name: document.getElementById('member-name').value,
-            email: document.getElementById('member-email').value,
-            password: document.getElementById('member-password').value || 'member123'
-        };
+    const memberData = {
+      name: document.getElementById('member-name').value,
+      email: document.getElementById('member-email').value,
+      password: document.getElementById('member-password').value || 'member123'
+    };
 
-        try {
-            const response = await fetch('/api/users', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(memberData)
-            });
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(memberData)
+      });
 
-            if (response.ok) {
-                const newMember = await response.json();
-                teamMembers.push(newMember);
-                renderTeamMembers();
-                closeModal(modal);
+      if (response.ok) {
+        const newMember = await response.json();
+        teamMembers.push(newMember);
+        renderTeamMembers();
+        closeModal(modal);
 
-                // Reload boards to show new member board
-                if (currentWorkspace === 'tasks') {
-                    await loadBoards();
-                    renderBoardTabs();
-                }
-            } else {
-                const error = await response.json();
-                showError(error.error || 'Failed to add member');
-            }
-        } catch (error) {
-            console.error('Add member error:', error);
-            showError('Failed to add member');
+        // Reload boards to show new member board
+        if (currentWorkspace === 'tasks') {
+          await loadBoards();
+          renderBoardTabs();
         }
-    });
+      } else {
+        let errorMessage = 'Failed to add member';
+        try {
+          const error = await response.json();
+          errorMessage = error.error || error.message || errorMessage;
+        } catch (e) {
+          console.error('Non-JSON response');
+          errorMessage += ' (Server Error)';
+        }
+        showError(errorMessage);
+      }
+    } catch (error) {
+      console.error('Add member error:', error);
+      showError('Error: ' + error.message);
+    }
+  });
 }
 
 async function deactivateMember(memberId, memberName) {
-    if (!confirm(`Are you sure you want to deactivate ${memberName}? Their tasks will become unassigned.`)) {
-        return;
+  if (!confirm(`Are you sure you want to deactivate ${memberName}? Their tasks will become unassigned.`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/users/${memberId}`, {
+      method: 'DELETE'
+    });
+
+    if (response.ok) {
+      teamMembers = teamMembers.filter(m => m.id !== memberId);
+      renderTeamMembers();
+
+      // Reload tasks if in tasks workspace
+      if (currentWorkspace === 'tasks') {
+        await loadTasks();
+        renderTasks();
+      }
     }
-
-    try {
-        const response = await fetch(`/api/users/${memberId}`, {
-            method: 'DELETE'
-        });
-
-        if (response.ok) {
-            teamMembers = teamMembers.filter(m => m.id !== memberId);
-            renderTeamMembers();
-
-            // Reload tasks if in tasks workspace
-            if (currentWorkspace === 'tasks') {
-                await loadTasks();
-                renderTasks();
-            }
-        }
-    } catch (error) {
-        console.error('Deactivate member error:', error);
-        showError('Failed to deactivate member');
-    }
+  } catch (error) {
+    console.error('Deactivate member error:', error);
+    showError('Failed to deactivate member');
+  }
 }
