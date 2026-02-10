@@ -100,9 +100,28 @@ function DashboardContent() {
     return (
         <div className="p-6 space-y-6">
             {/* Welcome Banner */}
-            <div className="bg-gradient-to-r from-primary to-primary/80 text-white rounded-lg p-8">
-                <h1 className="text-3xl font-bold mb-2">Welcome back, {user?.name}! 👋</h1>
-                <p className="text-lg opacity-90">{currentDate}</p>
+            <div className="bg-gradient-to-r from-primary to-primary/80 text-white rounded-lg p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+                <div>
+                    <h1 className="text-3xl font-bold mb-2">Welcome back, {user?.name}! 👋</h1>
+                    <p className="text-lg opacity-90">{currentDate}</p>
+                </div>
+                <div className="flex items-center gap-4">
+                    <div className="text-right hidden sm:block">
+                        <p className="text-sm opacity-80 uppercase tracking-wider font-semibold">Current Status</p>
+                        <p className="text-xl font-bold">
+                            {attendanceStatus?.status === 'active' ? '🟢 Working' : '⚪ Not clocked in'}
+                        </p>
+                    </div>
+                    <Button
+                        size="lg"
+                        variant="secondary"
+                        className="bg-white text-primary hover:bg-white/90 font-bold px-8"
+                        onClick={handleClockInOut}
+                        disabled={isClockLoading}
+                    >
+                        {isClockLoading ? 'Loading...' : attendanceStatus?.status === 'active' ? 'Clock Out' : 'Clock In'}
+                    </Button>
+                </div>
             </div>
 
             {/* Stats Cards */}
@@ -151,26 +170,18 @@ function DashboardContent() {
                 </Card>
 
                 <Card className="p-6">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-muted-foreground">Hours Today</p>
                             <p className="text-3xl font-bold mt-2">{hoursToday}h</p>
                             <p className="text-xs text-muted-foreground mt-1">
-                                {attendanceStatus?.status === 'active' ? '🟢 Working' : 'Not clocked in'}
+                                {attendanceStatus?.status === 'active' ? 'Total duration so far' : 'Complete for today'}
                             </p>
                         </div>
                         <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center">
                             <span className="text-2xl">⏱️</span>
                         </div>
                     </div>
-                    <Button
-                        className="w-full"
-                        variant={attendanceStatus?.status === 'active' ? "destructive" : "default"}
-                        onClick={handleClockInOut}
-                        disabled={isClockLoading}
-                    >
-                        {isClockLoading ? 'Loading...' : attendanceStatus?.status === 'active' ? 'Clock Out' : 'Clock In'}
-                    </Button>
                 </Card>
             </div>
 
