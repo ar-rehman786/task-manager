@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tantml:query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -118,8 +118,8 @@ function ProfileContent() {
                             </label>
                             <span
                                 className={`inline-block px-3 py-1 rounded text-sm font-medium ${user?.role === 'admin'
-                                        ? 'bg-purple-500/20 text-purple-600'
-                                        : 'bg-blue-500/20 text-blue-600'
+                                    ? 'bg-purple-500/20 text-purple-600'
+                                    : 'bg-blue-500/20 text-blue-600'
                                     }`}
                             >
                                 {user?.role}
