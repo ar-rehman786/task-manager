@@ -348,12 +348,13 @@ function calculateDuration(startTime) {
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-// Format minutes to HH:MM
+// Format minutes to Xh Ym
 function formatMinutes(minutes) {
-    if (!minutes) return '00:00';
+    if (!minutes) return '0m';
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    if (hours === 0) return `${mins}m`;
+    return `${hours}h ${mins}m`;
 }
 
 // View task details

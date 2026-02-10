@@ -214,14 +214,24 @@ function startTimer() {
 
     timerInterval = setInterval(() => {
         if (activeSession) {
-            const duration = calculateDuration(activeSession.clockInTime);
+            const currentSessionDuration = calculateMinutes(activeSession.clockInTime);
+            const totalDuration = (window.todayBaseMinutes || 0) + currentSessionDuration;
+
             const durationDisplay = document.getElementById('duration-display');
             const summaryDuration = document.getElementById('summary-duration');
 
-            if (durationDisplay) durationDisplay.textContent = duration;
-            if (summaryDuration) summaryDuration.textContent = duration;
+            if (durationDisplay) durationDisplay.textContent = formatDuration(currentSessionDuration); // Show current session
+            if (summaryDuration) summaryDuration.textContent = formatDuration(totalDuration); // Show DAY total
         }
     }, 1000);
+}
+
+// Calculate minutes duration
+function calculateMinutes(startTime) {
+    const start = new Date(startTime);
+    const now = new Date();
+    const diff = now - start;
+    return Math.floor(diff / 1000 / 60);
 }
 
 // Stop timer
@@ -245,19 +255,36 @@ function calculateDuration(startTime) {
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-// Format duration (minutes to HH:MM)
 function formatDuration(minutes) {
-    if (!minutes) return '00:00';
+    if (!minutes) return '0m';
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    if (hours === 0) return `${mins}m`;
+    return `${hours}h ${mins}m`;
 }
 
 // Load attendance history
+// Load attendance history and calculate today's total
 async function loadAttendanceHistory() {
     try {
         const response = await fetch('/api/attendance/history?limit=30');
         const records = await response.json();
+
+        // Calculate today's total duration
+        const today = new Date().toDateString();
+        const todayRecords = records.filter(r => new Date(r.clockInTime).toDateString() === today);
+        let totalMinutes = todayRecords.reduce((sum, r) => sum + (r.workDuration || 0), 0);
+
+        // Update summary widget with total (static part)
+        // If active session exists, timer will add to this
+        const summaryDuration = document.getElementById('summary-duration');
+        if (summaryDuration && !activeSession) {
+            summaryDuration.textContent = formatDuration(totalMinutes);
+        }
+
+        // Store for timer use
+        window.todayBaseMinutes = totalMinutes;
+
         renderAttendanceHistory(records);
     } catch (error) {
         console.error('Load history error:', error);
