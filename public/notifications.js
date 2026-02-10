@@ -53,6 +53,18 @@ async function initNotifications() {
     // Connect to Socket.io
     socket = io();
 
+    // Attach click listener manually to ensure it works
+    const bell = document.querySelector('.notification-bell');
+    if (bell) {
+        console.log('Notification bell found, attaching listener');
+        bell.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent bubbling
+            toggleNotifications();
+        });
+    } else {
+        console.error('Notification bell NOT found in DOM');
+    }
+
     // Join user room
     try {
         const res = await fetch('/api/auth/me');
@@ -152,7 +164,10 @@ function markAllRead() {
 }
 
 function toggleNotifications() {
+    console.log('Toggling notifications dropdown');
     const dropdown = document.getElementById('notification-dropdown');
+    if (!dropdown) return console.error('Dropdown not found');
+
     dropdown.classList.toggle('show');
     if (dropdown.classList.contains('show') && notificationCount > 0) {
         markAllRead();
