@@ -34,7 +34,8 @@ async function loadDashboardStats() {
 // Load attendance widget
 async function loadAttendanceWidget() {
     try {
-        const response = await fetch('/api/attendance/status');
+        const timestamp = Date.now();
+        const response = await fetch(`/api/attendance/status?t=${timestamp}`);
         const activeSession = await response.json();
         renderClockInWidget(activeSession);
 
