@@ -32,8 +32,9 @@ async function initApp() {
         // Setup search
         setupSearch();
 
-        // Load initial workspace
-        loadWorkspace('dashboard');
+        // Load initial workspace (restore from local storage or default to dashboard)
+        const lastWorkspace = localStorage.getItem('lastWorkspace') || 'dashboard';
+        loadWorkspace(lastWorkspace);
     } catch (error) {
         console.error('Init error:', error);
         window.location.href = '/';
@@ -49,6 +50,7 @@ function setupNavigation() {
                 navItems.forEach(n => n.classList.remove('active'));
                 item.classList.add('active');
                 loadWorkspace(workspace);
+                localStorage.setItem('lastWorkspace', workspace);
             }
         });
     });
@@ -57,6 +59,16 @@ function setupNavigation() {
 function loadWorkspace(workspace) {
     currentWorkspace = workspace;
     const contentArea = document.getElementById('content-area');
+
+    // Update active class if loading from storage/init
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        if (item.dataset.workspace === workspace) {
+            item.classList.add('active');
+        } else {
+            item.classList.remove('active');
+        }
+    });
 
     switch (workspace) {
         case 'dashboard':

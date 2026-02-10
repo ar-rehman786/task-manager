@@ -184,16 +184,23 @@ function renderChartJs() {
     const ctx = document.getElementById('statusChartCanvas');
     if (!ctx) return;
 
-    // Destroy previous instance if exists
-    if (statusChart) {
-        statusChart.destroy();
-    }
-
-    const stats = dashboardStats.statusBreakdown;
-
     // Check if Chart is loaded
     if (typeof Chart === 'undefined') {
         ctx.parentNode.innerHTML = '<p style="color:red; text-align:center;">Chart.js not loaded. Check internet connection.</p>';
+        return;
+    }
+
+    const dataValues = [
+        stats.todo || 0,
+        stats.in_progress || 0,
+        stats.done || 0,
+        stats.blocked || 0
+    ];
+
+    // If chart exists, update data instead of destroy/create
+    if (statusChart) {
+        statusChart.data.datasets[0].data = dataValues;
+        statusChart.update(); // Smooth transition, no full animation
         return;
     }
 
@@ -202,12 +209,7 @@ function renderChartJs() {
         data: {
             labels: ['To Do', 'In Progress', 'Done', 'Blocked'],
             datasets: [{
-                data: [
-                    stats.todo || 0,
-                    stats.in_progress || 0,
-                    stats.done || 0,
-                    stats.blocked || 0
-                ],
+                data: dataValues,
                 backgroundColor: [
                     '#94a3b8', // Todo (Gray)
                     '#818cf8', // In Progress (Indigo)
