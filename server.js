@@ -15,11 +15,22 @@ const PORT = process.env.PORT || 3000;
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+app.set('trust proxy', 1); // Trust first proxy (Railway)
+
+const pgSession = require('connect-pg-simple')(session);
+
 app.use(session({
+    store: new pgSession({
+        pool: pool,                // Connection pool
+        tableName: 'session'   // Use another table-name than the default "session" one
+    }),
     secret: 'task-manager-secret-key-change-in-production',
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 24 * 60 * 60 * 1000 } // 24 hours
+    cookie: {
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        secure: process.env.NODE_ENV === 'production' // Secure in production
+    }
 }));
 
 // Serve static files
