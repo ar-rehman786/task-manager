@@ -6,26 +6,7 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const { pool, query, initializeDatabase } = require('./database');
 
-const http = require('http');
-// Debug Route: Force create notifications table
-app.get('/api/debug/init-notifications', async (req, res) => {
-    try {
-        await query(`
-            CREATE TABLE IF NOT EXISTS notifications (
-                id SERIAL PRIMARY KEY,
-                "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                type TEXT NOT NULL,
-                message TEXT NOT NULL,
-                "isRead" INTEGER DEFAULT 0,
-                data JSONB,
-                "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        `);
-        res.send('<h1>Success! Notifications table created.</h1><p>You can now go back and refresh the app.</p>');
-    } catch (error) {
-        res.status(500).send(`<h1>Error</h1><pre>${error.message}</pre>`);
-    }
-});
+
 
 // Start Server
 const { Server } = require('socket.io');
@@ -181,6 +162,26 @@ app.use(session({
         secure: process.env.NODE_ENV === 'production' // Secure in production
     }
 }));
+
+// Debug Route: Force create notifications table
+app.get('/api/debug/init-notifications', async (req, res) => {
+    try {
+        await query(`
+            CREATE TABLE IF NOT EXISTS notifications (
+                id SERIAL PRIMARY KEY,
+                "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                type TEXT NOT NULL,
+                message TEXT NOT NULL,
+                "isRead" INTEGER DEFAULT 0,
+                data JSONB,
+                "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        res.send('<h1>Success! Notifications table created.</h1><p>You can now go back and refresh the app.</p>');
+    } catch (error) {
+        res.status(500).send(`<h1>Error</h1><pre>${error.message}</pre>`);
+    }
+});
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
