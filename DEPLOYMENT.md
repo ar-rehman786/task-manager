@@ -10,16 +10,16 @@ All changes have been successfully pushed to GitHub and deployed to Railway.
 
 ### Latest Commits:
 ```
+980ac0d - Fix: Update Node.js to v20 for Next.js compatibility
+b50ffbf - Add Railway configuration to deploy Next.js application
+894ae37 - Add complete Next.js application - full migration with all features
 125afae - Add CORS support for Next.js frontend and /api/login endpoint
-4a2b431 - Fix light mode styling - replace hardcoded dark colors with CSS variables
-0eee8cd - Add KEKA-style attendance module with clock-in/out, live timer, and admin dashboard
-017580c - Add GET endpoint for database seeding
 ```
 
 ### Repository:
 **GitHub:** https://github.com/ar-rehman786/task-manager  
 **Branch:** main  
-**Status:** ✅ Up to date
+**Status:** ✅ Deployed - Railway building with Node.js 20
 
 ---
 

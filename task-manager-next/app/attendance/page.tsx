@@ -145,9 +145,9 @@ function AttendanceContent() {
                         variant={isClockedIn ? 'destructive' : 'default'}
                         onClick={() => {
                             if (isClockedIn) {
-                                clockOutMutation.mutate();
+                                clockOutMutation.mutate(undefined);
                             } else {
-                                clockInMutation.mutate();
+                                clockInMutation.mutate(undefined);
                             }
                         }}
                         disabled={clockInMutation.isPending || clockOutMutation.isPending}
