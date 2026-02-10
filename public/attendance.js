@@ -31,58 +31,61 @@ async function initAttendance() {
 
     try {
         if (attendanceUser && attendanceUser.role === 'admin') {
-            console.log('User is admin. Injecting Admin Panel...');
-
-            // construct HTML
+            // construct HTML with native classes for dark mode support
             const adminHtml = `
-                <div id="dynamic-admin-section" style="
-                    margin-bottom: 2rem; 
-                    padding: 1.5rem; 
-                    background: #fdf2f8; 
-                    border: 1px solid #fbcfe8; 
-                    border-radius: 1rem;
-                ">
-                    <h3 style="color: #be185d; margin-bottom: 1rem;">👑 Admin Attendance Overview</h3>
+                <div id="dynamic-admin-section" class="attendance-history" style="margin-bottom: 2rem; border-color: var(--primary);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h3 style="color: var(--primary); margin: 0;">👑 Team Attendance Overview</h3>
+                        <span class="badge badge-secondary">Admin View</span>
+                    </div>
                     
-                    <h4 style="margin-top: 1rem;">Today's Team Activity</h4>
-                    <table class="data-table" id="today-table" style="background: white;">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Email</th>
-                                <th>Clock In</th>
-                                <th>Clock Out</th>
-                                <th>Duration</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr><td colspan="6" style="text-align: center;">Loading...</td></tr>
-                        </tbody>
-                    </table>
+                    <h4 style="margin-bottom: 1rem; color: var(--text-secondary);">Today's Team Activity</h4>
+                    <div style="overflow-x: auto;">
+                        <table class="data-table" id="today-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Clock In</th>
+                                    <th>Clock Out</th>
+                                    <th>Duration</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="6" style="text-align: center;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
 
-                    <h4 style="margin-top: 2rem;">Full History (All Members)</h4>
-                    <table class="data-table" id="admin-history-table" style="background: white;">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Date</th>
-                                <th>Clock In</th>
-                                <th>Clock Out</th>
-                                <th>Duration</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr><td colspan="6" style="text-align: center;">Loading...</td></tr>
-                        </tbody>
-                    </table>
+                    <h4 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--text-secondary);">Full History (All Members)</h4>
+                    <div style="overflow-x: auto;">
+                        <table class="data-table" id="admin-history-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Date</th>
+                                    <th>Clock In</th>
+                                    <th>Clock Out</th>
+                                    <th>Duration</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="6" style="text-align: center;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             `;
 
             // Inject at the top of content-area (after header)
             const header = document.querySelector('.workspace-header');
             if (header) {
+                // Remove existing if any (prevent duplicates on re-render)
+                const existing = document.getElementById('dynamic-admin-section');
+                if (existing) existing.remove();
+
                 header.insertAdjacentHTML('afterend', adminHtml);
 
                 // Now load data into these new tables
