@@ -8,4 +8,4 @@ cmds = ['npm install && cd task-manager-next && npm install']
 cmds = ['cd task-manager-next && npm run build']
 
 [start]
-cmd = 'node server.js'
+cmd = 'node /app/server.js'
