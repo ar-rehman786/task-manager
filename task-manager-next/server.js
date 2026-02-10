@@ -1353,8 +1353,12 @@ app.post('/api/attendance/clock-out', requireAuth, async (req, res) => {
             activeSession.id
         ]);
 
-        const session = await query('SELECT * FROM attendance WHERE id = $1', [activeSession.id]);
-        res.json(session.rows[0]);
+        const sessionResult = await query('SELECT * FROM attendance WHERE id = $1', [activeSession.id]);
+
+        // Broadcast data update
+        io.emit('dataUpdate', { type: 'attendance' });
+
+        res.json(sessionResult.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Clock out error' });
     }
