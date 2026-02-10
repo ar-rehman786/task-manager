@@ -278,7 +278,11 @@ function loadAttendanceWorkspace() {
 
     // Initialize attendance after DOM is ready
     if (typeof initAttendance === 'function') {
+        console.log('Calling initAttendance from app.js');
         initAttendance();
+    } else {
+        console.error('initAttendance function not found!');
+        showError('Application Error: Attendance module failed to load. Please refresh the page.');
     }
 }
 
