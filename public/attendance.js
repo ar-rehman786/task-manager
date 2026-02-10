@@ -38,6 +38,19 @@ async function initAttendance() {
                 await loadAllAttendanceHistory();
 
                 // Ensure user sees it
+                // DEBUG: Move to top of page to verify visibility
+                const attendanceWidget = document.getElementById('attendance-widget');
+                if (attendanceWidget && adminSection) {
+                    console.log('Moving admin section to top...');
+                    attendanceWidget.parentNode.insertBefore(adminSection, attendanceWidget);
+
+                    // Add debug styling to make it impossible to miss
+                    adminSection.style.border = '2px solid #f59e0b'; // Orange border
+                    adminSection.style.padding = '1rem';
+                    adminSection.style.marginBottom = '2rem';
+                    adminSection.style.background = 'rgba(245, 158, 11, 0.1)';
+                }
+
                 setTimeout(() => {
                     console.log('Scrolling admin section into view');
                     adminSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
