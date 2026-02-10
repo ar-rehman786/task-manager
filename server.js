@@ -90,6 +90,7 @@ async function sendNotification(userId, type, message, data = {}) {
 
 // Notification APIs
 app.get('/api/notifications', requireAuth, async (req, res) => {
+    console.log(`[NOTIFICATIONS] Fetching for user ${req.session.userId}`);
     try {
         const result = await query(
             'SELECT * FROM notifications WHERE "userId" = $1 ORDER BY "createdAt" DESC LIMIT 50',
@@ -232,6 +233,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Auth middleware
 function requireAuth(req, res, next) {
     if (!req.session.userId) {
+        console.log(`[AUTH] Unauthorized access to ${req.originalUrl}. Session ID: ${req.sessionID}`);
         return res.status(401).json({ error: 'Unauthorized' });
     }
     next();
@@ -1280,6 +1282,16 @@ async function seedDatabase() {
         console.error('Auto-seed failed:', error);
     }
 }
+
+// GLOBAL ERROR HANDLER
+app.use((err, req, res, next) => {
+    console.error('🔥 CRITICAL SERVER ERROR:', err);
+    res.status(500).json({
+        error: 'Critical Server Error',
+        message: err.message,
+        location: 'Global Handler'
+    });
+});
 
 server.listen(PORT, async () => {
     console.log(`\n🚀 Server running on http://localhost:${PORT}`);
