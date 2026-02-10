@@ -11,7 +11,30 @@ const PORT = process.env.PORT || 3000;
 // Database initialization will be called on startup
 
 
+
+// Helper for startup errors
+let startupError = null;
+
 // Middleware
+app.use((req, res, next) => {
+    if (startupError) {
+        return res.status(500).send(`
+            <html>
+            <body style="font-family: monospace; background: #0f172a; color: #ef4444; padding: 2rem; max-width: 800px; margin: 0 auto;">
+                <h1 style="border-bottom: 2px solid #334155; padding-bottom: 1rem;">⚠️ Application Startup Failed</h1>
+                <p style="color: #cbd5e1; font-size: 1.1rem;">The server started, but the database initialization failed.</p>
+                <div style="background: #1e293b; padding: 1.5rem; border-radius: 0.5rem; overflow: auto; margin: 2rem 0; border: 1px solid #334155;">
+                    <strong style="color: #fca5a5; display: block; margin-bottom: 0.5rem;">Error Details:</strong>
+                    <pre style="margin: 0; white-space: pre-wrap;">${startupError.stack || startupError.message}</pre>
+                </div>
+                <p style="color: #94a3b8;">Please check your Railway logs and DATABASE_URL variable.</p>
+            </body>
+            </html>
+        `);
+    }
+    next();
+});
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -901,16 +924,19 @@ async function seedDatabase() {
 }
 
 app.listen(PORT, async () => {
+    console.log(`\n🚀 Server running on http://localhost:${PORT}`);
+
     try {
         console.log('🔄 Initializing database...');
         await initializeDatabase();
         console.log('✅ Database initialized.');
 
         await seedDatabase();
-        console.log(`\n🚀 SloraAI Task Manager (PostgreSQL) running on http://localhost:${PORT}`);
+        console.log(`✅ Database seeded.`);
         console.log(`📝 Login at http://localhost:${PORT}\n`);
     } catch (error) {
-        console.error('❌ Failed to start server:', error);
-        process.exit(1);
+        console.error('❌ Failed to initialize database:', error);
+        startupError = error;
+        // Do NOT process.exit(1) - keep server running to show error page
     }
 });
