@@ -42,7 +42,131 @@ async function loadDashboardStats() {
     }
 }
 
-// ... (renderDashboard remains largely the same, assuming it's correct)
+    }
+}
+
+// Load attendance widget
+async function loadAttendanceWidget() {
+    try {
+        const response = await fetch('/api/attendance/status');
+        if (response.ok) {
+            activeSession = await response.json();
+            renderClockInWidget(activeSession);
+            if (activeSession) {
+                startClockInTimer(activeSession.clockInTime);
+            }
+        }
+    } catch (error) {
+        console.error('Attendance widget error:', error);
+    }
+}
+
+// Render dashboard data
+function renderDashboard() {
+    if (!dashboardStats) return;
+
+    // Render Stats
+    renderChartJs();
+    renderPriorityChart();
+    renderUpcomingTasks();
+    renderCompletedTasks();
+}
+
+function renderUpcomingTasks() {
+    const container = document.getElementById('upcoming-tasks');
+    if (!container) return;
+
+    if (!dashboardStats.upcomingTasks || dashboardStats.upcomingTasks.length === 0) {
+        container.innerHTML = '<p class="text-muted" style="text-align:center; padding: 1rem;">No upcoming tasks due soon.</p>';
+        return;
+    }
+
+    container.innerHTML = dashboardStats.upcomingTasks.map(task => `
+        <div class="task-item" onclick="viewTask(${task.id})" style="cursor: pointer; padding: 0.75rem; border-bottom: 1px solid var(--border-color);">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div>
+                    <div style="font-weight: 500; margin-bottom: 0.25rem;">${task.title}</div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                        Due: ${new Date(task.dueDate).toLocaleDateString()}
+                        ${task.assignedUserName ? `• ${task.assignedUserName}` : ''}
+                    </div>
+                </div>
+                <span class="badge badge-${getPriorityColor(task.priority)}">${task.priority}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderCompletedTasks() {
+    const container = document.getElementById('completed-tasks');
+    if (!container) return;
+
+    if (!dashboardStats.completedTasks || dashboardStats.completedTasks.length === 0) {
+        container.innerHTML = '<p class="text-muted" style="text-align:center; padding: 1rem;">No recently completed tasks.</p>';
+        return;
+    }
+
+    container.innerHTML = dashboardStats.completedTasks.map(task => `
+        <div class="task-item" style="padding: 0.75rem; border-bottom: 1px solid var(--border-color); opacity: 0.8;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="text-decoration: line-through; color: var(--text-secondary);">${task.title}</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">
+                    ${new Date(task.updatedAt).toLocaleDateString()}
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderPriorityChart() {
+    const ctx = document.getElementById('priority-chart');
+    if (!ctx) return;
+
+    // Check if we already have a chart instance for this canvas, if so destroy it or reused it? 
+    // Since we don't track it globally like statusChart, let's look for a way to track it or just recreate simple HTML bars if Chart.js is too heavy for two charts.
+    // Actually, let's use a simple HTML progress bar style for priority to vary the visuals.
+
+    const stats = dashboardStats.priorityBreakdown || {};
+    const total = (stats.low || 0) + (stats.medium || 0) + (stats.high || 0) || 1; // avoid divide by zero
+
+    ctx.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 1rem; padding: 1rem;">
+            <div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.25rem;">
+                    <span>High Priority</span>
+                    <span>${stats.high || 0}</span>
+                </div>
+                <div style="height: 6px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden;">
+                    <div style="height: 100%; width: ${(stats.high || 0) / total * 100}%; background: #ef4444;"></div>
+                </div>
+            </div>
+            <div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.25rem;">
+                    <span>Medium Priority</span>
+                    <span>${stats.medium || 0}</span>
+                </div>
+                <div style="height: 6px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden;">
+                    <div style="height: 100%; width: ${(stats.medium || 0) / total * 100}%; background: #f59e0b;"></div>
+                </div>
+            </div>
+            <div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.25rem;">
+                    <span>Low Priority</span>
+                    <span>${stats.low || 0}</span>
+                </div>
+                <div style="height: 6px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden;">
+                    <div style="height: 100%; width: ${(stats.low || 0) / total * 100}%; background: #10b981;"></div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function getPriorityColor(priority) {
+    if (priority === 'high') return 'danger';
+    if (priority === 'medium') return 'warning';
+    return 'success';
+}
 
 function renderChartJs() {
     const ctx = document.getElementById('statusChartCanvas');
