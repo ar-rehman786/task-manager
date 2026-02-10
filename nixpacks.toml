@@ -1,11 +1,12 @@
 [phases.setup]
 nixPkgs = ['nodejs_20']
+aptPkgs = []
 
 [phases.install]
-cmds = ['cd task-manager-next && npm ci']
+cmds = ['cd task-manager-next && npm ci --include=dev']
 
 [phases.build]
 cmds = ['cd task-manager-next && npm run build']
 
 [start]
-cmd = 'cd task-manager-next && npm start'
+cmd = 'cd task-manager-next && PORT=$PORT npm start'
