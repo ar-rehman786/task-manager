@@ -69,10 +69,10 @@ function renderProfile(user) {
                     <span class="icon">📞</span> ${user.phone || 'No phone added'}
                 </div>
                 <div class="info-item">
-                    <span class="icon">📍</span> ${user.location || 'Remote'}
+                    <span class="icon">📍</span> ${user.location || '<span style="opacity:0.5">Add Location</span>'}
                 </div>
                 <div class="info-item">
-                    <span class="icon">🆔</span> ${user.employeeId || 'ID: N/A'}
+                    <span class="icon">🆔</span> ${user.employeeId || '<span style="opacity:0.5">Add ID</span>'}
                 </div>
              </div>
 
@@ -85,52 +85,49 @@ function renderProfile(user) {
 
              <!-- Tab Content -->
              <div class="profile-tab-content" id="tab-about">
-                <div class="card profile-card">
-                    <div class="card-header">
-                        <h3>Personal Details</h3>
-                        <button class="btn btn-primary btn-sm" onclick="toggleEditProfile()">
-                            ${isEditing ? 'Save Changes' : 'Edit Profile'}
+                <div class="card profile-card" style="border: 1px solid var(--border); box-shadow: var(--shadow-md);">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem;">
+                        <h3 style="margin: 0; font-size: 1.25rem;">Personal Information</h3>
+                        <button class="btn btn-primary" onclick="toggleEditProfile()" style="padding: 0.5rem 1.5rem;">
+                            ${isEditing ? '💾 Save Changes' : '✏️ Edit Profile'}
                         </button>
                     </div>
                     <div class="card-body">
                         <form id="profile-form" class="profile-form ${isEditing ? 'editing' : 'view-only'}">
-                            <div class="form-row">
+                            <div class="form-grid">
                                 <div class="form-group">
                                     <label>Full Name</label>
-                                    <input type="text" name="name" value="${user.name}" ${isEditing ? '' : 'readonly'}>
+                                    <input type="text" name="name" value="${user.name}" ${isEditing ? '' : 'readonly'} placeholder="Enter full name">
                                 </div>
                                 <div class="form-group">
                                     <label>Job Title</label>
-                                    <input type="text" name="title" value="${user.title || ''}" ${isEditing ? '' : 'readonly'}>
+                                    <input type="text" name="title" value="${user.title || ''}" ${isEditing ? '' : 'readonly'} placeholder="e.g. Senior Developer">
                                 </div>
-                            </div>
-                            <div class="form-row">
                                 <div class="form-group">
                                     <label>Department</label>
-                                    <input type="text" name="department" value="${user.department || ''}" ${isEditing ? '' : 'readonly'}>
+                                    <input type="text" name="department" value="${user.department || ''}" ${isEditing ? '' : 'readonly'} placeholder="e.g. Engineering">
                                 </div>
                                 <div class="form-group">
                                     <label>Reporting Manager</label>
                                     <select name="managerId" ${isEditing ? '' : 'disabled'}>
                                         <option value="${user.managerId || ''}">${user.managerName || 'Select Manager'}</option>
-                                        <!-- Will be populated dynamicall if editing -->
                                     </select>
                                 </div>
-                            </div>
-                            <div class="form-row">
                                 <div class="form-group">
-                                    <label>Phone</label>
-                                    <input type="text" name="phone" value="${user.phone || ''}" ${isEditing ? '' : 'readonly'}>
+                                    <label>Phone Number</label>
+                                    <input type="text" name="phone" value="${user.phone || ''}" ${isEditing ? '' : 'readonly'} placeholder="+1 (555) 000-0000">
                                 </div>
                                 <div class="form-group">
                                     <label>Location</label>
-                                    <input type="text" name="location" value="${user.location || ''}" ${isEditing ? '' : 'readonly'}>
+                                    <input type="text" name="location" value="${user.location || ''}" ${isEditing ? '' : 'readonly'} placeholder="e.g. New York, USA">
                                 </div>
-                            </div>
-                            <div class="form-row">
                                 <div class="form-group">
                                     <label>Employee ID</label>
-                                    <input type="text" name="employeeId" value="${user.employeeId || ''}" ${isEditing ? '' : 'readonly'}>
+                                    <input type="text" name="employeeId" value="${user.employeeId || ''}" ${isEditing ? '' : 'readonly'} placeholder="e.g. EMP-001">
+                                </div>
+                                <div class="form-group">
+                                    <label>Email Address</label>
+                                    <input type="email" value="${user.email}" readonly style="cursor: not-allowed; opacity: 0.7;">
                                 </div>
                             </div>
                         </form>

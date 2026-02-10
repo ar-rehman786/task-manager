@@ -294,17 +294,34 @@ function renderClockInWidget(activeSession) {
     const isClockedIn = activeSession !== null;
 
     wrapper.innerHTML = `
-        <div style="display: flex; gap: 1rem; align-items: center; background: var(--bg-secondary); padding: 0.5rem 1rem; border-radius: var(--radius-lg); border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
-            ${isClockedIn ? `
-                <div style="color: #34d399; font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
-                    <span style="animation: pulse 2s infinite">●</span> <span id="clock-duration">00:00:00</span>
+        <div class="clock-in-widget-container">
+            <div class="clock-status-text">
+                <div class="clock-status-title">
+                    ${isClockedIn ? 'Active Session' : 'Ready to work?'}
                 </div>
-                <button class="btn btn-danger btn-sm" onclick="quickClockOut()">Stop</button>
+                <div class="clock-status-subtitle">
+                    ${isClockedIn ? 'Tracking your time automatically' : 'Start your timer to track attendance'}
+                </div>
+            </div>
+
+            ${isClockedIn ? `
+                <div class="clock-timer-display">
+                    <span id="clock-duration">${calculateDuration(activeSession.clockInTime)}</span>
+                </div>
+                <div class="clock-action-area">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; color: #10b981; font-weight: 500;">
+                        <span class="pulse-dot-large"></span> Live
+                    </div>
+                    <button class="btn-clock-out-large" onclick="quickClockOut()">
+                        ⏹ End Session
+                    </button>
+                </div>
             ` : `
-                <span style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">Ready to work?</span>
-                <button class="btn btn-primary btn-sm" onclick="quickClockIn()">
-                    <span style="margin-right: 0.25rem;">▶️</span> Clock In
-                </button>
+                <div class="clock-action-area">
+                    <button class="btn-clock-in-large" onclick="quickClockIn()">
+                        ▶ Start Session
+                    </button>
+                </div>
             `}
         </div>
     `;
@@ -394,7 +411,7 @@ function stopClockInTimer() {
 function calculateDuration(startTime) {
     const start = new Date(startTime);
     const now = new Date();
-    const diff = now - start;
+    const diff = Math.max(0, now - start); // Prevent negative diffs
 
     const hours = Math.floor(diff / 1000 / 60 / 60);
     const minutes = Math.floor((diff / 1000 / 60) % 60);
