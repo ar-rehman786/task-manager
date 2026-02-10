@@ -43,6 +43,16 @@ async function initNotifications() {
         console.error('Notification bell NOT found in DOM');
     }
 
+    // Request notification permission immediately
+    if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                console.log('System notifications granted!');
+                new Notification('Task Manager', { body: 'Notifications enabled!' });
+            }
+        });
+    }
+
     // Join user room
     try {
         console.log('[DEEP_DEBUG] Fetching /api/auth/me...');
@@ -63,6 +73,7 @@ async function initNotifications() {
         console.log(`[DEEP_DEBUG] RECEIVED NOTIFICATION:`, data);
         playNotificationSound(data.type);
         showToast(data.message, data.type);
+        showSystemNotification(data); // Add system notification support
         addNotificationToDropdown(data);
         incrementBadge();
     });
@@ -252,6 +263,22 @@ function formatTimeAgo(dateString) {
     const hours = Math.floor(minutes / 60);
     if (hours < 24) return `${hours}h ago`;
     return date.toLocaleDateString();
+}
+
+function showSystemNotification(data) {
+    if (!('Notification' in window)) {
+        console.log('This browser does not support system notifications');
+        return;
+        const notification = new Notification('Task Manager', {
+            body: data.message,
+            tag: 'task-manager-notification'
+        });
+
+        notification.onclick = function () {
+            window.focus();
+            notification.close();
+        };
+    }
 }
 
 // Expose global for onclick

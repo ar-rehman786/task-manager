@@ -69,6 +69,10 @@ f596b6f - Initial deployment with tasks, projects, and team management
 - [x] Animated status indicators
 - [x] Optional notes for clock-in/out
 
+### ✅ Notifications (NEW):
+- [x] In-app toasts
+- [x] System-level notifications (Web Push)
+
 ---
 
 ## 🎯 How to Access
