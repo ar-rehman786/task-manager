@@ -268,7 +268,11 @@ function formatDuration(minutes) {
 async function loadAttendanceHistory() {
     try {
         const response = await fetch('/api/attendance/history?limit=30');
+        if (!response.ok) throw new Error('Failed to load history');
+
         const records = await response.json();
+
+        if (!Array.isArray(records)) throw new Error('Invalid response format');
 
         // Calculate today's total duration
         const today = new Date().toDateString();
@@ -288,6 +292,8 @@ async function loadAttendanceHistory() {
         renderAttendanceHistory(records);
     } catch (error) {
         console.error('Load history error:', error);
+        document.querySelector('#history-table tbody').innerHTML =
+            `<tr><td colspan="5" style="text-align: center; color: red;">Error loading history: ${error.message}</td></tr>`;
     }
 }
 
