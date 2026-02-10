@@ -1,16 +1,21 @@
-// Dashboard Page
+// Dashboard Page - Premium Redesign
 let dashboardStats = null;
 let dashboardUser = null;
 let clockInTimer = null;
+let statusChart = null; // Chart.js instance
 
 // Initialize dashboard
 async function initDashboard() {
-    dashboardUser = await fetch('/api/auth/me').then(r => r.json());
-    await loadDashboardStats();
-    await loadAttendanceWidget();
+    try {
+        dashboardUser = await fetch('/api/auth/me').then(r => r.json());
+        await loadDashboardStats();
+        await loadAttendanceWidget();
 
-    // Refresh stats every 30 seconds
-    setInterval(loadDashboardStats, 30000);
+        // Refresh stats every 30 seconds
+        setInterval(loadDashboardStats, 30000);
+    } catch (err) {
+        console.error("Dashboard init failed", err);
+    }
 }
 
 // Load dashboard statistics
@@ -39,36 +44,227 @@ async function loadAttendanceWidget() {
     }
 }
 
-// Render dashboard
+// Render dashboard - The New "Premium" Layout
 function renderDashboard() {
     if (!dashboardStats) return;
 
-    renderStatCards();
-    renderUpcomingTasks();
-    renderCompletedTasks();
-    renderTaskCharts();
+    const container = document.getElementById('content-area');
+
+    // Safety check if dashboard container exists
+    if (!container) return;
+
+    // Build the grid layout
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const greeting = getGreeting();
+
+    container.innerHTML = `
+        <div class="dashboard-grid">
+            <!-- Header -->
+            <div class="dashboard-header">
+                <div class="welcome-section">
+                    <h1 class="gradient-text">${greeting}, ${dashboardUser.name.split(' ')[0]}</h1>
+                    <div class="date-display">${today}</div>
+                </div>
+                <div id="clock-in-widget-wrapper"></div>
+            </div>
+
+            <!-- Stat Cards Row -->
+            <div class="stat-card-premium" style="grid-column: 1 / 2;">
+                <div class="stat-icon-wrapper" style="background: rgba(99, 102, 241, 0.1); color: #818cf8;">
+                    📋
+                </div>
+                <div class="stat-details">
+                    <div class="stat-value-big">${dashboardStats.totalTasks}</div>
+                    <div class="stat-label-small">Total Tasks</div>
+                </div>
+            </div>
+
+            <div class="stat-card-premium" style="grid-column: 2 / 3;">
+                <div class="stat-icon-wrapper" style="background: rgba(245, 158, 11, 0.1); color: #fbbf24;">
+                    ⚡
+                </div>
+                <div class="stat-details">
+                    <div class="stat-value-big">${dashboardStats.statusBreakdown.in_progress || 0}</div>
+                    <div class="stat-label-small">In Progress</div>
+                </div>
+            </div>
+
+            <div class="stat-card-premium" style="grid-column: 3 / 4;">
+                <div class="stat-icon-wrapper" style="background: rgba(236, 72, 153, 0.1); color: #f472b6;">
+                    📅
+                </div>
+                <div class="stat-details">
+                    <div class="stat-value-big">${dashboardStats.upcomingTasks.length}</div>
+                    <div class="stat-label-small">Upcoming</div>
+                </div>
+            </div>
+
+            <div class="stat-card-premium" style="grid-column: 4 / 5;">
+                <div class="stat-icon-wrapper" style="background: rgba(16, 185, 129, 0.1); color: #34d399;">
+                    ✅
+                </div>
+                <div class="stat-details">
+                    <div class="stat-value-big">${dashboardStats.statusBreakdown.done || 0}</div>
+                    <div class="stat-label-small">Completed</div>
+                </div>
+            </div>
+
+            <!-- Priority Focus Section (List) -->
+            <div class="priority-focus-section">
+                <div class="dashboard-section-title">
+                    <span>🔥 Priority Focus</span>
+                </div>
+                <div id="upcoming-tasks-list">
+                    <!-- Tasks injected here -->
+                </div>
+            </div>
+
+            <!-- Analytics Section (Charts) -->
+            <div class="analytics-section">
+                <div class="chart-container-card">
+                    <div class="dashboard-section-title">Task Distribution</div>
+                    <div style="height: 250px; position: relative;">
+                        <canvas id="statusChartCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Render Sub-components
+    renderUpcomingTasksList();
+    loadAttendanceWidget(); // Re-bind widget to new container
+
+    // Render Chart using Chart.js
+    renderChartJs();
 }
 
-// Render clock-in widget
+function getGreeting() {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 18) return 'Good Afternoon';
+    return 'Good Evening';
+}
+
+function renderUpcomingTasksList() {
+    const container = document.getElementById('upcoming-tasks-list');
+    const tasks = dashboardStats.upcomingTasks;
+
+    if (tasks.length === 0) {
+        container.innerHTML = '<div style="text-align:center; padding: 2rem; color: var(--text-muted);">🎉 All caught up! No upcoming tasks.</div>';
+        return;
+    }
+
+    container.innerHTML = tasks.slice(0, 5).map(task => { // Limit to 5 tasks
+        const dueDate = new Date(task.dueDate);
+        const daysUntil = Math.ceil((dueDate - new Date()) / (1000 * 60 * 60 * 24));
+        const colorClass = daysUntil <= 1 ? '#f87171' : '#cbd5e1'; // Red for urgent
+
+        return `
+            <div class="task-row" onclick="viewTask(${task.id})">
+                <div class="task-row-icon">
+                    ⚪
+                </div>
+                <div class="task-row-content">
+                    <div class="task-row-title">${task.title}</div>
+                    <div class="task-row-meta">
+                        <span style="color: ${colorClass}">📅 Due ${new Date(task.dueDate).toLocaleDateString()}</span>
+                        <span>• ${task.priority}</span>
+                    </div>
+                </div>
+                <div class="task-row-status" style="background: rgba(255,255,255,0.1);">
+                    ${task.status.replace('_', ' ')}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderChartJs() {
+    const ctx = document.getElementById('statusChartCanvas');
+    if (!ctx) return;
+
+    // Destroy previous instance if exists
+    if (statusChart) {
+        statusChart.destroy();
+    }
+
+    const stats = dashboardStats.statusBreakdown;
+
+    // Check if Chart is loaded
+    if (typeof Chart === 'undefined') {
+        ctx.parentNode.innerHTML = '<p style="color:red; text-align:center;">Chart.js not loaded. Check internet connection.</p>';
+        return;
+    }
+
+    statusChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['To Do', 'In Progress', 'Done', 'Blocked'],
+            datasets: [{
+                data: [
+                    stats.todo || 0,
+                    stats.in_progress || 0,
+                    stats.done || 0,
+                    stats.blocked || 0
+                ],
+                backgroundColor: [
+                    '#94a3b8', // Todo (Gray)
+                    '#818cf8', // In Progress (Indigo)
+                    '#34d399', // Done (Emerald)
+                    '#ef4444'  // Blocked (Red)
+                ],
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: '#cbd5e1',
+                        font: {
+                            family: 'Inter',
+                            size: 11
+                        },
+                        boxWidth: 12,
+                        padding: 20
+                    }
+                }
+            },
+            cutout: '70%'
+        }
+    });
+}
+
+// Render clock-in widget (Re-implementation for new container)
 function renderClockInWidget(activeSession) {
-    const widget = document.getElementById('clock-in-widget');
+    const wrapper = document.getElementById('clock-in-widget-wrapper');
+    if (!wrapper) return;
+
     const isClockedIn = activeSession !== null;
 
-    widget.innerHTML = `
-        <div class="quick-clock-widget ${isClockedIn ? 'clocked-in' : ''}">
-            <div class="clock-status">
-                <div class="status-dot ${isClockedIn ? 'active' : ''}"></div>
-                <span class="status-text">${isClockedIn ? 'Clocked In' : 'Not Clocked In'}</span>
-            </div>
+    wrapper.innerHTML = `
+        <div style="display: flex; gap: 1rem; align-items: center;">
             ${isClockedIn ? `
-                <div class="clock-duration" id="clock-duration">00:00:00</div>
-                <button class="btn btn-danger btn-sm" onclick="quickClockOut()">Clock Out</button>
+                <div style="background: rgba(16, 185, 129, 0.2); color: #34d399; padding: 0.5rem 1rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="animation: pulse 2s infinite">●</span> <span id="clock-duration">00:00:00</span>
+                </div>
+                <button class="btn btn-danger btn-sm" onclick="quickClockOut()">Stop</button>
             ` : `
-                <button class="btn btn-primary btn-sm" onclick="quickClockIn()">Clock In</button>
+                <button class="btn btn-primary" onclick="quickClockIn()">
+                    <span style="margin-right: 0.5rem;">▶️</span> Clock In
+                </button>
             `}
         </div>
     `;
 }
+
+// ... Keep existing Clock In/Out logic (quickClockIn, quickClockOut, Timer logic) ...
+// (Re-pasting helper functions to ensure they exist)
 
 // Quick clock in
 async function quickClockIn() {
@@ -160,188 +356,14 @@ function formatMinutes(minutes) {
     return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 }
 
-// Render stat cards
-function renderStatCards() {
-    const container = document.getElementById('stat-cards');
-    const stats = dashboardStats.statusBreakdown;
-
-    container.innerHTML = `
-        <div class="stat-card">
-            <div class="stat-icon" style="background: linear-gradient(135deg, #667eea, #764ba2);">📊</div>
-            <div class="stat-info">
-                <div class="stat-label">Total Tasks</div>
-                <div class="stat-value">${dashboardStats.totalTasks}</div>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb, #f5576c);">📅</div>
-            <div class="stat-info">
-                <div class="stat-label">Upcoming</div>
-                <div class="stat-value">${dashboardStats.upcomingTasks.length}</div>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe, #00f2fe);">⚡</div>
-            <div class="stat-info">
-                <div class="stat-label">In Progress</div>
-                <div class="stat-value">${stats.in_progress || 0}</div>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b, #38f9d7);">✅</div>
-            <div class="stat-info">
-                <div class="stat-label">Completed</div>
-                <div class="stat-value">${stats.done || 0}</div>
-            </div>
-        </div>
-    `;
-}
-
-// Render upcoming tasks
-function renderUpcomingTasks() {
-    const container = document.getElementById('upcoming-tasks');
-    const tasks = dashboardStats.upcomingTasks;
-
-    if (tasks.length === 0) {
-        container.innerHTML = '<p class="empty-state">No upcoming tasks</p>';
-        return;
-    }
-
-    container.innerHTML = tasks.map(task => {
-        const dueDate = new Date(task.dueDate);
-        const daysUntil = Math.ceil((dueDate - new Date()) / (1000 * 60 * 60 * 24));
-        const urgency = daysUntil <= 1 ? 'urgent' : daysUntil <= 3 ? 'soon' : 'normal';
-
-        return `
-            <div class="task-item ${urgency}" onclick="viewTask(${task.id})">
-                <div class="task-item-header">
-                    <span class="task-item-title">${task.title}</span>
-                    <span class="task-priority ${task.priority}">${task.priority}</span>
-                </div>
-                <div class="task-item-meta">
-                    <span class="task-due-date">
-                        📅 ${daysUntil === 0 ? 'Today' : daysUntil === 1 ? 'Tomorrow' : `${daysUntil} days`}
-                    </span>
-                    ${task.assignedUserName ? `<span class="task-assignee">👤 ${task.assignedUserName}</span>` : ''}
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-// Render completed tasks
-function renderCompletedTasks() {
-    const container = document.getElementById('completed-tasks');
-    const tasks = dashboardStats.completedTasks;
-
-    if (tasks.length === 0) {
-        container.innerHTML = '<p class="empty-state">No completed tasks yet</p>';
-        return;
-    }
-
-    container.innerHTML = tasks.map(task => `
-        <div class="task-item completed" onclick="viewTask(${task.id})">
-            <div class="task-item-header">
-                <span class="task-item-title">✓ ${task.title}</span>
-            </div>
-            <div class="task-item-meta">
-                <span class="task-completed-date">Completed ${formatRelativeTime(task.updatedAt)}</span>
-                ${task.assignedUserName ? `<span class="task-assignee">👤 ${task.assignedUserName}</span>` : ''}
-            </div>
-        </div>
-    `).join('');
-}
-
-// Render task charts
-function renderTaskCharts() {
-    renderStatusChart();
-    renderPriorityChart();
-}
-
-// Render status chart (simple text-based visualization)
-function renderStatusChart() {
-    const container = document.getElementById('status-chart');
-    const stats = dashboardStats.statusBreakdown;
-    const total = dashboardStats.totalTasks || 1;
-
-    const statusData = [
-        { label: 'To Do', count: stats.todo || 0, color: '#94a3b8' },
-        { label: 'In Progress', count: stats.in_progress || 0, color: '#3b82f6' },
-        { label: 'Blocked', count: stats.blocked || 0, color: '#f59e0b' },
-        { label: 'Done', count: stats.done || 0, color: '#10b981' }
-    ];
-
-    container.innerHTML = `
-        <div class="chart-bars">
-            ${statusData.map(item => {
-        const percentage = total > 0 ? (item.count / total * 100) : 0;
-        return `
-                    <div class="chart-bar-item">
-                        <div class="chart-bar-label">
-                            <span>${item.label}</span>
-                            <span class="chart-bar-value">${item.count}</span>
-                        </div>
-                        <div class="chart-bar-track">
-                            <div class="chart-bar-fill" style="width: ${percentage}%; background: ${item.color};"></div>
-                        </div>
-                    </div>
-                `;
-    }).join('')}
-        </div>
-    `;
-}
-
-// Render priority chart
-function renderPriorityChart() {
-    const container = document.getElementById('priority-chart');
-    const stats = dashboardStats.priorityBreakdown;
-    const total = (stats.low || 0) + (stats.medium || 0) + (stats.high || 0) || 1;
-
-    const priorityData = [
-        { label: 'Low', count: stats.low || 0, color: '#6ee7b7', percentage: ((stats.low || 0) / total * 100).toFixed(1) },
-        { label: 'Medium', count: stats.medium || 0, color: '#fbbf24', percentage: ((stats.medium || 0) / total * 100).toFixed(1) },
-        { label: 'High', count: stats.high || 0, color: '#f87171', percentage: ((stats.high || 0) / total * 100).toFixed(1) }
-    ];
-
-    container.innerHTML = `
-        <div class="chart-legend">
-            ${priorityData.map(item => `
-                <div class="chart-legend-item">
-                    <div class="chart-legend-color" style="background: ${item.color};"></div>
-                    <div class="chart-legend-info">
-                        <div class="chart-legend-label">${item.label}</div>
-                        <div class="chart-legend-value">${item.count} (${item.percentage}%)</div>
-                    </div>
-                </div>
-            `).join('')}
-        </div>
-    `;
-}
-
 // View task details
 function viewTask(taskId) {
-    // Navigate to tasks page and open task modal
     loadWorkspace('tasks');
-    // Note: Task modal opening would be handled by tasks.js
-}
-
-// Format relative time
-function formatRelativeTime(dateString) {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now - date;
-    const minutes = Math.floor(diff / 1000 / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    return `${days}d ago`;
+    // Note: In a full app, this would open the specific task modal
 }
 
 // Show notification
 function showNotification(message, type = 'info') {
-    // Simple notification - can be enhanced with a toast library
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
     notification.textContent = message;
@@ -365,6 +387,4 @@ function showNotification(message, type = 'info') {
         setTimeout(() => notification.remove(), 300);
     }, 3000);
 }
-
-// Initialize on page load
 
