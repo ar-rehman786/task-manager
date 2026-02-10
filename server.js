@@ -533,6 +533,9 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
             SELECT t.*, u.name as "assignedUserName", c.name as "createdByName", p.name as "projectName"
             FROM tasks t
             LEFT JOIN users u ON t."assignedUserId" = u.id
+            LEFT JOIN users c ON t."createdBy" = c.id
+            LEFT JOIN projects p ON t."projectId" = p.id
+            WHERE t.id = $1
         `, [task.id]);
 
         // Send Notification to Assignee
@@ -550,8 +553,19 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
 app.put('/api/tasks/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     const { title, description, status, priority, dueDate, assignedUserId, labels, projectId } = req.body;
+    const currentUserId = req.session.userId;
+    const currentUserName = req.session.userName;
 
     try {
+        // Fetch existing task first
+        const oldTaskResult = await query('SELECT * FROM tasks WHERE id = $1', [id]);
+        const oldTask = oldTaskResult.rows[0];
+
+        if (!oldTask) {
+            return res.status(404).json({ error: 'Task not found' });
+        }
+
+        // Perform Update
         await query(`
             UPDATE tasks 
             SET title = $1, description = $2, status = $3, priority = $4, "dueDate" = $5, 
@@ -559,7 +573,7 @@ app.put('/api/tasks/:id', requireAuth, async (req, res) => {
             WHERE id = $9
         `, [title, description, status, priority, dueDate, assignedUserId, labels, projectId, id]);
 
-        const task = await query(`
+        const taskResult = await query(`
             SELECT t.*, u.name as "assignedUserName", c.name as "createdByName", p.name as "projectName"
             FROM tasks t
             LEFT JOIN users u ON t."assignedUserId" = u.id
@@ -567,13 +581,41 @@ app.put('/api/tasks/:id', requireAuth, async (req, res) => {
             LEFT JOIN projects p ON t."projectId" = p.id
             WHERE t.id = $1
         `, [id]);
+        const newTask = taskResult.rows[0];
 
-        // Notification for assignee
-        if (assignedUserId && Number(assignedUserId) !== req.session.userId) {
-            sendNotification(assignedUserId, 'info', `Task Updated: ${task.rows[0].title}`, { taskId: id });
+        // --- Notification Logic ---
+        let notificationMessage = '';
+        const targetUserId = Number(assignedUserId);
+
+        // 1. Assignment Change
+        if (oldTask.assignedUserId != assignedUserId) {
+            if (targetUserId && targetUserId !== currentUserId) {
+                notificationMessage = `${currentUserName} assigned you to task: ${newTask.title}`;
+            }
+        }
+        // 2. Status Change
+        else if (oldTask.status !== status) {
+            const statusMap = { todo: 'To Do', in_progress: 'In Progress', blocked: 'Blocked', done: 'Done' };
+            notificationMessage = `${currentUserName} moved task '${newTask.title}' from ${statusMap[oldTask.status]} to ${statusMap[status]}`;
+        }
+        // 3. Priority Change
+        else if (oldTask.priority !== priority) {
+            notificationMessage = `${currentUserName} changed priority of '${newTask.title}' to ${priority}`;
+        }
+        // 4. Content Update (Title/Description) - only if no other major change
+        else if (oldTask.title !== title || oldTask.description !== description) {
+            notificationMessage = `${currentUserName} updated details for task: ${newTask.title}`;
         }
 
-        res.json(task.rows[0]);
+        // Send Notification if message exists and user is not assigning to themselves
+        if (notificationMessage && targetUserId && targetUserId !== currentUserId) {
+            sendNotification(targetUserId, 'info', notificationMessage, { taskId: id });
+        } else if (notificationMessage && !targetUserId && oldTask.createdBy !== currentUserId) {
+            // Notify creator if unassigned and someone else updates it
+            sendNotification(oldTask.createdBy, 'info', notificationMessage, { taskId: id });
+        }
+
+        res.json(newTask);
     } catch (error) {
         console.error('Update task error:', error);
         res.status(500).json({ error: 'Failed to update task' });

@@ -72,6 +72,7 @@ f596b6f - Initial deployment with tasks, projects, and team management
 ### ✅ Notifications (NEW):
 - [x] In-app toasts
 - [x] System-level notifications (Web Push)
+- [x] Detailed action messages (e.g., "User X moved task to Done")
 
 ---
 
