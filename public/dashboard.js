@@ -63,10 +63,66 @@ function renderDashboard() {
     if (!dashboardStats) return;
 
     // Render Stats
+    renderStatCards();
     renderChartJs();
     renderPriorityChart();
     renderUpcomingTasks();
     renderCompletedTasks();
+}
+
+function renderStatCards() {
+    const container = document.getElementById('stat-cards');
+    if (!container) return;
+
+    // Safety checks
+    const totalTasks = dashboardStats.totalTasks || 0;
+    const completedTasks = dashboardStats.statusBreakdown ? (dashboardStats.statusBreakdown.done || 0) : 0;
+    const attendance = dashboardStats.attendanceSummary || { active: 0, total: 0 };
+
+    // Calculate completion rate
+    const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    container.innerHTML = `
+        <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(99, 102, 241, 0.1); color: #6366f1;">
+                📝
+            </div>
+            <div class="stat-info">
+                <div class="stat-value">${totalTasks}</div>
+                <div class="stat-label">Total Tasks</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+                ✅
+            </div>
+            <div class="stat-info">
+                <div class="stat-value">${completionRate}%</div>
+                <div class="stat-label">Completion Rate</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+                ⏱️
+            </div>
+            <div class="stat-info">
+                <div class="stat-value">${attendance.active || 0}</div>
+                <div class="stat-label">Active Now</div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;">
+                📅
+            </div>
+            <div class="stat-info">
+                <div class="stat-value">${attendance.total || 0}</div>
+                <div class="stat-label">Sessions Today</div>
+            </div>
+        </div>
+    `;
 }
 
 function renderUpcomingTasks() {
