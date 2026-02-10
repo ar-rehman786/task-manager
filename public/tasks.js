@@ -64,7 +64,19 @@ async function loadTasksWorkspace() {
 
   // Load first board
   if (allBoards.length > 0) {
+    // If a task ID is pending, find which board it belongs to (if possible) or just switch to the first/relevant board
+    // Ideally update switchBoard to handle this but for now just load defaults
     switchBoard(allBoards[0].id);
+  }
+
+  // Check for pending task to open (from dashboard)
+  const pendingTaskId = sessionStorage.getItem('openTaskId');
+  if (pendingTaskId) {
+    sessionStorage.removeItem('openTaskId');
+    // Give UI a moment to render
+    setTimeout(() => {
+      showTaskDetails(pendingTaskId); // Function found in view_file of tasks.js lower half
+    }, 500);
   }
 }
 

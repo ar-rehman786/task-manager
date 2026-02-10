@@ -160,7 +160,7 @@ function renderCompletedTasks() {
     }
 
     container.innerHTML = dashboardStats.completedTasks.map(task => `
-        <div class="task-item" style="padding: 0.75rem; border-bottom: 1px solid var(--border-color); opacity: 0.8;">
+        <div class="task-item" onclick="viewTask(${task.id})" style="padding: 0.75rem; border-bottom: 1px solid var(--border-color); opacity: 0.8; cursor: pointer;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="text-decoration: line-through; color: var(--text-secondary);">${task.title}</div>
                 <div style="font-size: 0.75rem; color: var(--text-muted);">
@@ -286,27 +286,36 @@ function renderChartJs() {
     });
 }
 
-// Render clock-in widget (Re-implementation for new container)
+// Render clock-in widget
 function renderClockInWidget(activeSession) {
-    const wrapper = document.getElementById('clock-in-widget-wrapper');
+    const wrapper = document.getElementById('clock-in-widget');
     if (!wrapper) return;
 
     const isClockedIn = activeSession !== null;
 
     wrapper.innerHTML = `
-        <div style="display: flex; gap: 1rem; align-items: center;">
+        <div style="display: flex; gap: 1rem; align-items: center; background: var(--bg-secondary); padding: 0.5rem 1rem; border-radius: var(--radius-lg); border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
             ${isClockedIn ? `
-                <div style="background: rgba(16, 185, 129, 0.2); color: #34d399; padding: 0.5rem 1rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
+                <div style="color: #34d399; font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem;">
                     <span style="animation: pulse 2s infinite">●</span> <span id="clock-duration">00:00:00</span>
                 </div>
                 <button class="btn btn-danger btn-sm" onclick="quickClockOut()">Stop</button>
             ` : `
-                <button class="btn btn-primary" onclick="quickClockIn()">
-                    <span style="margin-right: 0.5rem;">▶️</span> Clock In
+                <span style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">Ready to work?</span>
+                <button class="btn btn-primary btn-sm" onclick="quickClockIn()">
+                    <span style="margin-right: 0.25rem;">▶️</span> Clock In
                 </button>
             `}
         </div>
     `;
+}
+
+// ... Keep existing Clock In/Out logic ...
+
+// View task details
+function viewTask(taskId) {
+    sessionStorage.setItem('openTaskId', taskId);
+    loadWorkspace('tasks');
 }
 
 // ... Keep existing Clock In/Out logic (quickClockIn, quickClockOut, Timer logic) ...
