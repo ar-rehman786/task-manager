@@ -10,9 +10,10 @@ All changes have been successfully pushed to GitHub and deployed to Railway.
 
 ### Latest Commits:
 ```
+125afae - Add CORS support for Next.js frontend and /api/login endpoint
+4a2b431 - Fix light mode styling - replace hardcoded dark colors with CSS variables
 0eee8cd - Add KEKA-style attendance module with clock-in/out, live timer, and admin dashboard
 017580c - Add GET endpoint for database seeding
-f596b6f - Initial deployment with tasks, projects, and team management
 ```
 
 ### Repository:
@@ -87,6 +88,22 @@ f596b6f - Initial deployment with tasks, projects, and team management
   - Added theme switcher in top navigation bar
   - Smooth transitions between light and dark themes
   - Theme preference persists via localStorage
+  - **FIXED**: Replaced all hardcoded dark colors with CSS variables for proper theme switching
+  - Profile sections, navigation bars, widgets, and tables now display correctly in light mode
+
+### 🆕 Next.js Frontend (In Development):
+- [x] **Backend CORS Configuration**: Server now supports Next.js frontend on localhost:3000
+- [x] **API Compatibility**: Added `/api/login` endpoint for Next.js authentication
+- [x] **Foundation Built**: 
+  - Next.js 14 with TypeScript and Tailwind CSS
+  - Authentication system with Zustand
+  - Professional UI components and layouts
+  - Dashboard, Login pages complete
+  - Placeholder pages for Tasks, Projects, Team, Attendance, Profile
+- [ ] **Production Deployment**: Next.js frontend not yet deployed (coming soon)
+- 📍 **Local Development**: Run `npm run dev` in `/task-manager-next` folder
+
+> **Note:** The Next.js frontend is a modern rewrite running locally. Production deployment coming in future updates.
 
 ---
 
