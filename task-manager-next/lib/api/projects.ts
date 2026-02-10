@@ -1,5 +1,5 @@
+import { Project, Milestone, AccessItem, ProjectLog, Transcription } from '../types';
 import api from './client';
-import { Project, ApiResponse } from '../types';
 
 export const projectsApi = {
     getProjects: async () => {
@@ -23,7 +23,61 @@ export const projectsApi = {
     },
 
     deleteProject: async (id: number) => {
-        const response = await api.delete<ApiResponse<any>>(`/api/projects/${id}`);
+        const response = await api.delete(`/api/projects/${id}`);
+        return response.data;
+    },
+
+    // Milestones
+    getMilestones: async (projectId: number) => {
+        const response = await api.get<Milestone[]>(`/api/projects/${projectId}/milestones`);
+        return response.data;
+    },
+
+    createMilestone: async (projectId: number, data: Partial<Milestone>) => {
+        const response = await api.post<Milestone>(`/api/projects/${projectId}/milestones`, data);
+        return response.data;
+    },
+
+    updateMilestone: async (id: number, data: Partial<Milestone>) => {
+        const response = await api.put<Milestone>(`/api/milestones/${id}`, data);
+        return response.data;
+    },
+
+    deleteMilestone: async (id: number) => {
+        const response = await api.delete(`/api/milestones/${id}`);
+        return response.data;
+    },
+
+    // Access Items
+    getAccessItems: async (projectId: number) => {
+        const response = await api.get<AccessItem[]>(`/api/projects/${projectId}/access`);
+        return response.data;
+    },
+
+    createAccessItem: async (projectId: number, data: Partial<AccessItem>) => {
+        const response = await api.post<AccessItem>(`/api/projects/${projectId}/access`, data);
+        return response.data;
+    },
+
+    updateAccessItem: async (id: number, data: Partial<AccessItem>) => {
+        const response = await api.put<AccessItem>(`/api/access/${id}`, data);
+        return response.data;
+    },
+
+    // Logs
+    getProjectLogs: async (projectId: number) => {
+        const response = await api.get<ProjectLog[]>(`/api/projects/${projectId}/logs`);
+        return response.data;
+    },
+
+    // Transcriptions
+    getTranscriptions: async (projectId: number) => {
+        const response = await api.get<Transcription[]>(`/api/projects/${projectId}/transcriptions`);
+        return response.data;
+    },
+
+    createTranscription: async (projectId: number, data: Partial<Transcription>) => {
+        const response = await api.post<Transcription>(`/api/projects/${projectId}/transcriptions`, data);
         return response.data;
     },
 };

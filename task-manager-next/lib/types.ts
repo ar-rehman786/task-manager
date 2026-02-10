@@ -48,6 +48,11 @@ export interface Project {
     endDate?: string;
     budget?: number;
     spent?: number;
+    managerId?: number;
+    managerName?: string;
+    assignedUserId?: number;
+    assignedUserName?: string;
+    pendingAccessCount?: number;
     milestones?: Milestone[];
     accessItems?: AccessItem[];
     createdBy?: number;
@@ -58,10 +63,10 @@ export interface Milestone {
     id: number;
     projectId: number;
     title: string;
-    description?: string;
+    details?: string;
     status: 'not_started' | 'in_progress' | 'done';
     dueDate?: string;
-    checklist?: ChecklistItem[];
+    orderIndex?: number;
     createdAt?: string;
 }
 
@@ -74,12 +79,24 @@ export interface ChecklistItem {
 export interface AccessItem {
     id: number;
     projectId: number;
-    title: string;
-    url?: string;
-    username?: string;
-    password?: string;
+    platform: string;
+    description?: string;
     notes?: string;
+    isGranted?: number; // 0 or 1
+    grantedAt?: string;
+    grantedEmail?: string;
     createdAt?: string;
+    requestedAt?: string; // or createdAt
+}
+
+export interface ProjectLog {
+    id: number;
+    projectId: number;
+    type: string; // 'project_update', 'milestone_update', 'access_update'
+    message: string;
+    createdBy: number;
+    userName?: string;
+    createdAt: string;
 }
 
 export interface Attendance {
@@ -114,4 +131,13 @@ export interface AuthResponse {
     success: boolean;
     user?: User;
     message?: string;
+}
+
+export interface Transcription {
+    id: number;
+    projectId: number;
+    title: string;
+    content: string;
+    createdBy: number;
+    createdAt: string;
 }

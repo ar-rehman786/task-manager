@@ -1,0 +1,46 @@
+[
+  {
+    "email": "admin@taskmanager.com",
+    "password": "$2b$10$MvdTEGqZrpClw8JGOr/MWe1lWB/GRJbWTr3BLXZYhVLL6hs.xu8IG"
+  },
+  {
+    "email": "ali@gmail.com",
+    "password": "$2b$10$8/8eJvOqzmgzETowAq1TueRlAh7pJlXIai9qFIiCIiPmxVxQmWCs6"
+  },
+  {
+    "email": "saqib@gmail.com",
+    "password": "$2b$10$2CNVw7qSs43dDMB45lzHWebSRKjyGyHZJyzDC7Y1O69/8TxRBSKL6"
+  },
+  {
+    "email": "saqibb@gmail.com",
+    "password": "$2b$10$xpfW07Gf5tRGkfVvHSpb1OUGZtimcs5cy8h52PgjbObqDkaAChLAS"
+  },
+  {
+    "email": "saqibbb@gmail.com",
+    "password": "$2b$10$FxeFUqClmTiKZqXkfXv13.3xlbWpNNOLveFY01.eYUV.xzA5orNVq"
+  },
+  {
+    "email": "member@taskmanager.com",
+    "password": "$2b$10$5V1agu11RlmMZLMIXFt8LeGmWV3SSInBvleY3vlH1arNKd4JEymbq"
+  },
+  {
+    "email": "asda@sloraai.com",
+    "password": "$2b$10$LyhyalaDkH2TTPP9CNipP.8Hx5yhPIEU8Lk1gxh4.7KXMC0VNa0Ym"
+  },
+  {
+    "email": "kuch@gmail.com",
+    "password": "$2b$10$G3BoSqKEfJd7YdHswT99OeNbk4I3wvMw.cQYRsZk/6q3gdor/czB6"
+  },
+  {
+    "email": "temp1770742329684@test.com",
+    "password": "$2b$10$CGYmy2/9zZxmmrpJSqcWwepTt1QzKFjTMO6mJBJsO6t4KURYmFtrm"
+  },
+  {
+    "email": "awais@sloraai.com",
+    "password": "$2b$10$RzTQ4WhqvWHP5BOzIWhem.lBtwXGnbQpwqTnzi4KNIbEMPPs1D8F2"
+  },
+  {
+    "email": "abdulrehmanhameed4321@gmail.com",
+    "password": "$2b$10$c6pXr/MK.gj9Q3mR34hEIuUsRBHIszDIHgwNmw3HeFYHGcnVOGS4q"
+  }
+]
