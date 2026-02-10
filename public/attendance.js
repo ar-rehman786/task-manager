@@ -11,43 +11,38 @@ async function initAttendance() {
     const timestamp = Date.now();
 
     try {
-        console.log('Fetching user...');
         attendanceUser = await fetch(`/api/auth/me?t=${timestamp}`).then(r => r.json());
-        console.log('User fetched:', attendanceUser);
     } catch (e) {
         console.error('Failed to fetch user:', e);
-        return; // Stop if no user
+        return;
     }
 
     try {
-        console.log('Loading status...');
         await loadAttendanceStatus();
-        console.log('Status loaded');
     } catch (e) {
         console.error('Failed to load status:', e);
     }
 
     try {
-        console.log('Loading history...');
         await loadAttendanceHistory();
-        console.log('History loaded');
     } catch (e) {
         console.error('Failed to load history:', e);
     }
 
     try {
         if (attendanceUser && attendanceUser.role === 'admin') {
-            console.log('User is admin, showing admin section');
             const adminSection = document.getElementById('admin-section');
             if (adminSection) {
                 adminSection.style.display = 'block';
                 await loadTodayAttendance();
                 await loadAllAttendanceHistory();
-            } else {
-                console.error('Admin section not found in DOM');
+
+                // Ensure user sees it
+                setTimeout(() => {
+                    console.log('Scrolling admin section into view');
+                    adminSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 500);
             }
-        } else {
-            console.log('User is NOT admin or attendanceUser is null:', attendanceUser ? attendanceUser.role : 'null');
         }
     } catch (e) {
         console.error('Error in admin check section:', e);
