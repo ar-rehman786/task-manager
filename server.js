@@ -96,7 +96,8 @@ app.get('/api/notifications', requireAuth, async (req, res) => {
         );
         res.json(result.rows);
     } catch (error) {
-        res.status(500).json({ error: 'Server error' });
+        console.error('Notification Fetch Error:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 
