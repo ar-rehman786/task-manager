@@ -399,14 +399,24 @@ function renderAttendanceHistory(records) {
 
 // Load today's attendance (admin)
 async function loadTodayAttendance() {
+    console.log('loadTodayAttendance: START');
     try {
         const timestamp = Date.now();
+        console.log('loadTodayAttendance: Fetching...');
         const response = await fetch(`/api/attendance/today?t=${timestamp}`);
+        console.log('loadTodayAttendance: Response received', response.status);
+
+        if (!response.ok) {
+            throw new Error(`Server returned ${response.status}`);
+        }
+
         const records = await response.json();
+        console.log('loadTodayAttendance: JSON parsed, records:', records.length);
         renderTodayAttendance(records);
     } catch (error) {
-        console.error('Load today error:', error);
+        console.error('loadTodayAttendance ERROR:', error);
     }
+    console.log('loadTodayAttendance: END');
 }
 
 // Render today's attendance (admin)
@@ -491,14 +501,24 @@ function showError(message) {
 
 // Load all attendance history (admin)
 async function loadAllAttendanceHistory() {
+    console.log('loadAllAttendanceHistory: START');
     try {
         const timestamp = Date.now();
+        console.log('loadAllAttendanceHistory: Fetching...');
         const response = await fetch(`/api/attendance/admin/history?t=${timestamp}`);
+        console.log('loadAllAttendanceHistory: Response received', response.status);
+
+        if (!response.ok) {
+            throw new Error(`Server returned ${response.status}`);
+        }
+
         const records = await response.json();
+        console.log('loadAllAttendanceHistory: JSON parsed, records:', records.length);
         renderAllAttendanceHistory(records);
     } catch (error) {
-        console.error('Load all history error:', error);
+        console.error('loadAllAttendanceHistory ERROR:', error);
     }
+    console.log('loadAllAttendanceHistory: END');
 }
 
 // Render all attendance history (admin)
