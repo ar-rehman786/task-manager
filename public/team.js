@@ -32,33 +32,37 @@ async function loadTeamMembers() {
 
 function renderTeamMembers() {
   const container = document.getElementById('team-members-list');
+  if (!container) return;
 
   container.innerHTML = `
     <div style="display: grid; gap: 1rem;">
-// Render team members
-function renderTeamMembers(users) {
-    const tbody = document.getElementById('team-table-body');
-    if (!tbody) return; // Guard clause
-
-    tbody.innerHTML = users.map(user => `
-    < tr >
-            <td>
-                <div class="user-info">
-                    <div class="user-avatar">${user.name.charAt(0)}</div>
-                    <div>
-                        <div class="user-name">${user.name}</div>
-                        <div class="user-email">${user.email}</div>
-                    </div>
-                </div>
-            </td>
-            <td><span class="badge badge-${user.role === 'admin' ? 'primary' : 'secondary'}">${user.role}</span></td>
-            <td><span class="badge badge-${user.active ? 'success' : 'danger'}">${user.active ? 'Active' : 'Inactive'}</span></td>
-            <td>${new Date(user.createdAt).toLocaleDateString()}</td>
-            <td>
-                <button class="btn btn-sm btn-secondary" onclick="editUser(${user.id})">Edit</button>
-            </td>
-        </tr >
-    `).join('');
+      ${teamMembers.map(member => `
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div>
+              <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem;">${member.name}</h3>
+              <p style="color: var(--text-secondary); font-size: 0.875rem;">${member.email}</p>
+              <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                  <span style="display: inline-block; padding: 0.25rem 0.75rem; background: ${member.role === 'admin' ? 'var(--primary)' : 'var(--bg-tertiary)'}; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600;">
+                    ${member.role}
+                  </span>
+                  <span style="display: inline-block; padding: 0.25rem 0.75rem; background: ${member.active ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}; color: ${member.active ? '#34d399' : '#f87171'}; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600;">
+                    ${member.active ? 'Active' : 'Inactive'}
+                  </span>
+              </div>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              ${member.role !== 'admin' ? `
+                <button class="btn btn-danger btn-sm" onclick="deactivateMember(${member.id}, '${member.name}')">
+                  Deactivate
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
 }
 
 function showAddMember() {
@@ -138,12 +142,12 @@ function showAddMember() {
 }
 
 async function deactivateMember(memberId, memberName) {
-  if (!confirm(`Are you sure you want to deactivate ${ memberName }? Their tasks will become unassigned.`)) {
+  if (!confirm(`Are you sure you want to deactivate ${memberName}? Their tasks will become unassigned.`)) {
     return;
   }
 
   try {
-    const response = await fetch(`/ api / users / ${ memberId } `, {
+    const response = await fetch(`/ api / users / ${memberId} `, {
       method: 'DELETE'
     });
 
