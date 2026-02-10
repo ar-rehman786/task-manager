@@ -164,7 +164,13 @@ app.use(session({
 
 // Debug Route: Force create notifications table
 app.get('/api/debug/init-notifications', async (req, res) => {
+    console.log('[DEBUG_ROUTE] hit');
     try {
+        // 1. Test connection
+        await query('SELECT 1');
+        console.log('[DEBUG_ROUTE] DB Connection OK');
+
+        // 2. Create Table
         await query(`
             CREATE TABLE IF NOT EXISTS notifications (
                 id SERIAL PRIMARY KEY,
@@ -176,9 +182,20 @@ app.get('/api/debug/init-notifications', async (req, res) => {
                 "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
-        res.send('<h1>Success! Notifications table created.</h1><p>You can now go back and refresh the app.</p>');
+        console.log('[DEBUG_ROUTE] Table created');
+
+        res.json({
+            success: true,
+            message: 'Notifications table created successfully',
+            timestamp: new Date().toISOString()
+        });
     } catch (error) {
-        res.status(500).send(`<h1>Error</h1><pre>${error.message}</pre>`);
+        console.error('[DEBUG_ROUTE] Error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            stack: error.stack
+        });
     }
 });
 
