@@ -12,7 +12,12 @@ async function initDashboard() {
         await loadAttendanceWidget();
 
         // Refresh stats every 30 seconds
-        setInterval(loadDashboardStats, 30000);
+        if (typeof dashboardInterval !== 'undefined') {
+            if (dashboardInterval) clearInterval(dashboardInterval);
+            dashboardInterval = setInterval(loadDashboardStats, 30000);
+        } else {
+            setInterval(loadDashboardStats, 30000);
+        }
     } catch (err) {
         console.error("Dashboard init failed", err);
     }
@@ -46,6 +51,9 @@ async function loadAttendanceWidget() {
 
 // Render dashboard - The New "Premium" Layout
 function renderDashboard() {
+    // CRITICAL: Stop rendering if we moved away from dashboard
+    if (typeof currentWorkspace !== 'undefined' && currentWorkspace !== 'dashboard') return;
+
     if (!dashboardStats) return;
 
     const container = document.getElementById('content-area');

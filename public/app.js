@@ -56,38 +56,62 @@ function setupNavigation() {
     });
 }
 
+// interval tracker
+let dashboardInterval = null;
+
 function loadWorkspace(workspace) {
-    currentWorkspace = workspace;
-    const contentArea = document.getElementById('content-area');
+    try {
+        console.log(`Loading workspace: ${workspace}`);
 
-    // Update active class if loading from storage/init
-    const navItems = document.querySelectorAll('.nav-item');
-    navItems.forEach(item => {
-        if (item.dataset.workspace === workspace) {
-            item.classList.add('active');
-        } else {
-            item.classList.remove('active');
+        // Clear existing interval if any
+        if (dashboardInterval) {
+            clearInterval(dashboardInterval);
+            dashboardInterval = null;
         }
-    });
 
-    switch (workspace) {
-        case 'dashboard':
-            loadDashboardWorkspace();
-            break;
-        case 'tasks':
-            loadTasksWorkspace();
-            break;
-        case 'projects':
-            loadProjectsWorkspace();
-            break;
-        case 'team':
-            if (currentUser.role === 'admin') {
-                loadTeamWorkspace();
+        currentWorkspace = workspace;
+        const contentArea = document.getElementById('content-area');
+
+        // Update active class if loading from storage/init
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach(item => {
+            if (item.dataset.workspace === workspace) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
             }
-            break;
-        case 'attendance':
-            loadAttendanceWorkspace();
-            break;
+        });
+
+        switch (workspace) {
+            case 'dashboard':
+                loadDashboardWorkspace();
+                break;
+            case 'tasks':
+                loadTasksWorkspace();
+                break;
+            case 'projects':
+                loadProjectsWorkspace();
+                break;
+            case 'team':
+                if (currentUser && currentUser.role === 'admin') {
+                    loadTeamWorkspace();
+                }
+                break;
+            case 'attendance':
+                loadAttendanceWorkspace();
+                break;
+            default:
+                console.warn('Unknown workspace:', workspace);
+                loadDashboardWorkspace();
+        }
+    } catch (error) {
+        console.error(`Error loading workspace ${workspace}:`, error);
+        document.getElementById('content-area').innerHTML =
+            `<div style="padding: 2rem; color: #ef4444; text-align: center;">
+                <h3>Error Loading Page</h3>
+                <p>${error.message}</p>
+                <button class="btn btn-primary" onclick="window.location.reload()">Reload Page</button>
+            </div>`;
     }
 }
 
