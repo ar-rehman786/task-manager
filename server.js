@@ -33,11 +33,28 @@ function requireAuth(req, res, next) {
     next();
 }
 
-function requireAdmin(req, res, next) {
-    if (!req.session.userId || req.session.userRole !== 'admin') {
-        return res.status(403).json({ error: 'Forbidden - Admin only' });
+async function requireAdmin(req, res, next) {
+    if (!req.session.userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
     }
-    next();
+
+    try {
+        // Double check role from DB to ensure security and prevent session sync issues
+        const result = await query('SELECT role FROM users WHERE id = $1', [req.session.userId]);
+        const user = result.rows[0];
+
+        if (!user || user.role !== 'admin') {
+            console.warn(`Admin access denied for User ${req.session.userId}. Role: ${user ? user.role : 'none'}`);
+            return res.status(403).json({ error: 'Forbidden - Admin only' });
+        }
+
+        // Refresh session role
+        req.session.userRole = user.role;
+        next();
+    } catch (error) {
+        console.error('Admin check error:', error);
+        res.status(500).json({ error: 'Server error checking permissions' });
+    }
 }
 
 // ============= AUTH ROUTES =============
