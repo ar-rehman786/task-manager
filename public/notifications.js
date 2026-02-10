@@ -2,6 +2,7 @@
 
 let socket;
 let audioContext;
+let notificationCount = 0; // Fix: Initialize global variable
 
 // Sound assets (Base64 encoded short beeps/sounds to avoid external dependencies for now)
 // In a real production app, these would be proper .mp3 files loaded from /assets/sounds/
