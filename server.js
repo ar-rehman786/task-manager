@@ -121,7 +121,10 @@ app.post('/api/users', requireAdmin, async (req, res) => {
         res.json({ id: user.id, name: user.name, email: user.email, role: user.role });
     } catch (error) {
         console.error('Create user error:', error);
-        res.status(500).json({ error: 'Failed to create user' });
+        if (error.code === '23505') { // Unique violation
+            return res.status(400).json({ error: 'User with this email already exists' });
+        }
+        res.status(500).json({ error: 'Failed to create user: ' + error.message });
     }
 });
 
