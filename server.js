@@ -223,19 +223,21 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
         let result;
         if (req.session.userRole === 'admin') {
             result = await query(`
-                SELECT t.*, u.name as "assignedUserName", c.name as "createdByName"
+                SELECT t.*, u.name as "assignedUserName", c.name as "createdByName", p.name as "projectName"
                 FROM tasks t
                 LEFT JOIN users u ON t."assignedUserId" = u.id
                 LEFT JOIN users c ON t."createdBy" = c.id
+                LEFT JOIN projects p ON t."projectId" = p.id
                 ORDER BY t."createdAt" DESC
             `);
         } else {
             result = await query(`
-                SELECT t.*, u.name as "assignedUserName", c.name as "createdByName"
+                SELECT t.*, u.name as "assignedUserName", c.name as "createdByName", p.name as "projectName"
                 FROM tasks t
                 LEFT JOIN users u ON t."assignedUserId" = u.id
                 LEFT JOIN users c ON t."createdBy" = c.id
-                WHERE t."assignedUserId" = $1
+                LEFT JOIN projects p ON t."projectId" = p.id
+                WHERE t."assignedUserId" = $1 OR t."createdBy" = $1
                 ORDER BY t."createdAt" DESC
             `, [req.session.userId]);
         }
@@ -247,12 +249,12 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
 });
 
 app.post('/api/tasks', requireAuth, async (req, res) => {
-    const { title, description, status, priority, dueDate, assignedUserId, labels } = req.body;
+    const { title, description, status, priority, dueDate, assignedUserId, labels, projectId } = req.body;
 
     try {
         const result = await query(`
-            INSERT INTO tasks (title, description, status, priority, "dueDate", "assignedUserId", "createdBy", labels)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            INSERT INTO tasks (title, description, status, priority, "dueDate", "assignedUserId", "createdBy", labels, "projectId")
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
         `, [
             title,
@@ -262,7 +264,8 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
             dueDate || null,
             assignedUserId || null,
             req.session.userId,
-            labels || null
+            labels || null,
+            projectId || null
         ]);
 
         const task = result.rows[0];
@@ -276,10 +279,11 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
 
         // Get full task details with names
         const fullTask = await query(`
-            SELECT t.*, u.name as "assignedUserName", c.name as "createdByName"
+            SELECT t.*, u.name as "assignedUserName", c.name as "createdByName", p.name as "projectName"
             FROM tasks t
             LEFT JOIN users u ON t."assignedUserId" = u.id
             LEFT JOIN users c ON t."createdBy" = c.id
+            LEFT JOIN projects p ON t."projectId" = p.id
             WHERE t.id = $1
         `, [task.id]);
 
@@ -292,21 +296,22 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
 
 app.put('/api/tasks/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
-    const { title, description, status, priority, dueDate, assignedUserId, labels } = req.body;
+    const { title, description, status, priority, dueDate, assignedUserId, labels, projectId } = req.body;
 
     try {
         await query(`
             UPDATE tasks 
             SET title = $1, description = $2, status = $3, priority = $4, "dueDate" = $5, 
-                "assignedUserId" = $6, labels = $7, "updatedAt" = CURRENT_TIMESTAMP
-            WHERE id = $8
-        `, [title, description, status, priority, dueDate, assignedUserId, labels, id]);
+                "assignedUserId" = $6, labels = $7, "projectId" = $8, "updatedAt" = CURRENT_TIMESTAMP
+            WHERE id = $9
+        `, [title, description, status, priority, dueDate, assignedUserId, labels, projectId, id]);
 
         const task = await query(`
-            SELECT t.*, u.name as "assignedUserName", c.name as "createdByName"
+            SELECT t.*, u.name as "assignedUserName", c.name as "createdByName", p.name as "projectName"
             FROM tasks t
             LEFT JOIN users u ON t."assignedUserId" = u.id
             LEFT JOIN users c ON t."createdBy" = c.id
+            LEFT JOIN projects p ON t."projectId" = p.id
             WHERE t.id = $1
         `, [id]);
 
@@ -371,7 +376,12 @@ app.post('/api/tasks/:id/activity', requireAuth, async (req, res) => {
 
 app.get('/api/projects', requireAuth, async (req, res) => {
     try {
-        const projects = await query('SELECT * FROM projects ORDER BY "createdAt" DESC');
+        const projects = await query(`
+            SELECT p.*, u.name as "managerName"
+            FROM projects p
+            LEFT JOIN users u ON p."managerId" = u.id
+            ORDER BY p."createdAt" DESC
+        `);
         res.json(projects.rows);
     } catch (error) {
         res.status(500).json({ error: 'Error fetching projects' });
@@ -379,13 +389,28 @@ app.get('/api/projects', requireAuth, async (req, res) => {
 });
 
 app.post('/api/projects', requireAdmin, async (req, res) => {
-    const { name, client, status, startDate, endDate, description } = req.body;
+    const { name, client, status, startDate, endDate, description, managerId, initialTasks } = req.body;
 
     try {
         const result = await query(`
-            INSERT INTO projects (name, client, status, "startDate", "endDate", description)
-            VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
-        `, [name, client, status || 'active', startDate, endDate, description]);
+            INSERT INTO projects (name, client, status, "startDate", "endDate", description, "managerId")
+            VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
+        `, [name, client, status || 'active', startDate, endDate, description, managerId || null]);
+
+        const project = result.rows[0];
+
+        // Create initial tasks if provided
+        if (initialTasks && Array.isArray(initialTasks) && initialTasks.length > 0) {
+            for (const task of initialTasks) {
+                if (task.title) {
+                    await query(`
+                        INSERT INTO tasks (title, status, priority, "createdBy", "projectId")
+                        VALUES ($1, 'todo', $2, $3, $4)
+                    `, [task.title, task.priority || 'medium', req.session.userId, project.id]);
+                }
+            }
+        }
+
         res.json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Error creating project' });
@@ -394,14 +419,14 @@ app.post('/api/projects', requireAdmin, async (req, res) => {
 
 app.put('/api/projects/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
-    const { name, client, status, startDate, endDate, description } = req.body;
+    const { name, client, status, startDate, endDate, description, managerId } = req.body;
 
     try {
         await query(`
             UPDATE projects 
-            SET name = $1, client = $2, status = $3, "startDate" = $4, "endDate" = $5, description = $6, "updatedAt" = CURRENT_TIMESTAMP
-            WHERE id = $7
-        `, [name, client, status, startDate, endDate, description, id]);
+            SET name = $1, client = $2, status = $3, "startDate" = $4, "endDate" = $5, description = $6, "managerId" = $7, "updatedAt" = CURRENT_TIMESTAMP
+            WHERE id = $8
+        `, [name, client, status, startDate, endDate, description, managerId, id]);
 
         const project = await query('SELECT * FROM projects WHERE id = $1', [id]);
         res.json(project.rows[0]);

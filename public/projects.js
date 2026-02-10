@@ -66,6 +66,7 @@ async function renderProjects() {
       </div>
       ${project.accessPending ? '<div style="padding: 0.5rem; background: rgba(245, 158, 11, 0.1); border: 1px solid var(--warning); border-radius: var(--radius-sm); margin-top: 0.75rem; color: var(--warning); font-size: 0.75rem; font-weight: 600;">⚠️ Access Pending from Client</div>' : ''}
       ${project.client ? `<div class="project-client">Client: ${project.client}</div>` : ''}
+      ${project.managerName ? `<div class="project-manager" style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem;">Manager: 👤 ${project.managerName}</div>` : ''}
       ${project.description ? `<p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">${project.description}</p>` : ''}
       <div class="project-dates">
         <span>Start: ${formatDate(project.startDate)}</span>
@@ -117,6 +118,13 @@ function showCreateProject() {
         </select>
       </div>
       <div class="form-group">
+        <label class="form-label">Project Manager</label>
+        <select class="form-select" id="project-manager">
+          <option value="">Unassigned</option>
+          <!-- Users will be populated here -->
+        </select>
+      </div>
+      <div class="form-group">
         <label class="form-label">Start Date</label>
         <input type="date" class="form-input" id="project-start-date">
       </div>
@@ -128,6 +136,13 @@ function showCreateProject() {
         <label class="form-label">Description</label>
         <textarea class="form-textarea" id="project-description"></textarea>
       </div>
+      
+      <div class="form-group" style="padding-top: 1rem; border-top: 1px solid var(--border-color);">
+        <label class="form-label">Initial Tasks (Optional)</label>
+        <div id="initial-tasks-container"></div>
+        <button type="button" class="btn btn-secondary btn-sm" id="add-initial-task-btn" style="margin-top: 0.5rem;">+ Add Task</button>
+      </div>
+
       <div class="form-actions">
         <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
         <button type="submit" class="btn btn-primary">Create Project</button>
@@ -137,8 +152,56 @@ function showCreateProject() {
 
   const modal = showModal(modalContent);
 
+  // Load users for manager dropdown
+  fetch('/api/users')
+    .then(r => r.json())
+    .then(users => {
+      const select = document.getElementById('project-manager');
+      if (select) {
+        select.innerHTML = '<option value="">Unassigned</option>' +
+          users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+      }
+    });
+
+  // Handle Initial Tasks UI
+  const tasksContainer = document.getElementById('initial-tasks-container');
+  const addTaskBtn = document.getElementById('add-initial-task-btn');
+
+  addTaskBtn.addEventListener('click', () => {
+    const taskItem = document.createElement('div');
+    taskItem.className = 'initial-task-item';
+    taskItem.style.marginBottom = '0.5rem';
+    taskItem.style.display = 'flex';
+    taskItem.style.gap = '0.5rem';
+    taskItem.innerHTML = `
+      <input type="text" class="form-input task-title-input" placeholder="Task Title" required style="flex: 2;">
+      <select class="form-select task-priority-input" style="flex: 1;">
+        <option value="low">Low</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+      </select>
+      <button type="button" class="btn btn-danger btn-sm remove-task-btn">×</button>
+    `;
+
+    taskItem.querySelector('.remove-task-btn').addEventListener('click', () => {
+      taskItem.remove();
+    });
+
+    tasksContainer.appendChild(taskItem);
+  });
+
   document.getElementById('create-project-form').addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    // Collect initial tasks
+    const initialTasks = [];
+    document.querySelectorAll('.initial-task-item').forEach(item => {
+      const title = item.querySelector('.task-title-input').value;
+      const priority = item.querySelector('.task-priority-input').value;
+      if (title) {
+        initialTasks.push({ title, priority });
+      }
+    });
 
     const projectData = {
       name: document.getElementById('project-name').value,
@@ -146,7 +209,9 @@ function showCreateProject() {
       status: document.getElementById('project-status').value,
       startDate: document.getElementById('project-start-date').value,
       endDate: document.getElementById('project-end-date').value,
-      description: document.getElementById('project-description').value
+      description: document.getElementById('project-description').value,
+      managerId: document.getElementById('project-manager').value || null,
+      initialTasks: initialTasks
     };
 
     try {

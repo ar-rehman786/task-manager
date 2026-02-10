@@ -209,6 +209,7 @@ function createTaskCard(task) {
       <div class="task-assignee">
         ${task.assignedUserName ? `👤 ${task.assignedUserName}` : '👤 Unassigned'}
       </div>
+      ${task.projectName ? `<div class="task-project" style="font-size: 0.75rem; color: var(--primary); background: rgba(99, 102, 241, 0.1); padding: 2px 6px; border-radius: 4px;">📂 ${task.projectName}</div>` : ''}
       ${task.dueDate ? `<div class="task-due-date">📅 ${formatDate(task.dueDate)}</div>` : ''}
     </div>
   `;
@@ -341,6 +342,14 @@ function showQuickAddTask() {
         </select>
       </div>
       <div class="form-group">
+        <label class="form-label">Project</label>
+        <select class="form-select" id="task-project">
+          <option value="">No Project</option>
+          ${allBoards.filter(b => b.workspace === 'projects' || b.projectId).map(p => `<option value="${p.id}">${p.name}</option>`).join('')} 
+          <!-- Note: allBoards might not have projects. Need to fetch projects or use allProjects if available globally -->
+        </select>
+      </div>
+      <div class="form-group">
         <label class="form-label">Due Date</label>
         <input type="date" class="form-input" id="task-due-date">
       </div>
@@ -351,7 +360,23 @@ function showQuickAddTask() {
     </form>
   `;
 
+  // We need to populate projects. Check if we have access to them.
+  // If not, we might need to fetch them.
+  const projectSelect = new DOMParser().parseFromString(modalContent, 'text/html').getElementById('task-project'); // Just for logic check
+
+  // Real implementation:
   const modal = showModal(modalContent);
+
+  // Fetch projects and populate
+  fetch('/api/projects')
+    .then(res => res.json())
+    .then(projects => {
+      const select = document.getElementById('task-project');
+      if (select) {
+        select.innerHTML = '<option value="">No Project</option>' +
+          projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+      }
+    });
 
   document.getElementById('quick-add-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -361,6 +386,7 @@ function showQuickAddTask() {
       description: document.getElementById('task-description').value,
       priority: document.getElementById('task-priority').value,
       assignedUserId: document.getElementById('task-assignee').value || null,
+      projectId: document.getElementById('task-project').value || null,
       dueDate: document.getElementById('task-due-date').value || null,
       status: 'todo'
     };
@@ -436,6 +462,12 @@ function showTaskDetails(taskId) {
         </select>
       </div>
       <div class="form-group">
+        <label class="form-label">Project</label>
+        <select class="form-select" id="edit-task-project">
+          <option value="">Loading projects...</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label class="form-label">Due Date</label>
         <input type="date" class="form-input" id="edit-task-due-date" value="${task.dueDate || ''}">
       </div>
@@ -454,6 +486,17 @@ function showTaskDetails(taskId) {
 
   const modal = showModal(modalContent);
 
+  // Fetch projects and populate
+  fetch('/api/projects')
+    .then(res => res.json())
+    .then(projects => {
+      const select = document.getElementById('edit-task-project');
+      if (select) {
+        select.innerHTML = '<option value="">No Project</option>' +
+          projects.map(p => `<option value="${p.id}" ${task.projectId == p.id ? 'selected' : ''}>${p.name}</option>`).join('');
+      }
+    });
+
   document.getElementById('edit-task-form').addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -463,6 +506,7 @@ function showTaskDetails(taskId) {
       status: document.getElementById('edit-task-status').value,
       priority: document.getElementById('edit-task-priority').value,
       assignedUserId: document.getElementById('edit-task-assignee').value || null,
+      projectId: document.getElementById('edit-task-project').value || null,
       dueDate: document.getElementById('edit-task-due-date').value || null,
       labels: document.getElementById('edit-task-labels').value
     };

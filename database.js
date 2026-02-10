@@ -178,6 +178,29 @@ async function initializeDatabase() {
     await client.query('CREATE INDEX IF NOT EXISTS idx_boards_owner ON boards("ownerUserId")');
     await client.query('CREATE INDEX IF NOT EXISTS idx_attendance_user ON attendance("userId")');
 
+    // Schema Updates (Safe to run multiple times)
+    // Add projectId to tasks
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='projectId') THEN
+          ALTER TABLE tasks ADD COLUMN "projectId" INTEGER REFERENCES projects(id) ON DELETE SET NULL;
+        END IF;
+      END
+      $$;
+    `);
+
+    // Add managerId to projects
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='projects' AND column_name='managerId') THEN
+          ALTER TABLE projects ADD COLUMN "managerId" INTEGER REFERENCES users(id) ON DELETE SET NULL;
+        END IF;
+      END
+      $$;
+    `);
+
     await client.query('COMMIT');
     console.log('✅ Database initialized successfully');
   } catch (error) {
