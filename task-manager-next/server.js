@@ -629,12 +629,12 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
 });
 
 app.post('/api/tasks', requireAuth, async (req, res) => {
-    const { title, description, status, priority, dueDate, assignedUserId, labels, projectId } = req.body;
+    const { title, description, status, priority, dueDate, assignedUserId, labels, projectId, milestoneId, loomVideo, workflowLink, workflowStatus } = req.body;
 
     try {
         const result = await query(`
-            INSERT INTO tasks (title, description, status, priority, "dueDate", "assignedUserId", "createdBy", labels, "projectId")
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            INSERT INTO tasks (title, description, status, priority, "dueDate", "assignedUserId", "createdBy", labels, "projectId", "milestoneId", "loomVideo", "workflowLink", "workflowStatus")
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING *
         `, [
             title,
@@ -645,7 +645,11 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
             assignedUserId || null,
             req.session.userId,
             labels || null,
-            projectId || null
+            projectId || null,
+            milestoneId || null,
+            loomVideo || null,
+            workflowLink || null,
+            workflowStatus || null
         ]);
 
         const task = result.rows[0];
@@ -657,13 +661,24 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
             req.session.userId
         ]);
 
+        // --- NOTIFICATION LOGIC ---
+        if (assignedUserId && Number(assignedUserId) !== req.session.userId) {
+            await sendNotification(
+                assignedUserId,
+                'info',
+                `${req.session.userName || 'Admin'} assigned you to task: ${title}`,
+                { taskId: task.id }
+            );
+        }
+
         // Get full task details with names
         const fullTask = await query(`
-            SELECT t.*, u.name as "assignedUserName", c.name as "createdByName", p.name as "projectName"
+            SELECT t.*, u.name as "assignedUserName", c.name as "createdByName", p.name as "projectName", m.title as "milestoneTitle"
             FROM tasks t
             LEFT JOIN users u ON t."assignedUserId" = u.id
             LEFT JOIN users c ON t."createdBy" = c.id
             LEFT JOIN projects p ON t."projectId" = p.id
+            LEFT JOIN milestones m ON t."milestoneId" = m.id
             WHERE t.id = $1
         `, [task.id]);
 
@@ -681,9 +696,10 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
 
 app.put('/api/tasks/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
-    const { title, description, status, priority, dueDate, assignedUserId, labels, projectId } = req.body;
+    const { title, description, status, priority, dueDate, assignedUserId, labels, projectId, milestoneId, loomVideo, workflowLink, workflowStatus } = req.body;
     const currentUserId = req.session.userId;
     const currentUserName = req.session.userName;
+    const currentUserRole = req.session.userRole;
 
     try {
         // Fetch existing task first
@@ -694,34 +710,47 @@ app.put('/api/tasks/:id', requireAuth, async (req, res) => {
             return res.status(404).json({ error: 'Task not found' });
         }
 
+        // --- Member Completion Rule Validation ---
+        if (status === 'done' && oldTask.status !== 'done' && currentUserRole === 'member') {
+            if (!workflowLink || !workflowStatus) {
+                return res.status(400).json({
+                    error: 'Task completion requires details (Workflow Link and Workflow Status).',
+                    requireDetails: true
+                });
+            }
+        }
+
         // Perform Update
         await query(`
             UPDATE tasks 
             SET title = $1, description = $2, status = $3, priority = $4, "dueDate" = $5, 
-                "assignedUserId" = $6, labels = $7, "projectId" = $8, "updatedAt" = CURRENT_TIMESTAMP
-            WHERE id = $9
-        `, [title, description, status, priority, dueDate, assignedUserId, labels, projectId, id]);
+                "assignedUserId" = $6, labels = $7, "projectId" = $8, "milestoneId" = $9,
+                "loomVideo" = $10, "workflowLink" = $11, "workflowStatus" = $12, "updatedAt" = CURRENT_TIMESTAMP
+            WHERE id = $13
+        `, [title, description, status, priority, dueDate, assignedUserId, labels, projectId, milestoneId, loomVideo, workflowLink, workflowStatus, id]);
 
         const taskResult = await query(`
-            SELECT t.*, u.name as "assignedUserName", c.name as "createdByName", p.name as "projectName"
+            SELECT t.*, u.name as "assignedUserName", c.name as "createdByName", p.name as "projectName", m.title as "milestoneTitle"
             FROM tasks t
             LEFT JOIN users u ON t."assignedUserId" = u.id
             LEFT JOIN users c ON t."createdBy" = c.id
             LEFT JOIN projects p ON t."projectId" = p.id
+            LEFT JOIN milestones m ON t."milestoneId" = m.id
             WHERE t.id = $1
         `, [id]);
         const newTask = taskResult.rows[0];
 
         // --- Notification Logic ---
         let notificationMessage = '';
-        let notifyUserId = null;
         const targetUserId = Number(assignedUserId);
+        const currentUserId = req.session.userId;
+        const currentUserName = req.session.userName || 'Someone';
 
         // 1. Assignment Change
         if (oldTask.assignedUserId != assignedUserId) {
             if (targetUserId && targetUserId !== currentUserId) {
                 notificationMessage = `${currentUserName} assigned you to task: ${newTask.title}`;
-                notifyUserId = targetUserId;
+                await sendNotification(targetUserId, 'info', notificationMessage, { taskId: newTask.id });
             }
         }
         // 2. Status Change (notify current assignee or creator)
@@ -729,21 +758,18 @@ app.put('/api/tasks/:id', requireAuth, async (req, res) => {
             const statusMap = { todo: 'To Do', in_progress: 'In Progress', blocked: 'Blocked', done: 'Done' };
             notificationMessage = `${currentUserName} moved task '${newTask.title}' from ${statusMap[oldTask.status]} to ${statusMap[status]}`;
 
-            // Notify the currently assigned user, or creator if unassigned
-            if (oldTask.assignedUserId && oldTask.assignedUserId !== currentUserId) {
-                notifyUserId = oldTask.assignedUserId;
-            } else if (!oldTask.assignedUserId && oldTask.createdBy !== currentUserId) {
-                notifyUserId = oldTask.createdBy;
+            const notifyId = oldTask.assignedUserId || (oldTask.createdBy !== currentUserId ? oldTask.createdBy : null);
+            if (notifyId && notifyId !== currentUserId) {
+                await sendNotification(notifyId, 'info', notificationMessage, { taskId: newTask.id });
             }
         }
         // 3. Priority Change (notify current assignee or creator)
         else if (oldTask.priority !== priority) {
             notificationMessage = `${currentUserName} changed priority of '${newTask.title}' to ${priority}`;
 
-            if (oldTask.assignedUserId && oldTask.assignedUserId !== currentUserId) {
-                notifyUserId = oldTask.assignedUserId;
-            } else if (!oldTask.assignedUserId && oldTask.createdBy !== currentUserId) {
-                notifyUserId = oldTask.createdBy;
+            const notifyId = oldTask.assignedUserId || (oldTask.createdBy !== currentUserId ? oldTask.createdBy : null);
+            if (notifyId && notifyId !== currentUserId) {
+                await sendNotification(notifyId, 'info', notificationMessage, { taskId: newTask.id });
             }
         }
         // 4. Content Update (Title/Description) - notify current assignee or creator
@@ -776,11 +802,12 @@ app.get('/api/tasks/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     try {
         const result = await query(`
-            SELECT t.*, u.name as "assignedUserName", c.name as "createdByName", p.name as "projectName"
+            SELECT t.*, u.name as "assignedUserName", c.name as "createdByName", p.name as "projectName", m.title as "milestoneTitle"
             FROM tasks t
             LEFT JOIN users u ON t."assignedUserId" = u.id
             LEFT JOIN users c ON t."createdBy" = c.id
             LEFT JOIN projects p ON t."projectId" = p.id
+            LEFT JOIN milestones m ON t."milestoneId" = m.id
             WHERE t.id = $1
         `, [id]);
 
@@ -980,6 +1007,35 @@ app.post('/api/projects/:projectId/milestones', requireAuth, async (req, res) =>
             INSERT INTO project_logs ("projectId", type, message, "createdBy")
             VALUES ($1, 'milestone_update', $2, $3)
         `, [projectId, `Milestone "${title}" created`, req.session.userId]);
+
+        // --- NOTIFICATION LOGIC ---
+        // Get project details to find manager and assignee
+        const projectResult = await query('SELECT name, "managerId", "assignedUserId" FROM projects WHERE id = $1', [projectId]);
+        const project = projectResult.rows[0];
+
+        if (project) {
+            const notifMessage = `New milestone "${title}" added to project: ${project.name}`;
+            const notifData = { projectId: Number(projectId), milestoneId: result.rows[0].id };
+
+            // 1. Notify Assignee (if not the creator)
+            if (project.assignedUserId && project.assignedUserId !== req.session.userId) {
+                await sendNotification(project.assignedUserId, 'info', notifMessage, notifData);
+            }
+
+            // 2. Notify Manager (if not the creator and different from assignee)
+            if (project.managerId && project.managerId !== req.session.userId && project.managerId !== project.assignedUserId) {
+                await sendNotification(project.managerId, 'info', notifMessage, notifData);
+            }
+
+            // 3. Notify Admins (excluding the creator)
+            const adminsResult = await query("SELECT id FROM users WHERE role = 'admin' AND id != $1", [req.session.userId]);
+            for (const admin of adminsResult.rows) {
+                // Don't double-notify if admin is manager or assignee
+                if (admin.id !== project.assignedUserId && admin.id !== project.managerId) {
+                    await sendNotification(admin.id, 'info', notifMessage, notifData);
+                }
+            }
+        }
 
         res.json(result.rows[0]);
     } catch (error) {
@@ -1508,7 +1564,7 @@ async function sendNotification(userId, type, message, data = {}) {
     try {
         // Save to database
         const result = await query(
-            'INSERT INTO notifications ("userId", type, message, data) VALUES ($1, $2, $3, $4) RETURNING *',
+            'INSERT INTO notifications ("userId", type, message, data, "isRead") VALUES ($1, $2, $3, $4, 0) RETURNING *',
             [userId, type, message, JSON.stringify(data)]
         );
 

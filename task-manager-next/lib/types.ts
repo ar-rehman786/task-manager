@@ -21,6 +21,11 @@ export interface Task {
     assignedUserName?: string;
     projectId?: number;
     projectName?: string;
+    milestoneId?: number;
+    milestoneTitle?: string;
+    loomVideo?: string;
+    workflowLink?: string;
+    workflowStatus?: string;
     dueDate?: string;
     labels?: string;
     createdBy?: number;
@@ -117,6 +122,7 @@ export interface Notification {
     type: 'info' | 'success' | 'warning' | 'error';
     read: boolean;
     relatedTaskId?: number;
+    data?: any;
     createdAt: string;
 }
 

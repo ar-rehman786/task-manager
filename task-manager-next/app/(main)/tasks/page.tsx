@@ -5,9 +5,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tasksApi } from '@/lib/api/tasks';
 import { usersApi } from '@/lib/api/users';
 import { Task, User, Board } from '@/lib/types';
+import { TaskDialog } from '@/components/tasks/task-dialog';
+import { TaskCompletionModal } from '@/components/tasks/task-completion-modal';
+import { useAuthStore } from '@/lib/store/authStore';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import ProtectedRoute from '@/components/protected-route';
 import api from '@/lib/api/client';
 
@@ -24,7 +25,11 @@ function TasksContent() {
     const [currentBoardId, setCurrentBoardId] = useState<number | null>(null);
     const [filters, setFilters] = useState({ assignee: 'all', status: 'all', priority: 'all' });
     const [showTaskModal, setShowTaskModal] = useState(false);
+    const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+    const [showCompletionModal, setShowCompletionModal] = useState(false);
     const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
+    const [pendingStatusUpdate, setPendingStatusUpdate] = useState<{ id: number; status: string } | null>(null);
+    const userRole = useAuthStore((state) => state.user?.role);
 
     // Fetch tasks, boards, and users
     const { data: tasks = [], isLoading: tasksLoading } = useQuery({
@@ -58,6 +63,18 @@ function TasksContent() {
             tasksApi.updateTask(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            setShowTaskModal(false);
+            setSelectedTask(null);
+            setShowCompletionModal(false);
+            setPendingStatusUpdate(null);
+        },
+    });
+
+    const createTaskMutation = useMutation({
+        mutationFn: (data: Partial<Task>) => tasksApi.createTask(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            setShowTaskModal(false);
         },
     });
 
@@ -113,12 +130,42 @@ function TasksContent() {
         const task = tasks.find((t) => t.id === draggedTaskId);
         if (!task) return;
 
-        updateTaskMutation.mutate({
-            id: draggedTaskId,
-            data: { ...task, status },
-        });
+        // Validation for members moving to 'done'
+        if (status === 'done' && task.status !== 'done' && userRole === 'member') {
+            setPendingStatusUpdate({ id: draggedTaskId, status });
+            setShowCompletionModal(true);
+        } else {
+            updateTaskMutation.mutate({
+                id: draggedTaskId,
+                data: { ...task, status },
+            });
+        }
 
         setDraggedTaskId(null);
+    };
+
+    const handleTaskSubmit = (data: Partial<Task>) => {
+        if (selectedTask) {
+            updateTaskMutation.mutate({ id: selectedTask.id, data });
+        } else {
+            createTaskMutation.mutate(data);
+        }
+    };
+
+    const handleCompletionConfirm = (details: { workflowLink: string; workflowStatus: string; loomVideo?: string }) => {
+        if (!pendingStatusUpdate) return;
+
+        const task = tasks.find((t) => t.id === pendingStatusUpdate.id);
+        if (!task) return;
+
+        updateTaskMutation.mutate({
+            id: pendingStatusUpdate.id,
+            data: {
+                ...task,
+                status: pendingStatusUpdate.status as Task['status'],
+                ...details
+            },
+        });
     };
 
     if (tasksLoading || boardsLoading) {
@@ -182,8 +229,8 @@ function TasksContent() {
                     <button
                         key={board.id}
                         className={`px-4 py-2 font-medium transition-colors ${currentBoardId === board.id
-                                ? 'border-b-2 border-primary text-primary'
-                                : 'text-muted-foreground hover:text-foreground'
+                            ? 'border-b-2 border-primary text-primary'
+                            : 'text-muted-foreground hover:text-foreground'
                             }`}
                         onClick={() => setCurrentBoardId(board.id)}
                     >
@@ -216,16 +263,20 @@ function TasksContent() {
                                     key={task.id}
                                     draggable
                                     onDragStart={() => handleDragStart(task.id)}
-                                    className="bg-background p-4 rounded-lg shadow-sm border cursor-move hover:shadow-md transition-shadow"
+                                    onClick={() => {
+                                        setSelectedTask(task);
+                                        setShowTaskModal(true);
+                                    }}
+                                    className="bg-background p-4 rounded-lg shadow-sm border cursor-pointer hover:shadow-md transition-shadow relative group"
                                 >
                                     <div className="flex justify-between items-start mb-2">
-                                        <h4 className="font-medium">{task.title}</h4>
+                                        <h4 className="font-medium group-hover:text-primary transition-colors">{task.title}</h4>
                                         <span
                                             className={`text-xs px-2 py-1 rounded ${task.priority === 'high'
-                                                    ? 'bg-red-500/20 text-red-600'
-                                                    : task.priority === 'medium'
-                                                        ? 'bg-yellow-500/20 text-yellow-600'
-                                                        : 'bg-green-500/20 text-green-600'
+                                                ? 'bg-red-500/20 text-red-600'
+                                                : task.priority === 'medium'
+                                                    ? 'bg-yellow-500/20 text-yellow-600'
+                                                    : 'bg-green-500/20 text-green-600'
                                                 }`}
                                         >
                                             {task.priority}
@@ -237,6 +288,19 @@ function TasksContent() {
                                             {task.description}
                                         </p>
                                     )}
+
+                                    <div className="space-y-1 mb-2">
+                                        {task.projectName && (
+                                            <div className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded inline-block">
+                                                📁 {task.projectName}
+                                            </div>
+                                        )}
+                                        {task.milestoneTitle && (
+                                            <div className="text-[10px] text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded block">
+                                                🎯 {task.milestoneTitle}
+                                            </div>
+                                        )}
+                                    </div>
 
                                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                                         <span>
@@ -252,6 +316,22 @@ function TasksContent() {
                     </div>
                 ))}
             </div>
+
+            <TaskDialog
+                open={showTaskModal}
+                onOpenChange={(open) => {
+                    setShowTaskModal(open);
+                    if (!open) setSelectedTask(null);
+                }}
+                task={selectedTask}
+                onSubmit={handleTaskSubmit}
+            />
+
+            <TaskCompletionModal
+                open={showCompletionModal}
+                onOpenChange={setShowCompletionModal}
+                onConfirm={handleCompletionConfirm}
+            />
         </div>
     );
 }

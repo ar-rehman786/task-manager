@@ -5,9 +5,12 @@ import { useAuthStore } from '@/lib/store/authStore';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Sun, Moon, Bell, Search, LogOut } from 'lucide-react';
+import { Sun, Moon, Search, LogOut } from 'lucide-react';
+import { NotificationDropdown } from './notification-dropdown';
+import { useNotifications } from '@/hooks/useNotifications';
 
 export default function Topbar() {
+    useNotifications();
     const router = useRouter();
     const { user, logout } = useAuthStore();
     const { theme, setTheme } = useTheme();
@@ -42,10 +45,7 @@ export default function Topbar() {
                 </Button>
 
                 {/* Notifications */}
-                <Button variant="ghost" size="icon" className="relative">
-                    <Bell size={20} />
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-                </Button>
+                <NotificationDropdown />
 
                 {/* User Menu */}
                 <div className="flex items-center gap-3">
