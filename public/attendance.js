@@ -420,32 +420,172 @@ async function loadAttendanceHistory() {
     }
 }
 
-// Render attendance history
+// Render attendance history (Redesign: Logs & Requests)
 function renderAttendanceHistory(records) {
-    const tbody = document.querySelector('#history-table tbody');
-    if (!tbody) return;
+    // We are overriding the entire container for the new design
+    // Find the container where we want to render this
+    // We will target the .attendance-history div created in app.js, or create a new one
+    let container = document.querySelector('.attendance-history');
 
-    if (records.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem; color: #999;">No attendance records found</td></tr>';
-        return;
+    // If we can't find the container (e.g. app structure changed), let's assume content-area is where we want to be, 
+    // but app.js creates specific structure. Let's try to overwrite the ".attendance-history" content.
+    if (!container) {
+        // Fallback or potentially overwrite content-area if we are in attendance workspace
+        // But for safety, let's look for #history-table and go up
+        const table = document.getElementById('history-table');
+        if (table) container = table.closest('.attendance-history');
     }
 
-    tbody.innerHTML = records.map(record => {
-        const clockIn = new Date(record.clockInTime);
-        const clockOut = record.clockOutTime ? new Date(record.clockOutTime) : null;
-        const duration = record.workDuration ? formatDuration(record.workDuration) : 'In Progress';
-        const status = record.status === 'active' ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-secondary">Completed</span>';
+    if (!container) return;
+
+    // Generate Last 30 Days Data
+    const days = [];
+    const today = new Date();
+    for (let i = 0; i < 30; i++) {
+        const d = new Date();
+        d.setDate(today.getDate() - i);
+        days.push(d);
+    }
+
+    // Process Records into a Map for easy lookup
+    // Key: YYYY-MM-DD
+    const recordsMap = {};
+    records.forEach(r => {
+        const dateKey = new Date(r.clockInTime).toDateString();
+        // Handle multiple sessions if needed? For now assuming 1 per day or taking the first/sum
+        // If multiple, we might want to sum duration.
+        if (!recordsMap[dateKey]) {
+            recordsMap[dateKey] = r;
+        } else {
+            // If checking multiple sessions, we'd add their durations here.
+            // For simplicity in this display, let's just stick to the main one or most recent
+        }
+    });
+
+    const rowsHtml = days.map(date => {
+        const dateKey = date.toDateString();
+        const record = recordsMap[dateKey];
+        const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+        const dateStr = date.toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
+        const isWeekend = dayName === 'Sat' || dayName === 'Sun';
+
+        // Row Logic
+        let visualHtml = '';
+        let effectiveHtml = '';
+        let grossHtml = '';
+        let arrivalHtml = '';
+        let rowClass = '';
+        let weekendTag = '';
+
+        if (isWeekend) {
+            rowClass = 'row-weekend';
+            weekendTag = '<span class="tag-weekend">W-OFF</span>';
+            effectiveHtml = '<span class="text-muted">Full day Weekly-off</span>';
+        } else if (record) {
+            // Has data
+            const duration = record.workDuration ? formatDuration(record.workDuration) : 'Active';
+            const widthPct = Math.min(100, Math.max(5, (record.workDuration || 0) / 480 * 100)); // Assume 8h = 100%
+
+            visualHtml = `
+                <div class="visual-bar-container">
+                    <div class="visual-bar" style="width: ${widthPct}%"></div>
+                </div>
+            `;
+            effectiveHtml = `<strong>${duration}</strong>`;
+            grossHtml = duration; // Same for now
+
+            // Arrival Logic (Assume 9:00 AM)
+            const clockIn = new Date(record.clockInTime);
+            const isLate = clockIn.getHours() > 9 || (clockIn.getHours() === 9 && clockIn.getMinutes() > 0);
+
+            if (!isLate) {
+                arrivalHtml = `<div class="status-check"><span>✔</span> On Time</div>`;
+            } else {
+                arrivalHtml = `<div class="status-check" style="color: #f59e0b"><span>⚠</span> Late</div>`;
+            }
+
+        } else {
+            // No data (Absent or Future?)
+            if (date.getTime() > Date.now()) {
+                // Future - shouldn't happen with "Last 30 days" loop going backwards
+            } else {
+                effectiveHtml = '<span class="text-muted">No Time Entries Logged</span>';
+                arrivalHtml = '<span class="text-muted">-</span>';
+                grossHtml = '<span class="text-muted">-</span>';
+            }
+        }
 
         return `
-            <tr>
-                <td>${clockIn.toLocaleDateString()}</td>
-                <td>${clockIn.toLocaleTimeString()}</td>
-                <td>${clockOut ? clockOut.toLocaleTimeString() : '--:--'}</td>
-                <td><strong>${duration}</strong></td>
-                <td>${status}</td>
+            <tr class="${rowClass}">
+                <td style="width: 200px;">
+                    <div style="font-weight: 500; color: var(--text-primary); display: flex; align-items: center;">
+                        ${dayName}, ${dateStr} ${weekendTag}
+                    </div>
+                </td>
+                <td style="width: 30%;">
+                    ${visualHtml}
+                </td>
+                <td>${effectiveHtml}</td>
+                <td>${grossHtml}</td>
+                <td>${arrivalHtml}</td>
+                <td style="text-align: right;">
+                    <span class="action-icon">⋯</span>
+                </td>
             </tr>
         `;
     }).join('');
+
+    // Rebuild the Container HTML
+    container.innerHTML = `
+        <div class="workspace-header" style="margin-bottom: 0;">
+            <h2>Logs & Requests</h2>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <label class="switch-label" style="font-size: 0.8rem; color: var(--text-secondary);">
+                    <input type="checkbox" checked> 24 hour format
+                </label>
+            </div>
+        </div>
+
+        <div class="attendance-dashboard">
+            <div class="attendance-header-nav">
+                <div class="attendance-tabs">
+                    <button class="att-tab active">Attendance Log</button>
+                    <button class="att-tab">Calendar</button>
+                    <button class="att-tab">Attendance Requests</button>
+                </div>
+            </div>
+
+            <div class="attendance-controls">
+                <span style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary); margin-right: auto;">Last 30 Days</span>
+                
+                <button class="date-filter-btn active">30 Days</button>
+                <button class="date-filter-btn">Jan</button>
+                <button class="date-filter-btn">Dec</button>
+                <button class="date-filter-btn">Nov</button>
+                <button class="date-filter-btn">Oct</button>
+                <button class="date-filter-btn">Sep</button>
+                <button class="date-filter-btn">Aug</button>
+            </div>
+
+            <div class="att-table-container">
+                <table class="att-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Attendance Visual</th>
+                            <th>Effective Hours</th>
+                            <th>Gross Hours</th>
+                            <th>Arrival</th>
+                            <th style="text-align: right;">Log</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
 }
 
 // Load today's attendance (admin)
