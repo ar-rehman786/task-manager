@@ -1,10 +1,9 @@
 
-
 [phases.install]
 cmds = ['cd task-manager-next && npm install']
 
 [phases.build]
-cmds = ['cd task-manager-next && npm run build']
+cmds = ['npm run build']
 
 [start]
-cmd = 'cd task-manager-next && node server.js'
+cmd = 'npm start'
