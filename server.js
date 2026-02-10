@@ -46,15 +46,61 @@ const upload = multer({
 // Socket.io connection handling
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
+
+    socket.on('join', (userId) => {
+        socket.join(`user:${userId}`);
+        console.log(`Socket ${socket.id} joined user:${userId}`);
+    });
+
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
     });
 });
 
 // Helper to send notifications
-function sendNotification(type, message, data = {}) {
-    io.emit('notification', { type, message, ...data, timestamp: new Date() });
+async function sendNotification(userId, type, message, data = {}) {
+    try {
+        // Save to database
+        const result = await query(
+            'INSERT INTO notifications ("userId", type, message, data) VALUES ($1, $2, $3, $4) RETURNING *',
+            [userId, type, message, JSON.stringify(data)]
+        );
+
+        const notification = result.rows[0];
+
+        // Emit to specific user via Socket.io
+        // We need to map userId to socketId or emit to a room named "user:{userId}"
+        io.to(`user:${userId}`).emit('notification', notification);
+
+    } catch (err) {
+        console.error('Failed to send notification:', err);
+    }
 }
+
+// Notification APIs
+app.get('/api/notifications', requireAuth, async (req, res) => {
+    try {
+        const result = await query(
+            'SELECT * FROM notifications WHERE "userId" = $1 ORDER BY "createdAt" DESC LIMIT 50',
+            [req.session.userId]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.put('/api/notifications/read', requireAuth, async (req, res) => {
+    try {
+        await query(
+            'UPDATE notifications SET "isRead" = 1 WHERE "userId" = $1',
+            [req.session.userId]
+        );
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Server error' });
+    }
+});
 
 // Database initialization will be called on startup
 
@@ -273,7 +319,7 @@ app.post('/api/users', requireAdmin, async (req, res) => {
         );
 
         // Notify team
-        sendNotification('new_member', `New Team Member: ${user.name}`, user);
+        // sendNotification('new_member', `New Team Member: ${user.name}`, user);
 
         res.json({ id: user.id, name: user.name, email: user.email, role: user.role });
     } catch (error) {
@@ -471,8 +517,10 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
             WHERE t.id = $1
         `, [task.id]);
 
-        // Helper to send notifications
-        sendNotification('new_task', `New Task Created: ${fullTask.rows[0].title}`, fullTask.rows[0]);
+        // Send Notification to Assignee
+        if (assignedUserId && Number(assignedUserId) !== req.session.userId) {
+            sendNotification(assignedUserId, 'info', `You were assigned to task: ${fullTask.rows[0].title}`, { taskId: fullTask.rows[0].id });
+        }
 
         res.json(fullTask.rows[0]);
     } catch (error) {
@@ -502,8 +550,10 @@ app.put('/api/tasks/:id', requireAuth, async (req, res) => {
             WHERE t.id = $1
         `, [id]);
 
-        // Notification for status change or update
-        sendNotification('task_update', `Task Updated: ${task.rows[0].title}`, task.rows[0]);
+        // Notification for assignee
+        if (assignedUserId && Number(assignedUserId) !== req.session.userId) {
+            sendNotification(assignedUserId, 'info', `Task Updated: ${task.rows[0].title}`, { taskId: id });
+        }
 
         res.json(task.rows[0]);
     } catch (error) {
@@ -868,7 +918,7 @@ app.post('/api/attendance/clock-in', requireAuth, async (req, res) => {
         `, [userId, new Date().toISOString(), notes]);
 
         // Notify admin
-        sendNotification('attendance', `${req.session.userName || 'A user'} just clocked in.`, { userId, type: 'clock_in' });
+        // sendNotification('attendance', `${req.session.userName || 'A user'} just clocked in.`, { userId, type: 'clock_in' });
 
         res.json(result.rows[0]);
     } catch (error) {

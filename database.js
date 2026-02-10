@@ -180,11 +180,25 @@ async function initializeDatabase() {
       );
     `);
 
+    // Notifications table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        type TEXT NOT NULL,
+        message TEXT NOT NULL,
+        "isRead" INTEGER DEFAULT 0,
+        data JSONB,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Indexes
     await client.query('CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks("assignedUserId")');
     await client.query('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_boards_owner ON boards("ownerUserId")');
     await client.query('CREATE INDEX IF NOT EXISTS idx_attendance_user ON attendance("userId")');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications("userId")');
 
     // Schema Updates (Safe to run multiple times)
     // Add projectId to tasks

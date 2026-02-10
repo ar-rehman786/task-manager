@@ -37,68 +37,188 @@ const playNotificationSound = (type) => {
     }
 };
 
-function initNotifications() {
+// Request audio permission interaction (kept as not explicitly removed)
+document.addEventListener('click', () => {
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        audioContext.resume();
+    }
+}, { once: true });
+
+document.addEventListener('DOMContentLoaded', () => {
+    initNotifications();
+});
+
+async function initNotifications() {
     // Connect to Socket.io
     socket = io();
 
-    socket.on('connect', () => {
-        console.log('Connected to notification service');
-    });
-
-    socket.on('notification', (data) => {
-        console.log('Notification received:', data);
-        showToast(data.message, data.type);
-        playNotificationSound(data.type);
-    });
-
-    // Request audio permission interaction
-    document.addEventListener('click', () => {
-        if (!audioContext) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            audioContext.resume();
+    // Join user room
+    try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+            const user = await res.json();
+            socket.emit('join', user.id);
         }
-    }, { once: true });
+    } catch (e) {
+        console.error('Failed to join notification room', e);
+    }
+
+    // Listen for notifications
+    socket.on('notification', (data) => {
+        playNotificationSound(data.type);
+        showToast(data.message, data.type);
+        addNotificationToDropdown(data);
+        incrementBadge();
+    });
+
+    // Load history
+    await loadNotificationHistory();
+}
+
+async function loadNotificationHistory() {
+    try {
+        const res = await fetch('/api/notifications');
+        const notifications = await res.json();
+
+        const list = document.getElementById('notification-list');
+        if (!list) return;
+
+        list.innerHTML = '';
+        let unreadCount = 0;
+
+        if (notifications.length === 0) {
+            list.innerHTML = '<div class="notification-empty">No notifications</div>';
+        } else {
+            notifications.forEach(n => {
+                const item = createNotificationItem(n);
+                list.appendChild(item);
+                if (!n.isRead) unreadCount++;
+            });
+        }
+
+        updateBadge(unreadCount);
+
+    } catch (e) {
+        console.error('Error loading notifications', e);
+    }
+}
+
+function createNotificationItem(n) {
+    const div = document.createElement('div');
+    div.className = `notification-item ${n.isRead ? 'read' : 'unread'}`;
+    div.innerHTML = `
+        <div class="notification-icon ${n.type}">
+            ${getIconForType(n.type)}
+        </div>
+        <div class="notification-content">
+            <p class="notification-message">${n.message}</p>
+            <span class="notification-time">${formatTimeAgo(n.createdAt)}</span>
+        </div>
+    `;
+    return div;
+}
+
+function addNotificationToDropdown(n) {
+    const list = document.getElementById('notification-list');
+    const empty = list.querySelector('.notification-empty');
+    if (empty) empty.remove();
+
+    const item = createNotificationItem(n);
+    list.insertBefore(item, list.firstChild);
+}
+
+function updateBadge(count) {
+    notificationCount = count;
+    const badge = document.getElementById('notification-badge');
+    if (badge) {
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.style.display = count > 0 ? 'flex' : 'none';
+    }
+}
+
+function incrementBadge() {
+    updateBadge(notificationCount + 1);
+}
+
+function markAllRead() {
+    fetch('/api/notifications/read', { method: 'PUT' });
+    notificationCount = 0;
+    updateBadge(0);
+    document.querySelectorAll('.notification-item.unread').forEach(el => {
+        el.classList.remove('unread');
+        el.classList.add('read');
+    });
+}
+
+function toggleNotifications() {
+    const dropdown = document.getElementById('notification-dropdown');
+    dropdown.classList.toggle('show');
+    if (dropdown.classList.contains('show') && notificationCount > 0) {
+        markAllRead();
+    }
+}
+
+// ... Helper functions (playNotificationSound, showToast, getIconForType, formatTimeAgo) ...
+function playNotificationSound(type) {
+    const audio = new Audio(type === 'error' ? '/assets/error.mp3' : '/assets/notification.mp3');
+    audio.play().catch(e => console.log('Audio play failed', e));
 }
 
 function showToast(message, type = 'info') {
-    const container = document.getElementById('toast-container') || createToastContainer();
-
+    // Use existing toast logic or create new
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    toast.innerHTML = `
-        <div class="toast-content">
-            <span class="toast-icon">${getIconForType(type)}</span>
-            <span class="toast-message">${message}</span>
-        </div>
-        <button class="toast-close" onclick="this.parentElement.remove()">×</button>
-    `;
-
-    container.appendChild(toast);
-
-    // Auto remove
+    toast.textContent = message;
+    document.body.appendChild(toast);
     setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 300);
-    }, 5000);
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }, 100);
 }
 
-function createToastContainer() {
-    const container = document.createElement('div');
-    container.id = 'toast-container';
-    document.body.appendChild(container);
-    return container;
-}
+// Original createToastContainer is now unused
+// function createToastContainer() {
+//     const container = document.createElement('div');
+//     container.id = 'toast-container';
+//     document.body.appendChild(container);
+//     return container;
+// }
 
 function getIconForType(type) {
-    switch (type) {
-        case 'new_task': return '📋';
-        case 'task_update': return '📝';
-        case 'new_member': return '👋';
-        case 'attendance': return '⏰';
-        case 'alert': return '⚠️';
-        default: return '📢';
-    }
+    if (type === 'success') return '✅';
+    if (type === 'error') return '❌';
+    if (type === 'warning') return '⚠️';
+    // Original icons for specific types are now unused
+    // switch (type) {
+    //     case 'new_task': return '📋';
+    //     case 'task_update': return '📝';
+    //     case 'new_member': return '👋';
+    //     case 'attendance': return '⏰';
+    //     case 'alert': return '⚠️';
+    //     default: return '📢';
+    // }
+    return 'ℹ️';
 }
+
+function formatTimeAgo(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+
+    if (seconds < 60) return 'Just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return date.toLocaleDateString();
+}
+
+// Expose global for onclick
+window.toggleNotifications = toggleNotifications;
 
 // Add styles dynamically
 const style = document.createElement('style');
