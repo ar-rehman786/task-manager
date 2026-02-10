@@ -6,8 +6,26 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const { pool, query, initializeDatabase } = require('./database');
 
+const http = require('http');
+const { Server } = require('socket.io');
+
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
 const PORT = process.env.PORT || 3000;
+
+// Socket.io connection handling
+io.on('connection', (socket) => {
+    console.log('User connected:', socket.id);
+    socket.on('disconnect', () => {
+        console.log('User disconnected:', socket.id);
+    });
+});
+
+// Helper to send notifications
+function sendNotification(type, message, data = {}) {
+    io.emit('notification', { type, message, ...data, timestamp: new Date() });
+}
 
 // Database initialization will be called on startup
 
@@ -213,6 +231,9 @@ app.post('/api/users', requireAdmin, async (req, res) => {
             ['tasks', `${name}'s Board`, 'MEMBER_BOARD', user.id]
         );
 
+        // Notify team
+        sendNotification('new_member', `New Team Member: ${user.name}`, user);
+
         res.json({ id: user.id, name: user.name, email: user.email, role: user.role });
     } catch (error) {
         console.error('Create user error:', error);
@@ -359,6 +380,9 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
             WHERE t.id = $1
         `, [task.id]);
 
+        // Helper to send notifications
+        sendNotification('new_task', `New Task Created: ${fullTask.rows[0].title}`, fullTask.rows[0]);
+
         res.json(fullTask.rows[0]);
     } catch (error) {
         console.error('Create task error:', error);
@@ -386,6 +410,9 @@ app.put('/api/tasks/:id', requireAuth, async (req, res) => {
             LEFT JOIN projects p ON t."projectId" = p.id
             WHERE t.id = $1
         `, [id]);
+
+        // Notification for status change or update
+        sendNotification('task_update', `Task Updated: ${task.rows[0].title}`, task.rows[0]);
 
         res.json(task.rows[0]);
     } catch (error) {
@@ -749,6 +776,9 @@ app.post('/api/attendance/clock-in', requireAuth, async (req, res) => {
             VALUES ($1, $2, 'active', $3) RETURNING *
         `, [userId, new Date().toISOString(), notes]);
 
+        // Notify admin
+        sendNotification('attendance', `${req.session.userName || 'A user'} just clocked in.`, { userId, type: 'clock_in' });
+
         res.json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Clock in error' });
@@ -1037,7 +1067,7 @@ async function seedDatabase() {
     }
 }
 
-app.listen(PORT, async () => {
+server.listen(PORT, async () => {
     console.log(`\n🚀 Server running on http://localhost:${PORT}`);
 
     try {
