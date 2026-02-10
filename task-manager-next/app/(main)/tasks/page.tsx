@@ -61,7 +61,30 @@ function TasksContent() {
     const updateTaskMutation = useMutation({
         mutationFn: ({ id, data }: { id: number; data: Partial<Task> }) =>
             tasksApi.updateTask(id, data),
-        onSuccess: () => {
+        onMutate: async ({ id, data }) => {
+            // Cancel any outgoing refetches
+            await queryClient.cancelQueries({ queryKey: ['tasks'] });
+
+            // Snapshot the previous value
+            const previousTasks = queryClient.getQueryData(['tasks']);
+
+            // Optimistically update to the new value
+            queryClient.setQueryData(['tasks'], (old: Task[] | undefined) => {
+                if (!old) return [];
+                return old.map((t) => (t.id === id ? { ...t, ...data } : t));
+            });
+
+            // Return a context object with the snapshotted value
+            return { previousTasks };
+        },
+        onError: (err, variables, context) => {
+            // Roll back to previous state on error
+            if (context?.previousTasks) {
+                queryClient.setQueryData(['tasks'], context.previousTasks);
+            }
+        },
+        onSettled: () => {
+            // Always refetch to ensure consistency
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
             setShowTaskModal(false);
             setSelectedTask(null);
