@@ -7,10 +7,14 @@ const path = require('path');
 const { pool, query, initializeDatabase } = require('./database');
 const http = require('http');
 
-// Start Server
 const { Server } = require('socket.io');
 const multer = require('multer');
 const fs = require('fs');
+const next = require('next');
+
+const dev = process.env.NODE_ENV !== 'production';
+const nextApp = next({ dev, dir: './task-manager-next' });
+const handle = nextApp.getRequestHandler();
 
 const app = express();
 const server = http.createServer(app);
@@ -233,8 +237,8 @@ app.get('/api/debug/init-notifications', async (req, res) => {
     }
 });
 
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve static files - DISABLED for Next.js integration
+// app.use(express.static(path.join(__dirname, 'public')));
 
 // Auth middleware
 function requireAuth(req, res, next) {
@@ -1494,6 +1498,11 @@ app.put('/api/notifications/read', requireAuth, async (req, res) => {
     }
 });
 
+// Next.js Request Handler
+app.all('*', (req, res) => {
+    return handle(req, res);
+});
+
 // GLOBAL ERROR HANDLER
 app.use((err, req, res, next) => {
     console.error('🔥 CRITICAL SERVER ERROR:', err);
@@ -1504,20 +1513,22 @@ app.use((err, req, res, next) => {
     });
 });
 
-server.listen(PORT, async () => {
-    console.log(`\n🚀 Server running on http://localhost:${PORT}`);
+nextApp.prepare().then(() => {
+    server.listen(PORT, async () => {
+        console.log(`\n🚀 Server running on http://localhost:${PORT}`);
 
-    try {
-        console.log('🔄 Initializing database...');
-        await initializeDatabase();
-        console.log('✅ Database initialized.');
+        try {
+            console.log('🔄 Initializing database...');
+            await initializeDatabase();
+            console.log('✅ Database initialized.');
 
-        await seedDatabase();
-        console.log(`✅ Database seeded.`);
-        console.log(`📝 Login at http://localhost:${PORT}\n`);
-    } catch (error) {
-        console.error('❌ Failed to initialize database:', error);
-        startupError = error;
-        // Do NOT process.exit(1) - keep server running to show error page
-    }
+            await seedDatabase();
+            console.log(`✅ Database seeded.`);
+            console.log(`📝 Login at http://localhost:${PORT}\n`);
+        } catch (error) {
+            console.error('❌ Failed to initialize database:', error);
+            startupError = error;
+            // Do NOT process.exit(1) - keep server running to show error page
+        }
+    });
 });
