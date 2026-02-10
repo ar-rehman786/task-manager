@@ -2,10 +2,10 @@
 nixPkgs = ['nodejs_20']
 
 [phases.install]
-cmds = ['npm install && cd task-manager-next && npm install']
+cmds = ['cd task-manager-next && npm install']
 
 [phases.build]
 cmds = ['cd task-manager-next && npm run build']
 
 [start]
-cmd = 'node /app/server.js'
+cmd = 'cd task-manager-next && node server.js'
