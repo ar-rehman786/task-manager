@@ -27,10 +27,13 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
-            // Clear auth and redirect to login
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/login';
+            // Only redirect if we're in the browser
+            if (typeof window !== 'undefined') {
+                localStorage.removeItem('token');
+                // Use a standard logout instead of raw redirect if possible,
+                // but let's stick to simple fix for now.
+                window.location.href = '/login';
+            }
         }
         return Promise.reject(error);
     }

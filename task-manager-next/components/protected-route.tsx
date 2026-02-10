@@ -4,15 +4,20 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
 
-export default function ProtectedRoute({ children }: { children: React.Node }) {
+export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const router = useRouter();
-    const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+    const { isAuthenticated, _hasHydrated } = useAuthStore();
 
     useEffect(() => {
-        if (!isAuthenticated) {
+        if (_hasHydrated && !isAuthenticated) {
             router.push('/login');
         }
-    }, [isAuthenticated, router]);
+    }, [_hasHydrated, isAuthenticated, router]);
+
+    // Show nothing while hydrating to prevent flickering or premature redirects
+    if (!_hasHydrated) {
+        return null;
+    }
 
     if (!isAuthenticated) {
         return null;

@@ -791,6 +791,9 @@ app.put('/api/tasks/:id', requireAuth, async (req, res) => {
             console.log(`[TASK_UPDATE] Notification message created but no target user: "${notificationMessage}"`);
         }
 
+        // Broadcast data update
+        io.emit('dataUpdate', { type: 'tasks' });
+
         res.json(newTask);
     } catch (error) {
         console.error('Update task error:', error);
@@ -830,6 +833,9 @@ app.get('/api/tasks/:id', requireAuth, async (req, res) => {
             // What about project tasks?
             return res.status(403).json({ error: 'Access denied' });
         }
+
+        // Broadcast data update
+        io.emit('dataUpdate', { type: 'tasks' });
 
         res.json(task);
     } catch (error) {
@@ -937,6 +943,9 @@ app.post('/api/projects', requireAdmin, async (req, res) => {
             VALUES ($1, 'project_update', $2, $3)
         `, [project.id, `Project "${name}" created`, req.session.userId]);
 
+        // Broadcast data update
+        io.emit('dataUpdate', { type: 'projects' });
+
         res.json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Error creating project' });
@@ -961,6 +970,9 @@ app.put('/api/projects/:id', requireAdmin, async (req, res) => {
             VALUES ($1, 'project_update', $2, $3)
         `, [id, `Project updated`, req.session.userId]);
 
+        // Broadcast data update
+        io.emit('dataUpdate', { type: 'projects' });
+
         res.json(project.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating project' });
@@ -971,6 +983,10 @@ app.delete('/api/projects/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     try {
         await query('DELETE FROM projects WHERE id = $1', [id]);
+
+        // Broadcast data update
+        io.emit('dataUpdate', { type: 'projects' });
+
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting project' });
@@ -1037,6 +1053,9 @@ app.post('/api/projects/:projectId/milestones', requireAuth, async (req, res) =>
             }
         }
 
+        // Broadcast data update
+        io.emit('dataUpdate', { type: 'projects' }); // Milestones are part of project view
+
         res.json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Error creating milestone' });
@@ -1052,6 +1071,10 @@ app.put('/api/milestones/:id', requireAdmin, async (req, res) => {
             UPDATE milestones SET title = $1, "dueDate" = $2, status = $3, details = $4 WHERE id = $5
         `, [title, dueDate, status, details, id]);
         const milestone = await query('SELECT * FROM milestones WHERE id = $1', [id]);
+
+        // Broadcast data update
+        io.emit('dataUpdate', { type: 'projects' }); // Milestones are viewed within projects
+
         res.json(milestone.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating milestone' });
@@ -1062,6 +1085,10 @@ app.delete('/api/milestones/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     try {
         await query('DELETE FROM milestones WHERE id = $1', [id]);
+
+        // Broadcast data update
+        io.emit('dataUpdate', { type: 'projects' });
+
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting milestone' });
@@ -1092,6 +1119,9 @@ app.post('/api/milestones/:milestoneId/checklist', requireAdmin, async (req, res
             INSERT INTO milestone_checklist_items ("milestoneId", text, "orderIndex")
             VALUES ($1, $2, $3) RETURNING *
         `, [milestoneId, text, orderIndex]);
+        // Broadcast data update
+        io.emit('dataUpdate', { type: 'projects' });
+
         res.json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Error creating checklist item' });
@@ -1105,6 +1135,10 @@ app.put('/api/checklist/:id', requireAdmin, async (req, res) => {
     try {
         await query('UPDATE milestone_checklist_items SET text = $1, "isDone" = $2 WHERE id = $3', [text, isDone ? 1 : 0, id]);
         const item = await query('SELECT * FROM milestone_checklist_items WHERE id = $1', [id]);
+
+        // Broadcast data update
+        io.emit('dataUpdate', { type: 'projects' });
+
         res.json(item.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating checklist item' });
@@ -1115,6 +1149,10 @@ app.delete('/api/checklist/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     try {
         await query('DELETE FROM milestone_checklist_items WHERE id = $1', [id]);
+
+        // Broadcast data update
+        io.emit('dataUpdate', { type: 'projects' });
+
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting checklist item' });
@@ -1156,6 +1194,9 @@ app.post('/api/projects/:projectId/logs', requireAdmin, async (req, res) => {
             WHERE l.id = $1
         `, [result.rows[0].id]);
 
+        // Broadcast data update
+        io.emit('dataUpdate', { type: 'projects' });
+
         res.json(log.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Error creating log' });
@@ -1190,6 +1231,9 @@ app.post('/api/projects/:projectId/access', requireAuth, async (req, res) => {
             VALUES ($1, 'access_update', $2, $3)
         `, [projectId, `Access requested for ${platform}`, req.session.userId]);
 
+        // Broadcast data update
+        io.emit('dataUpdate', { type: 'projects' });
+
         res.json(result.rows[0]);
     } catch (error) {
         console.error('Error creating access item:', error);
@@ -1221,6 +1265,9 @@ app.put('/api/access/:id', requireAdmin, async (req, res) => {
             `, [accessItem.projectId, `Access granted for ${accessItem.platform}`, req.session.userId]);
         }
 
+        // Broadcast data update
+        io.emit('dataUpdate', { type: 'projects' });
+
         res.json(item.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating access item' });
@@ -1231,6 +1278,10 @@ app.delete('/api/access/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     try {
         await query('DELETE FROM project_access_items WHERE id = $1', [id]);
+
+        // Broadcast data update
+        io.emit('dataUpdate', { type: 'projects' });
+
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting access item' });
@@ -1265,6 +1316,9 @@ app.post('/api/attendance/clock-in', requireAuth, async (req, res) => {
 
         // Notify admin
         // sendNotification('attendance', `${req.session.userName || 'A user'} just clocked in.`, { userId, type: 'clock_in' });
+
+        // Broadcast data update
+        io.emit('dataUpdate', { type: 'attendance' });
 
         res.json(result.rows[0]);
     } catch (error) {

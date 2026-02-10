@@ -7,10 +7,12 @@ import { getSocket } from '@/lib/socket';
 import { toast } from 'sonner';
 import { Notification } from '@/lib/types';
 import api from '@/lib/api/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 export function useNotifications() {
     const user = useAuthStore((state) => state.user);
     const { addNotification, setNotifications } = useNotificationStore();
+    const queryClient = useQueryClient();
 
     const fetchNotifications = useCallback(async () => {
         try {
@@ -71,13 +73,28 @@ export function useNotifications() {
             });
         };
 
+        const handleDataUpdate = (data: any) => {
+            console.log('Data update received:', data);
+            if (data.type) {
+                // Invalidate the specific query type (tasks, projects, etc.)
+                queryClient.invalidateQueries({ queryKey: [data.type] });
+
+                // Also invalidate related queries for consistency
+                if (data.type === 'projects') {
+                    queryClient.invalidateQueries({ queryKey: ['milestones'] });
+                }
+            }
+        };
+
         socket.on('notification', handleNotification);
+        socket.on('dataUpdate', handleDataUpdate);
 
         // Fetch initial notifications
         fetchNotifications();
 
         return () => {
             socket.off('notification', handleNotification);
+            socket.off('dataUpdate', handleDataUpdate);
         };
-    }, [user, addNotification, playNotificationSound, fetchNotifications]);
+    }, [user, addNotification, playNotificationSound, fetchNotifications, queryClient]);
 }
