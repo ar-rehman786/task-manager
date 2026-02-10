@@ -673,3 +673,160 @@ function editAccessItem(accessId) {
   }
 }
 
+// Edit Project (Added)
+function showEditProject(projectId) {
+  const project = allProjects.find(p => p.id === projectId);
+  if (!project) return;
+
+  const modalContent = `
+    <div class="modal-header">
+      <h3 class="modal-title">Edit Project</h3>
+      <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+    </div>
+    <form id="edit-project-form">
+      <div class="form-group">
+        <label class="form-label">Project Name *</label>
+        <input type="text" class="form-input" id="edit-project-name" value="${project.name}" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Client</label>
+        <input type="text" class="form-input" id="edit-project-client" value="${project.client || ''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select class="form-select" id="edit-project-status">
+          <option value="active" ${project.status === 'active' ? 'selected' : ''}>Active</option>
+          <option value="on_hold" ${project.status === 'on_hold' ? 'selected' : ''}>On Hold</option>
+          <option value="completed" ${project.status === 'completed' ? 'selected' : ''}>Completed</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Start Date</label>
+        <input type="date" class="form-input" id="edit-project-start-date" value="${project.startDate.split('T')[0]}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Target End Date</label>
+        <input type="date" class="form-input" id="edit-project-end-date" value="${project.endDate.split('T')[0]}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea class="form-textarea" id="edit-project-description">${project.description || ''}</textarea>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  `;
+
+  const modal = showModal(modalContent);
+
+  document.getElementById('edit-project-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const updates = {
+      name: document.getElementById('edit-project-name').value,
+      client: document.getElementById('edit-project-client').value,
+      status: document.getElementById('edit-project-status').value,
+      startDate: document.getElementById('edit-project-start-date').value,
+      endDate: document.getElementById('edit-project-end-date').value,
+      description: document.getElementById('edit-project-description').value
+    };
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+
+      if (response.ok) {
+        const updatedProject = await response.json();
+        const index = allProjects.findIndex(p => p.id === projectId);
+        allProjects[index] = updatedProject;
+        currentProject = updatedProject;
+
+        closeModal(modal);
+        showProjectDetail(projectId);
+      }
+    } catch (error) {
+      console.error('Update project error:', error);
+      showError('Failed to update project');
+    }
+  });
+}
+
+// Edit Milestone (Added)
+function showEditMilestone(milestoneId) {
+  if (!milestoneId) return;
+
+  fetch(`/api/milestones/${milestoneId}`)
+    .then(r => r.json())
+    .then(milestone => {
+      const modalContent = `
+            <div class="modal-header">
+            <h3 class="modal-title">Edit Milestone</h3>
+            <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+            </div>
+            <form id="edit-milestone-form">
+            <div class="form-group">
+                <label class="form-label">Title *</label>
+                <input type="text" class="form-input" id="edit-milestone-title" value="${milestone.title}" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Details</label>
+                <textarea class="form-textarea" id="edit-milestone-details">${milestone.details || ''}</textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Due Date</label>
+                <input type="date" class="form-input" id="edit-milestone-due-date" value="${milestone.dueDate ? milestone.dueDate.split('T')[0] : ''}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Status</label>
+                <select class="form-select" id="edit-milestone-status">
+                <option value="not_started" ${milestone.status === 'not_started' ? 'selected' : ''}>Not Started</option>
+                <option value="in_progress" ${milestone.status === 'in_progress' ? 'selected' : ''}>In Progress</option>
+                <option value="done" ${milestone.status === 'done' ? 'selected' : ''}>Done</option>
+                </select>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+            </form>
+        `;
+
+      const modal = showModal(modalContent);
+
+      document.getElementById('edit-milestone-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const updates = {
+          title: document.getElementById('edit-milestone-title').value,
+          details: document.getElementById('edit-milestone-details').value,
+          dueDate: document.getElementById('edit-milestone-due-date').value,
+          status: document.getElementById('edit-milestone-status').value
+        };
+
+        try {
+          const response = await fetch(`/api/milestones/${milestoneId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates)
+          });
+
+          if (response.ok) {
+            closeModal(modal);
+            showProjectDetail(currentProject.id);
+          }
+        } catch (error) {
+          console.error('Update milestone error:', error);
+          showError('Failed to update milestone');
+        }
+      });
+    })
+    .catch(err => {
+      console.error('Error fetching milestone for edit:', err);
+      showError('Failed to load milestone details');
+    });
+}
