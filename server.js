@@ -58,64 +58,7 @@ io.on('connection', (socket) => {
     });
 });
 
-// Helper to send notifications
-async function sendNotification(userId, type, message, data = {}) {
-    console.log(`[DEEP_DEBUG] sendNotification called for User ${userId}, Message: ${message}`);
-    try {
-        // Save to database
-        const result = await query(
-            'INSERT INTO notifications ("userId", type, message, data) VALUES ($1, $2, $3, $4) RETURNING *',
-            [userId, type, message, JSON.stringify(data)]
-        );
 
-        console.log(`[DEEP_DEBUG] Notification saved to DB with ID: ${result.rows[0].id}`);
-
-        const notification = result.rows[0];
-
-        // Emit to specific user via Socket.io
-        // We need to map userId to socketId or emit to a room named "user:{userId}"
-        const roomName = `user:${userId}`;
-        console.log(`[DEEP_DEBUG] Emitting socket event 'notification' to room: ${roomName}`);
-
-        // check if room has members
-        const sockets = await io.in(roomName).fetchSockets();
-        console.log(`[DEEP_DEBUG] Sockets in room ${roomName}: ${sockets.length}`);
-
-        io.to(roomName).emit('notification', notification);
-
-    } catch (err) {
-        console.error('[DEEP_DEBUG] Failed to send notification:', err);
-    }
-}
-
-// Notification APIs
-app.get('/api/notifications', requireAuth, async (req, res) => {
-    console.log(`[NOTIFICATIONS] Fetching for user ${req.session.userId}`);
-    try {
-        const result = await query(
-            'SELECT * FROM notifications WHERE "userId" = $1 ORDER BY "createdAt" DESC LIMIT 50',
-            [req.session.userId]
-        );
-        res.json(result.rows);
-    } catch (error) {
-        console.error('Notification Fetch Error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.put('/api/notifications/read', requireAuth, async (req, res) => {
-    try {
-        await query(
-            'UPDATE notifications SET "isRead" = 1 WHERE "userId" = $1',
-            [req.session.userId]
-        );
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: 'Server error' });
-    }
-});
-
-// Database initialization will be called on startup
 
 
 
