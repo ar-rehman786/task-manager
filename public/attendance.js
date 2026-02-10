@@ -15,12 +15,17 @@ async function initAttendance() {
         await loadAttendanceHistory();
 
         if (attendanceUser.role === 'admin') {
+            console.log('User is admin, showing admin section');
             const adminSection = document.getElementById('admin-section');
             if (adminSection) {
                 adminSection.style.display = 'block';
                 await loadTodayAttendance();
                 await loadAllAttendanceHistory();
+            } else {
+                console.error('Admin section not found in DOM');
             }
+        } else {
+            console.log('User is NOT admin:', attendanceUser.role);
         }
     } catch (e) {
         console.error('initAttendance failed:', e);
