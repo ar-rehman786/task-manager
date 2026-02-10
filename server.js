@@ -725,6 +725,23 @@ app.get('/api/attendance/today', requireAdmin, async (req, res) => {
     }
 });
 
+app.get('/api/attendance/admin/history', requireAdmin, async (req, res) => {
+    const { limit = 100 } = req.query;
+    try {
+        const records = await query(`
+            SELECT a.*, u.name as "userName", u.email as "userEmail"
+            FROM attendance a
+            JOIN users u ON a."userId" = u.id
+            ORDER BY a."clockInTime" DESC
+            LIMIT $1
+        `, [limit]);
+        res.json(records.rows);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error fetching all attendance history' });
+    }
+});
+
 // Seed endpoint (Postgres Version)
 app.post('/api/seed-database', async (req, res) => {
     try {

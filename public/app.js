@@ -273,6 +273,23 @@ function loadAttendanceWorkspace() {
                     <tr><td colspan="6" style="text-align: center; padding: 2rem;">Loading...</td></tr>
                 </tbody>
             </table>
+
+            <h3 style="margin-top: 2rem;">All Member Attendance History</h3>
+            <table class="data-table" id="admin-history-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Date</th>
+                        <th>Clock In</th>
+                        <th>Clock Out</th>
+                        <th>Duration</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="6" style="text-align: center; padding: 2rem;">Loading...</td></tr>
+                </tbody>
+            </table>
         </div>
     `;
 

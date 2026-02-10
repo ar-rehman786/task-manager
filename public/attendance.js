@@ -19,6 +19,7 @@ async function initAttendance() {
             if (adminSection) {
                 adminSection.style.display = 'block';
                 await loadTodayAttendance();
+                await loadAllAttendanceHistory();
             }
         }
     } catch (e) {
