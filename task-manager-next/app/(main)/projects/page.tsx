@@ -122,9 +122,10 @@ function ProjectsContent() {
                                 )}
 
                                 {project.description && (
-                                    <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                                        {project.description}
-                                    </p>
+                                    <div
+                                        className="text-sm text-muted-foreground mb-4 line-clamp-2 prose prose-sm dark:prose-invert max-w-none"
+                                        dangerouslySetInnerHTML={{ __html: project.description.substring(0, 200) }}
+                                    />
                                 )}
 
                                 <div className="space-y-1 mb-4">
@@ -214,6 +215,14 @@ function ProjectDetail({
         queryFn: () => projectsApi.getTranscriptions(project.id),
     });
 
+    const { data: files = [] } = useQuery({
+        queryKey: ['project-files', project.id],
+        queryFn: async () => {
+            const response = await api.get(`/api/projects/${project.id}/files`);
+            return response.data;
+        },
+    });
+
     // Mutations
     const createMilestoneMutation = useMutation({
         mutationFn: (data: Partial<Milestone>) => projectsApi.createMilestone(project.id, data),
@@ -238,6 +247,26 @@ function ProjectDetail({
         },
     });
 
+    const uploadFileMutation = useMutation({
+        mutationFn: (file: File) => {
+            const formData = new FormData();
+            formData.append('projectFile', file);
+            return api.post(`/api/projects/${project.id}/files`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['project-files', project.id] });
+        },
+    });
+
+    const deleteFileMutation = useMutation({
+        mutationFn: (fileId: number) => api.delete(`/api/projects/${project.id}/files/${fileId}`),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['project-files', project.id] });
+        },
+    });
+
     // Handlers
     const handleAddMilestone = (data: any) => createMilestoneMutation.mutate(data);
     const handleRequestAccess = (data: any) => createAccessMutation.mutate(data);
@@ -252,6 +281,14 @@ function ProjectDetail({
                 notes: adminNotes ? (item.notes ? item.notes + '\n\nAdmin: ' + adminNotes : adminNotes) : item.notes,
             }
         });
+    };
+
+    const handleUploadFile = (file: File) => {
+        if (!file.name.endsWith('.json')) {
+            alert('Please upload a JSON file');
+            return;
+        }
+        uploadFileMutation.mutate(file);
     };
 
     return (
@@ -274,7 +311,12 @@ function ProjectDetail({
                     </Badge>
                 </div>
 
-                {project.description && <p className="text-muted-foreground mb-4">{project.description}</p>}
+                {project.description && (
+                    <div
+                        className="text-muted-foreground mb-4 prose prose-sm dark:prose-invert max-w-none"
+                        dangerouslySetInnerHTML={{ __html: project.description }}
+                    />
+                )}
 
                 <div className="flex gap-4 text-sm text-muted-foreground">
                     <span>Start: {new Date(project.startDate || '').toLocaleDateString()}</span>
@@ -303,7 +345,12 @@ function ProjectDetail({
                                     <div className="flex justify-between text-xs text-muted-foreground">
                                         <span>Due: {m.dueDate ? new Date(m.dueDate).toLocaleDateString() : 'No date'}</span>
                                     </div>
-                                    {m.details && <p className="text-xs text-muted-foreground mt-2">{m.details}</p>}
+                                    {m.details && (
+                                        <div
+                                            className="text-xs text-muted-foreground mt-2 prose prose-xs dark:prose-invert max-w-none"
+                                            dangerouslySetInnerHTML={{ __html: m.details }}
+                                        />
+                                    )}
                                 </div>
                             ))
                         )}
@@ -392,6 +439,61 @@ function ProjectDetail({
                                         </PopoverContent>
                                     )}
                                 </Popover>
+                            ))
+                        )}
+                    </div>
+                </Card>
+                <Card className="p-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-semibold">Project JSON Files</h3>
+                        <div className="relative">
+                            <Button size="sm" variant="outline" asChild>
+                                <label className="cursor-pointer">
+                                    + Upload JSON
+                                    <input
+                                        type="file"
+                                        accept=".json"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) handleUploadFile(file);
+                                        }}
+                                    />
+                                </label>
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="space-y-3">
+                        {files.length === 0 ? (
+                            <p className="text-muted-foreground text-sm">No files uploaded yet.</p>
+                        ) : (
+                            files.map((file: any) => (
+                                <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xl">📄</span>
+                                        <div>
+                                            <p className="font-medium text-sm">{file.name}</p>
+                                            <p className="text-[10px] text-muted-foreground">
+                                                Added by {file.userName} on {new Date(file.createdAt).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button size="sm" variant="ghost" asChild>
+                                            <a href={file.path} download={file.name}>Download</a>
+                                        </Button>
+                                        {isAdmin && (
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="text-red-500 hover:text-red-600"
+                                                onClick={() => deleteFileMutation.mutate(file.id)}
+                                            >
+                                                Delete
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
                             ))
                         )}
                     </div>

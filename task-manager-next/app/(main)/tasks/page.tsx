@@ -137,7 +137,7 @@ function TasksContent() {
         } else {
             updateTaskMutation.mutate({
                 id: draggedTaskId,
-                data: { ...task, status },
+                data: { ...task, status: status as any },
             });
         }
 
@@ -284,9 +284,10 @@ function TasksContent() {
                                     </div>
 
                                     {task.description && (
-                                        <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                                            {task.description}
-                                        </p>
+                                        <div
+                                            className="text-sm text-muted-foreground mb-2 line-clamp-2 prose prose-sm dark:prose-invert max-w-none"
+                                            dangerouslySetInnerHTML={{ __html: task.description.substring(0, 200) }}
+                                        />
                                     )}
 
                                     <div className="space-y-1 mb-2">

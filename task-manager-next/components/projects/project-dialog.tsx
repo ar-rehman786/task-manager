@@ -14,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { RichTextEditor } from '@/components/rich-text-editor';
 import {
     Select,
     SelectContent,
@@ -208,11 +208,10 @@ export function ProjectDialog({
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="description">Description (Optional)</Label>
-                        <Textarea
-                            id="description"
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
+                        <Label htmlFor="description">Description (Support formatting & images)</Label>
+                        <RichTextEditor
+                            content={description}
+                            onChange={setDescription}
                         />
                     </div>
 

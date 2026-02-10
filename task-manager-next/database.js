@@ -186,6 +186,18 @@ async function initializeDatabase() {
       );
     `);
 
+    // Project files table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS project_files (
+        id SERIAL PRIMARY KEY,
+        "projectId" INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        path TEXT NOT NULL,
+        "uploadedBy" INTEGER NOT NULL REFERENCES users(id),
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Notifications table
     await client.query(`
       CREATE TABLE IF NOT EXISTS notifications (

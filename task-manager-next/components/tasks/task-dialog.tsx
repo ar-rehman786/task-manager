@@ -14,8 +14,8 @@ import {
     DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { RichTextEditor } from '@/components/rich-text-editor';
 
 interface TaskDialogProps {
     task?: Task | null;
@@ -95,11 +95,10 @@ export function TaskDialog({ task, open, onOpenChange, onSubmit }: TaskDialogPro
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="description">Description</Label>
-                        <Textarea
-                            id="description"
-                            value={formData.description}
-                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        <Label htmlFor="description">Description (Support formatting & images)</Label>
+                        <RichTextEditor
+                            content={formData.description || ''}
+                            onChange={(content) => setFormData({ ...formData, description: content })}
                         />
                     </div>
 

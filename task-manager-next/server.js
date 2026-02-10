@@ -62,6 +62,32 @@ const upload = multer({
     }
 });
 
+// Configure Multer for general uploads (Descriptions, Projects)
+const generalStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        let dir = 'public/uploads/general';
+        if (file.fieldname === 'projectFile') {
+            dir = `public/uploads/projects/${req.params.projectId}/files`;
+        } else if (file.fieldname === 'image') {
+            dir = 'public/uploads/descriptions';
+        }
+
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        cb(null, dir);
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const generalUpload = multer({
+    storage: generalStorage,
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
+
 // Socket.io connection handling
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
@@ -186,6 +212,9 @@ app.use(session({
         secure: process.env.NODE_ENV === 'production' // Secure in production
     }
 }));
+
+// Serve static files from the public directory
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Debug Route: Force create notifications table & DIAGNOSE
 app.get('/api/debug/init-notifications', async (req, res) => {
@@ -1364,6 +1393,80 @@ app.post('/api/attendance/clock-out', requireAuth, async (req, res) => {
     }
 });
 
+// ============= FILE UPLOAD ROUTES =============
+
+app.post('/api/upload/image', requireAuth, generalUpload.single('image'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No image uploaded' });
+    }
+    const imageUrl = `/uploads/descriptions/${req.file.filename}`;
+    res.json({ url: imageUrl });
+});
+
+app.get('/api/projects/:projectId/files', requireAuth, async (req, res) => {
+    const { projectId } = req.params;
+    try {
+        const result = await query(`
+            SELECT pf.*, u.name as "userName"
+            FROM project_files pf
+            JOIN users u ON pf."uploadedBy" = u.id
+            WHERE pf."projectId" = $1
+            ORDER BY pf."createdAt" DESC
+        `, [projectId]);
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Error fetching project files' });
+    }
+});
+
+app.post('/api/projects/:projectId/files', requireAuth, generalUpload.single('projectFile'), async (req, res) => {
+    const { projectId } = req.params;
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    try {
+        const filePath = `/uploads/projects/${projectId}/files/${req.file.filename}`;
+        const result = await query(`
+            INSERT INTO project_files ("projectId", name, path, "uploadedBy")
+            VALUES ($1, $2, $3, $4) RETURNING *
+        `, [projectId, req.file.originalname, filePath, req.session.userId]);
+
+        // Broadcast data update
+        io.emit('dataUpdate', { type: 'projects' });
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: 'Error saving file info' });
+    }
+});
+
+app.delete('/api/projects/:projectId/files/:id', requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const fileResult = await query('SELECT * FROM project_files WHERE id = $1', [id]);
+        if (fileResult.rows.length === 0) {
+            return res.status(404).json({ error: 'File not found' });
+        }
+
+        const file = fileResult.rows[0];
+        const fullPath = path.join(__dirname, 'public', file.path);
+
+        if (fs.existsSync(fullPath)) {
+            fs.unlinkSync(fullPath);
+        }
+
+        await query('DELETE FROM project_files WHERE id = $1', [id]);
+
+        // Broadcast data update
+        io.emit('dataUpdate', { type: 'projects' });
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting file' });
+    }
+});
+
 app.get('/api/attendance/history', requireAuth, async (req, res) => {
     const userId = req.session.userId;
     const { limit = 30 } = req.query;
@@ -1745,6 +1848,20 @@ nextApp.prepare().then(() => {
 
             await seedDatabase();
             console.log(`✅ Database seeded.`);
+
+            // Ensure upload directories exist
+            const uploadDirs = [
+                path.join(__dirname, 'public', 'uploads', 'descriptions'),
+                path.join(__dirname, 'public', 'uploads', 'projects'),
+                path.join(__dirname, 'public', 'uploads', 'profiles'),
+            ];
+            uploadDirs.forEach(dir => {
+                if (!require('fs').existsSync(dir)) {
+                    require('fs').mkdirSync(dir, { recursive: true });
+                    console.log(`📁 Created directory: ${dir}`);
+                }
+            });
+
             console.log(`📝 Login at http://localhost:${PORT}\n`);
         } catch (error) {
             console.error('❌ Failed to initialize database:', error);

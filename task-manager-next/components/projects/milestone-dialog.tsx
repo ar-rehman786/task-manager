@@ -10,8 +10,8 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { RichTextEditor } from "@/components/rich-text-editor"
 
 interface MilestoneDialogProps {
     open: boolean
@@ -64,8 +64,11 @@ export function MilestoneDialog({ open, onOpenChange, onSubmit }: MilestoneDialo
                         </Select>
                     </div>
                     <div className="grid gap-2">
-                        <label htmlFor="details" className="text-sm font-medium">Details</label>
-                        <Textarea id="details" value={details} onChange={(e) => setDetails(e.target.value)} placeholder="Additional details..." />
+                        <label htmlFor="details" className="text-sm font-medium">Details (Support formatting & images)</label>
+                        <RichTextEditor
+                            content={details}
+                            onChange={setDetails}
+                        />
                     </div>
                 </div>
                 <DialogFooter>
