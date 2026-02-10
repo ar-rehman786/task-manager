@@ -100,16 +100,20 @@ async function loadNotificationHistory() {
 
         list.innerHTML = '';
         if (notifications.length === 0) {
-
-        } catch (e) {
-            console.error('Error loading notifications', e);
+            list.innerHTML = '<div class="notification-empty">No notifications</div>';
+        } else {
+            notifications.forEach(n => addNotificationToDropdown(n));
         }
+
+    } catch (error) {
+        console.error('Error loading notifications', error);
     }
+}
 
 function createNotificationItem(n) {
-        const div = document.createElement('div');
-        div.className = `notification-item ${n.isRead ? 'read' : 'unread'}`;
-        div.innerHTML = `
+    const div = document.createElement('div');
+    div.className = `notification-item ${n.isRead ? 'read' : 'unread'}`;
+    div.innerHTML = `
         <div class="notification-icon ${n.type}">
             ${getIconForType(n.type)}
         </div>
@@ -118,144 +122,144 @@ function createNotificationItem(n) {
             <span class="notification-time">${formatTimeAgo(n.createdAt)}</span>
         </div>
     `;
-        return div;
+    return div;
+}
+
+function addNotificationToDropdown(n) {
+    const list = document.getElementById('notification-list');
+    const empty = list.querySelector('.notification-empty');
+    if (empty) empty.remove();
+
+    const item = createNotificationItem(n);
+    list.insertBefore(item, list.firstChild);
+}
+
+function updateBadge(count) {
+    notificationCount = count;
+    const badge = document.getElementById('notification-badge');
+    if (badge) {
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.style.display = count > 0 ? 'flex' : 'none';
+    }
+}
+
+function incrementBadge() {
+    updateBadge(notificationCount + 1);
+}
+
+function markAllRead() {
+    fetch('/api/notifications/read', { method: 'PUT' });
+    notificationCount = 0;
+    updateBadge(0);
+    document.querySelectorAll('.notification-item.unread').forEach(el => {
+        el.classList.remove('unread');
+        el.classList.add('read');
+    });
+}
+
+function toggleNotifications() {
+    console.log('Toggling notifications dropdown');
+    const dropdown = document.getElementById('notification-dropdown');
+    if (!dropdown) return console.error('Dropdown not found');
+
+    dropdown.classList.toggle('show');
+    if (dropdown.classList.contains('show') && notificationCount > 0) {
+        markAllRead();
+    }
+}
+
+// ... Helper functions (playNotificationSound, showToast, getIconForType, formatTimeAgo) ...
+function playNotificationSound(type) {
+    // Simple beep sound (Base64) to avoid missing file issues
+    const audioSrc = 'data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU';
+    // This is a very short placeholder. For a real sound, we'd need a longer string.
+    // Let's use a slightly longer one for a "pop" sound effect.
+    const popSound = 'data:audio/mpeg;base64,//uQxAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//uQxAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq';
+
+    // Better approach: Use the browser's AudioContext for a synthesized beep if file fails
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
 
-    function addNotificationToDropdown(n) {
-        const list = document.getElementById('notification-list');
-        const empty = list.querySelector('.notification-empty');
-        if (empty) empty.remove();
-
-        const item = createNotificationItem(n);
-        list.insertBefore(item, list.firstChild);
+    if (audioContext.state === 'suspended') {
+        audioContext.resume();
     }
 
-    function updateBadge(count) {
-        notificationCount = count;
-        const badge = document.getElementById('notification-badge');
-        if (badge) {
-            badge.textContent = count > 99 ? '99+' : count;
-            badge.style.display = count > 0 ? 'flex' : 'none';
-        }
-    }
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
 
-    function incrementBadge() {
-        updateBadge(notificationCount + 1);
-    }
+    oscillator.type = type === 'error' ? 'sawtooth' : 'sine';
+    oscillator.frequency.setValueAtTime(type === 'error' ? 150 : 500, audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(type === 'error' ? 100 : 300, audioContext.currentTime + 0.1);
 
-    function markAllRead() {
-        fetch('/api/notifications/read', { method: 'PUT' });
-        notificationCount = 0;
-        updateBadge(0);
-        document.querySelectorAll('.notification-item.unread').forEach(el => {
-            el.classList.remove('unread');
-            el.classList.add('read');
-        });
-    }
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
 
-    function toggleNotifications() {
-        console.log('Toggling notifications dropdown');
-        const dropdown = document.getElementById('notification-dropdown');
-        if (!dropdown) return console.error('Dropdown not found');
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
 
-        dropdown.classList.toggle('show');
-        if (dropdown.classList.contains('show') && notificationCount > 0) {
-            markAllRead();
-        }
-    }
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.1);
+}
 
-    // ... Helper functions (playNotificationSound, showToast, getIconForType, formatTimeAgo) ...
-    function playNotificationSound(type) {
-        // Simple beep sound (Base64) to avoid missing file issues
-        const audioSrc = 'data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU';
-        // This is a very short placeholder. For a real sound, we'd need a longer string.
-        // Let's use a slightly longer one for a "pop" sound effect.
-        const popSound = 'data:audio/mpeg;base64,//uQxAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//uQxAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq';
-
-        // Better approach: Use the browser's AudioContext for a synthesized beep if file fails
-        if (!audioContext) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
-
-        if (audioContext.state === 'suspended') {
-            audioContext.resume();
-        }
-
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-
-        oscillator.type = type === 'error' ? 'sawtooth' : 'sine';
-        oscillator.frequency.setValueAtTime(type === 'error' ? 150 : 500, audioContext.currentTime);
-        oscillator.frequency.exponentialRampToValueAtTime(type === 'error' ? 100 : 300, audioContext.currentTime + 0.1);
-
-        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-
-        oscillator.start();
-        oscillator.stop(audioContext.currentTime + 0.1);
-    }
-
-    function showToast(message, type = 'info') {
-        // Use existing toast logic or create new
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.textContent = message;
-        document.body.appendChild(toast);
+function showToast(message, type = 'info') {
+    // Use existing toast logic or create new
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('show');
         setTimeout(() => {
-            toast.classList.add('show');
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }, 100);
-    }
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }, 100);
+}
 
-    // Original createToastContainer is now unused
-    // function createToastContainer() {
-    //     const container = document.createElement('div');
-    //     container.id = 'toast-container';
-    //     document.body.appendChild(container);
-    //     return container;
+// Original createToastContainer is now unused
+// function createToastContainer() {
+//     const container = document.createElement('div');
+//     container.id = 'toast-container';
+//     document.body.appendChild(container);
+//     return container;
+// }
+
+function getIconForType(type) {
+    if (type === 'success') return '✅';
+    if (type === 'error') return '❌';
+    if (type === 'warning') return '⚠️';
+    // Original icons for specific types are now unused
+    // switch (type) {
+    //     case 'new_task': return '📋';
+    //     case 'task_update': return '📝';
+    //     case 'new_member': return '👋';
+    //     case 'attendance': return '⏰';
+    //     case 'alert': return '⚠️';
+    //     default: return '📢';
     // }
+    return 'ℹ️';
+}
 
-    function getIconForType(type) {
-        if (type === 'success') return '✅';
-        if (type === 'error') return '❌';
-        if (type === 'warning') return '⚠️';
-        // Original icons for specific types are now unused
-        // switch (type) {
-        //     case 'new_task': return '📋';
-        //     case 'task_update': return '📝';
-        //     case 'new_member': return '👋';
-        //     case 'attendance': return '⏰';
-        //     case 'alert': return '⚠️';
-        //     default: return '📢';
-        // }
-        return 'ℹ️';
-    }
+function formatTimeAgo(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
 
-    function formatTimeAgo(dateString) {
-        const date = new Date(dateString);
-        const now = new Date();
-        const seconds = Math.floor((now - date) / 1000);
+    if (seconds < 60) return 'Just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return date.toLocaleDateString();
+}
 
-        if (seconds < 60) return 'Just now';
-        const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return `${minutes}m ago`;
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) return `${hours}h ago`;
-        return date.toLocaleDateString();
-    }
+// Expose global for onclick
+window.toggleNotifications = toggleNotifications;
 
-    // Expose global for onclick
-    window.toggleNotifications = toggleNotifications;
-
-    // Add styles dynamically
-    const style = document.createElement('style');
-    style.textContent = `
+// Add styles dynamically
+const style = document.createElement('style');
+style.textContent = `
     #toast-container {
         position: fixed;
         bottom: 20px;
@@ -296,7 +300,7 @@ function createNotificationItem(n) {
         to { transform: translateX(0); opacity: 1; }
     }
 `;
-    document.head.appendChild(style);
+document.head.appendChild(style);
 
-    // Init on load
-    document.addEventListener('DOMContentLoaded', initNotifications);
+// Init on load
+document.addEventListener('DOMContentLoaded', initNotifications);
