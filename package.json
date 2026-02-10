@@ -21,9 +21,10 @@
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "body-parser": "^2.2.2",
+    "connect-pg-simple": "^9.0.0",
+    "dotenv": "^17.2.4",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
-    "pg": "^8.18.0",
-    "connect-pg-simple": "^9.0.0"
+    "pg": "^8.18.0"
   }
 }

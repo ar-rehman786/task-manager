@@ -107,6 +107,8 @@ function populateUserFilter() {
 
 function renderBoardTabs() {
   const tabsContainer = document.getElementById('board-tabs');
+  if (!tabsContainer) return;
+
   tabsContainer.innerHTML = '';
 
   allBoards.forEach(board => {

@@ -52,6 +52,11 @@ function renderTeamMembers() {
               </div>
             </div>
             <div style="display: flex; gap: 0.5rem;">
+              ${member.id != currentUser.id ? `
+                <button class="btn btn-secondary btn-sm" onclick="changeRole(${member.id}, '${member.role}', '${member.name}')" style="font-size: 0.75rem;">
+                  ${member.role === 'admin' ? 'Demote' : 'Promote'}
+                </button>
+              ` : ''}
               ${member.role !== 'admin' ? `
                 <button class="btn btn-danger btn-sm" onclick="deactivateMember(${member.id}, '${member.name}')">
                   Deactivate
@@ -67,10 +72,10 @@ function renderTeamMembers() {
 
 function showAddMember() {
   const modalContent = `
-    < div class="modal-header" >
+    <div class="modal-header">
       <h3 class="modal-title">Add Team Member</h3>
       <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
-    </div >
+    </div>
     <form id="add-member-form">
       <div class="form-group">
         <label class="form-label">Name *</label>
@@ -79,6 +84,13 @@ function showAddMember() {
       <div class="form-group">
         <label class="form-label">Email *</label>
         <input type="email" class="form-input" id="member-email" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <select class="form-select" id="member-role">
+            <option value="member">Member</option>
+            <option value="admin">Admin</option>
+        </select>
       </div>
       <div class="form-group">
         <label class="form-label">Password</label>
@@ -102,7 +114,8 @@ function showAddMember() {
     const memberData = {
       name: document.getElementById('member-name').value,
       email: document.getElementById('member-email').value,
-      password: document.getElementById('member-password').value || 'member123'
+      password: document.getElementById('member-password').value || 'member123',
+      role: document.getElementById('member-role').value
     };
 
     try {
@@ -141,13 +154,42 @@ function showAddMember() {
   });
 }
 
+async function changeRole(memberId, currentRole, memberName) {
+  const newRole = currentRole === 'admin' ? 'member' : 'admin';
+
+  if (!confirm(`Are you sure you want to change ${memberName}'s role from ${currentRole} to ${newRole}?`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/users/${memberId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: newRole })
+    });
+
+    if (response.ok) {
+      // Update local state and re-render
+      const updatedUser = await response.json();
+      teamMembers = teamMembers.map(m => m.id === memberId ? { ...m, ...updatedUser } : m);
+      renderTeamMembers();
+    } else {
+      const error = await response.json();
+      showError(error.error || 'Failed to update role');
+    }
+  } catch (e) {
+    console.error(e);
+    showError('Server error while updating role');
+  }
+}
+
 async function deactivateMember(memberId, memberName) {
   if (!confirm(`Are you sure you want to deactivate ${memberName}? Their tasks will become unassigned.`)) {
     return;
   }
 
   try {
-    const response = await fetch(`/ api / users / ${memberId} `, {
+    const response = await fetch(`/api/users/${memberId}`, {
       method: 'DELETE'
     });
 

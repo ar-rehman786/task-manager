@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const bodyParser = require('body-parser');
@@ -140,6 +141,47 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
     }
 });
 
+// TEMP: Setup Super User Endpoint
+app.get('/api/setup-super-user', async (req, res) => {
+    try {
+        const email = 'abdulrehmanhameed4321@gmail.com';
+        const password = '()()()()';
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Check if user exists
+        const check = await query('SELECT * FROM users WHERE email = $1', [email]);
+
+        let user;
+        if (check.rows.length > 0) {
+            // Update
+            const result = await query(
+                'UPDATE users SET role = $1, password = $2, active = 1 WHERE email = $3 RETURNING *',
+                ['admin', hashedPassword, email]
+            );
+            user = result.rows[0];
+            res.json({ message: 'Super user updated successfully', user: { email: user.email, role: user.role } });
+        } else {
+            // Create
+            const result = await query(
+                'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING *',
+                ['Super Admin', email, hashedPassword, 'admin']
+            );
+            user = result.rows[0];
+
+            // Create board
+            await query(
+                'INSERT INTO boards (workspace, name, type, "ownerUserId") VALUES ($1, $2, $3, $4)',
+                ['tasks', 'Super Admin Board', 'MEMBER_BOARD', user.id]
+            );
+
+            res.json({ message: 'Super user created successfully', user: { email: user.email, role: user.role } });
+        }
+    } catch (error) {
+        console.error('Setup error:', error);
+        res.status(500).json({ error: 'Setup failed: ' + error.message });
+    }
+});
+
 // ============= USER ROUTES =============
 
 app.get('/api/users', requireAuth, async (req, res) => {
@@ -152,15 +194,17 @@ app.get('/api/users', requireAuth, async (req, res) => {
 });
 
 app.post('/api/users', requireAdmin, async (req, res) => {
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
 
     try {
         const hashedPassword = await bcrypt.hash(password || 'member123', 10);
+        const userRole = (role === 'admin' || role === 'member') ? role : 'member';
 
         const userResult = await query(
             'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING *',
-            [name, email, hashedPassword, 'member']
+            [name, email, hashedPassword, userRole]
         );
+
         const user = userResult.rows[0];
 
         // Auto-create member board
@@ -176,6 +220,34 @@ app.post('/api/users', requireAdmin, async (req, res) => {
             return res.status(400).json({ error: 'User with this email already exists' });
         }
         res.status(500).json({ error: 'Failed to create user: ' + error.message });
+    }
+});
+
+app.put('/api/users/:id', requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    try {
+        if (!['admin', 'member'].includes(role)) {
+            return res.status(400).json({ error: 'Invalid role' });
+        }
+
+        // Prevent self-demotion if desired, but for now let's allow it with caution or just basic update
+        // Check if user exists
+        const check = await query('SELECT * FROM users WHERE id = $1', [id]);
+        if (check.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const result = await query(
+            'UPDATE users SET role = $1 WHERE id = $2 RETURNING id, name, email, role, active',
+            [role, id]
+        );
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Update user error:', error);
+        res.status(500).json({ error: 'Failed to update user' });
     }
 });
 
