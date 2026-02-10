@@ -452,13 +452,24 @@ app.get('/api/boards', requireAuth, async (req, res) => {
     try {
         let result;
         if (req.session.userRole === 'admin') {
-            result = await query('SELECT * FROM boards WHERE workspace = $1 ORDER BY type, name', ['tasks']);
-        } else {
-            // Members only see All Tasks board and their own board
             result = await query(`
-                SELECT * FROM boards 
-                WHERE workspace = $1 AND (type = $2 OR "ownerUserId" = $3)
-                ORDER BY type, name
+                SELECT b.* 
+                FROM boards b
+                LEFT JOIN users u ON b."ownerUserId" = u.id
+                WHERE b.workspace = $1 
+                AND (u.active = 1 OR b."ownerUserId" IS NULL)
+                ORDER BY b.type, b.name
+            `, ['tasks']);
+        } else {
+            // Members only see All Tasks board and their own board (if active)
+            result = await query(`
+                SELECT b.* 
+                FROM boards b
+                LEFT JOIN users u ON b."ownerUserId" = u.id
+                WHERE b.workspace = $1 
+                AND (b.type = $2 OR b."ownerUserId" = $3)
+                AND (u.active = 1 OR b."ownerUserId" IS NULL)
+                ORDER BY b.type, b.name
             `, ['tasks', 'ALL_TASKS', req.session.userId]);
         }
         res.json(result.rows);
