@@ -8,11 +8,40 @@ const { pool, query, initializeDatabase } = require('./database');
 
 const http = require('http');
 const { Server } = require('socket.io');
+const multer = require('multer');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 const PORT = process.env.PORT || 3000;
+
+// Configure Multer for file uploads
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const dir = 'public/uploads/profiles';
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        cb(null, dir);
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only images are allowed'));
+        }
+    }
+});
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
@@ -152,8 +181,20 @@ app.post('/api/auth/logout', (req, res) => {
 
 app.get('/api/auth/me', requireAuth, async (req, res) => {
     try {
-        const result = await query('SELECT id, name, email, role FROM users WHERE id = $1', [req.session.userId]);
-        res.json(result.rows[0]);
+        const result = await query(`
+            SELECT id, name, email, role, title, department, location, phone, "employeeId", "profilePicture", "coverImage", "managerId" 
+            FROM users WHERE id = $1
+        `, [req.session.userId]);
+
+        // Get manager name if exists
+        let user = result.rows[0];
+        if (user.managerId) {
+            const manager = await query('SELECT name FROM users WHERE id = $1', [user.managerId]);
+            if (manager.rows[0]) {
+                user.managerName = manager.rows[0].name;
+            }
+        }
+        res.json(user);
     } catch (error) {
         res.status(500).json({ error: 'Server error' });
     }
@@ -241,6 +282,56 @@ app.post('/api/users', requireAdmin, async (req, res) => {
             return res.status(400).json({ error: 'User with this email already exists' });
         }
         res.status(500).json({ error: 'Failed to create user: ' + error.message });
+    }
+});
+
+// Update Profile API
+app.put('/api/users/profile', requireAuth, upload.fields([{ name: 'profilePicture', maxCount: 1 }, { name: 'coverImage', maxCount: 1 }]), async (req, res) => {
+    const userId = req.session.userId;
+    const { name, title, department, location, phone, employeeId, managerId } = req.body;
+
+    try {
+        let updateQuery = `
+            UPDATE users 
+            SET name = COALESCE($1, name),
+                title = COALESCE($2, title),
+                department = COALESCE($3, department),
+                location = COALESCE($4, location),
+                phone = COALESCE($5, phone),
+                "employeeId" = COALESCE($6, "employeeId"),
+                "managerId" = $7
+        `;
+
+        const params = [name, title, department, location, phone, employeeId, managerId || null];
+        let paramIndex = 8;
+
+        if (req.files['profilePicture']) {
+            updateQuery += `, "profilePicture" = $${paramIndex}`;
+            params.push('/uploads/profiles/' + req.files['profilePicture'][0].filename);
+            paramIndex++;
+        }
+
+        if (req.files['coverImage']) {
+            updateQuery += `, "coverImage" = $${paramIndex}`;
+            params.push('/uploads/profiles/' + req.files['coverImage'][0].filename);
+            paramIndex++;
+        }
+
+        updateQuery += ` WHERE id = $${paramIndex} RETURNING *`;
+        params.push(userId);
+
+        const result = await query(updateQuery, params);
+        const user = result.rows[0];
+
+        // Notify if name changed (optional)
+        if (name && name !== req.session.userName) {
+            req.session.userName = name;
+        }
+
+        res.json(user);
+    } catch (error) {
+        console.error('Update profile error:', error);
+        res.status(500).json({ error: 'Failed to update profile' });
     }
 });
 

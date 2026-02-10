@@ -35,6 +35,11 @@ async function initApp() {
         // Load initial workspace (restore from local storage or default to dashboard)
         const lastWorkspace = localStorage.getItem('lastWorkspace') || 'dashboard';
         loadWorkspace(lastWorkspace);
+
+        // Profile Link
+        document.getElementById('user-avatar').addEventListener('click', () => {
+            loadWorkspace('profile');
+        });
     } catch (error) {
         console.error('Init error:', error);
         window.location.href = '/';
@@ -56,7 +61,16 @@ function setupNavigation() {
     });
 }
 
+// Valid workspaces
+const validWorkspaces = ['dashboard', 'tasks', 'projects', 'attendance', 'team', 'profile'];
+
 function loadWorkspace(workspace) {
+    if (!validWorkspaces.includes(workspace)) {
+        console.warn('Attempted to load invalid workspace:', workspace);
+        // Fallback to dashboard or show an error
+        loadDashboardWorkspace();
+        return;
+    }
     try {
         console.log(`Loading workspace: ${workspace}`);
 
@@ -96,6 +110,13 @@ function loadWorkspace(workspace) {
                 break;
             case 'attendance':
                 loadAttendanceWorkspace();
+                break;
+            case 'profile':
+                if (typeof initProfile === 'function') {
+                    initProfile();
+                } else {
+                    console.error('initProfile function not found!');
+                }
                 break;
             default:
                 console.warn('Unknown workspace:', workspace);

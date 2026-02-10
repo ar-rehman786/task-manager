@@ -34,7 +34,15 @@ async function initializeDatabase() {
         password TEXT NOT NULL,
         role TEXT NOT NULL CHECK(role IN ('admin', 'member')),
         active INTEGER DEFAULT 1,
-        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        title TEXT,
+        department TEXT,
+        location TEXT,
+        phone TEXT,
+        "employeeId" TEXT,
+        "profilePicture" TEXT,
+        "coverImage" TEXT,
+        "managerId" INTEGER REFERENCES users(id) ON DELETE SET NULL
       );
     `);
 
@@ -196,6 +204,24 @@ async function initializeDatabase() {
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='projects' AND column_name='managerId') THEN
           ALTER TABLE projects ADD COLUMN "managerId" INTEGER REFERENCES users(id) ON DELETE SET NULL;
+        END IF;
+      END
+      $$;
+    `);
+
+    // Add profile columns to users (Schema Migration)
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='title') THEN
+          ALTER TABLE users ADD COLUMN title TEXT;
+          ALTER TABLE users ADD COLUMN department TEXT;
+          ALTER TABLE users ADD COLUMN location TEXT;
+          ALTER TABLE users ADD COLUMN phone TEXT;
+          ALTER TABLE users ADD COLUMN "employeeId" TEXT;
+          ALTER TABLE users ADD COLUMN "profilePicture" TEXT;
+          ALTER TABLE users ADD COLUMN "coverImage" TEXT;
+          ALTER TABLE users ADD COLUMN "managerId" INTEGER REFERENCES users(id) ON DELETE SET NULL;
         END IF;
       END
       $$;
