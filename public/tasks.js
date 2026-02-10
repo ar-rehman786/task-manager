@@ -4,15 +4,15 @@ let allBoards = [];
 let allUsers = [];
 let currentBoard = null;
 let taskFilters = {
-    assignee: 'all',
-    status: 'all',
-    priority: 'all'
+  assignee: 'all',
+  status: 'all',
+  priority: 'all'
 };
 
 async function loadTasksWorkspace() {
-    const contentArea = document.getElementById('content-area');
+  const contentArea = document.getElementById('content-area');
 
-    contentArea.innerHTML = `
+  contentArea.innerHTML = `
     <div class="board-header">
       <h2 class="board-title">Tasks</h2>
       <div class="board-actions">
@@ -43,92 +43,92 @@ async function loadTasksWorkspace() {
     <div class="kanban-board" id="kanban-board"></div>
   `;
 
-    // Load data
-    await Promise.all([
-        loadTasks(),
-        loadBoards(),
-        loadUsers()
-    ]);
+  // Load data
+  await Promise.all([
+    loadTasks(),
+    loadBoards(),
+    loadUsers()
+  ]);
 
-    // Setup event listeners
-    document.getElementById('quick-add-task').addEventListener('click', showQuickAddTask);
-    document.getElementById('filter-assignee').addEventListener('change', handleFilterChange);
-    document.getElementById('filter-status').addEventListener('change', handleFilterChange);
-    document.getElementById('filter-priority').addEventListener('change', handleFilterChange);
+  // Setup event listeners
+  document.getElementById('quick-add-task').addEventListener('click', showQuickAddTask);
+  document.getElementById('filter-assignee').addEventListener('change', handleFilterChange);
+  document.getElementById('filter-status').addEventListener('change', handleFilterChange);
+  document.getElementById('filter-priority').addEventListener('change', handleFilterChange);
 
-    // Populate filters
-    populateUserFilter();
+  // Populate filters
+  populateUserFilter();
 
-    // Render boards tabs
-    renderBoardTabs();
+  // Render boards tabs
+  renderBoardTabs();
 
-    // Load first board
-    if (allBoards.length > 0) {
-        switchBoard(allBoards[0].id);
-    }
+  // Load first board
+  if (allBoards.length > 0) {
+    switchBoard(allBoards[0].id);
+  }
 }
 
 async function loadTasks() {
-    const response = await fetch('/api/tasks');
-    allTasks = await response.json();
+  const response = await fetch('/api/tasks');
+  allTasks = await response.json();
 }
 
 async function loadBoards() {
-    const response = await fetch('/api/boards');
-    allBoards = await response.json();
+  const response = await fetch('/api/boards');
+  allBoards = await response.json();
 }
 
 async function loadUsers() {
-    const response = await fetch('/api/users');
-    allUsers = await response.json();
+  const response = await fetch('/api/users');
+  allUsers = await response.json();
 }
 
 function populateUserFilter() {
-    const filterSelect = document.getElementById('filter-assignee');
-    allUsers.forEach(user => {
-        const option = document.createElement('option');
-        option.value = user.id;
-        option.textContent = user.name;
-        filterSelect.appendChild(option);
-    });
+  const filterSelect = document.getElementById('filter-assignee');
+  allUsers.forEach(user => {
+    const option = document.createElement('option');
+    option.value = user.id;
+    option.textContent = user.name;
+    filterSelect.appendChild(option);
+  });
 }
 
 function renderBoardTabs() {
-    const tabsContainer = document.getElementById('board-tabs');
-    tabsContainer.innerHTML = '';
+  const tabsContainer = document.getElementById('board-tabs');
+  tabsContainer.innerHTML = '';
 
-    allBoards.forEach(board => {
-        const tab = document.createElement('button');
-        tab.className = 'board-tab';
-        tab.textContent = board.name;
-        tab.dataset.boardId = board.id;
-        tab.addEventListener('click', () => switchBoard(board.id));
-        tabsContainer.appendChild(tab);
-    });
+  allBoards.forEach(board => {
+    const tab = document.createElement('button');
+    tab.className = 'board-tab';
+    tab.textContent = board.name;
+    tab.dataset.boardId = board.id;
+    tab.addEventListener('click', () => switchBoard(board.id));
+    tabsContainer.appendChild(tab);
+  });
 }
 
 function switchBoard(boardId) {
-    currentBoard = allBoards.find(b => b.id === boardId);
+  currentBoard = allBoards.find(b => b.id === boardId);
 
-    // Update active tab
-    document.querySelectorAll('.board-tab').forEach(tab => {
-        tab.classList.toggle('active', tab.dataset.boardId == boardId);
-    });
+  // Update active tab
+  document.querySelectorAll('.board-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.boardId == boardId);
+  });
 
-    renderKanbanBoard();
+  renderKanbanBoard();
 }
 
 function renderKanbanBoard() {
-    const board = document.getElementById('kanban-board');
+  const board = document.getElementById('kanban-board');
 
-    const columns = [
-        { id: 'todo', title: 'To Do', color: '#6366f1' },
-        { id: 'in_progress', title: 'In Progress', color: '#f59e0b' },
-        { id: 'blocked', title: 'Blocked', color: '#ef4444' },
-        { id: 'done', title: 'Done', color: '#10b981' }
-    ];
+  const columns = [
+    { id: 'todo', title: 'To Do', color: '#6366f1' },
+    { id: 'in_progress', title: 'In Progress', color: '#f59e0b' },
+    { id: 'blocked', title: 'Blocked', color: '#ef4444' },
+    { id: 'done', title: 'Done', color: '#10b981' }
+  ];
 
-    board.innerHTML = columns.map(col => `
+  board.innerHTML = columns.map(col => `
     <div class="kanban-column" data-status="${col.id}" ondrop="handleDrop(event)" ondragover="handleDragOver(event)">
       <div class="column-header">
         <span class="column-title" style="color: ${col.color}">${col.title}</span>
@@ -138,67 +138,67 @@ function renderKanbanBoard() {
     </div>
   `).join('');
 
-    renderTasks();
+  renderTasks();
 }
 
 function renderTasks() {
-    // Filter tasks based on current board and filters
-    let filteredTasks = allTasks.filter(task => {
-        // Board filtering
-        if (currentBoard.type === 'MEMBER_BOARD') {
-            if (task.assignedUserId !== currentBoard.ownerUserId) {
-                return false;
-            }
-        }
+  // Filter tasks based on current board and filters
+  let filteredTasks = allTasks.filter(task => {
+    // Board filtering
+    if (currentBoard.type === 'MEMBER_BOARD') {
+      if (task.assignedUserId !== currentBoard.ownerUserId) {
+        return false;
+      }
+    }
 
-        // User filters
-        if (taskFilters.assignee !== 'all' && task.assignedUserId != taskFilters.assignee) {
-            return false;
-        }
-        if (taskFilters.status !== 'all' && task.status !== taskFilters.status) {
-            return false;
-        }
-        if (taskFilters.priority !== 'all' && task.priority !== taskFilters.priority) {
-            return false;
-        }
+    // User filters
+    if (taskFilters.assignee !== 'all' && task.assignedUserId != taskFilters.assignee) {
+      return false;
+    }
+    if (taskFilters.status !== 'all' && task.status !== taskFilters.status) {
+      return false;
+    }
+    if (taskFilters.priority !== 'all' && task.priority !== taskFilters.priority) {
+      return false;
+    }
 
-        return true;
-    });
+    return true;
+  });
 
-    // Clear columns
-    ['todo', 'in_progress', 'blocked', 'done'].forEach(status => {
-        document.getElementById(`tasks-${status}`).innerHTML = '';
-    });
+  // Clear columns
+  ['todo', 'in_progress', 'blocked', 'done'].forEach(status => {
+    document.getElementById(`tasks-${status}`).innerHTML = '';
+  });
 
-    // Render tasks
-    filteredTasks.forEach(task => {
-        const taskCard = createTaskCard(task);
-        document.getElementById(`tasks-${task.status}`).appendChild(taskCard);
-    });
+  // Render tasks
+  filteredTasks.forEach(task => {
+    const taskCard = createTaskCard(task);
+    document.getElementById(`tasks-${task.status}`).appendChild(taskCard);
+  });
 
-    // Update counts
-    ['todo', 'in_progress', 'blocked', 'done'].forEach(status => {
-        const count = filteredTasks.filter(t => t.status === status).length;
-        document.getElementById(`count-${status}`).textContent = count;
-    });
+  // Update counts
+  ['todo', 'in_progress', 'blocked', 'done'].forEach(status => {
+    const count = filteredTasks.filter(t => t.status === status).length;
+    document.getElementById(`count-${status}`).textContent = count;
+  });
 }
 
 function createTaskCard(task) {
-    const card = document.createElement('div');
-    card.className = 'task-card';
-    card.draggable = true;
-    card.dataset.taskId = task.id;
-    card.dataset.assignedUserId = task.assignedUserId || '';
+  const card = document.createElement('div');
+  card.className = 'task-card';
+  card.draggable = true;
+  card.dataset.taskId = task.id;
+  card.dataset.assignedUserId = task.assignedUserId || '';
 
-    card.addEventListener('dragstart', handleDragStart);
-    card.addEventListener('dragend', handleDragEnd);
-    card.addEventListener('click', () => showTaskDetails(task.id));
+  card.addEventListener('dragstart', handleDragStart);
+  card.addEventListener('dragend', handleDragEnd);
+  card.addEventListener('click', () => showTaskDetails(task.id));
 
-    const labels = task.labels ? task.labels.split(',').map(l =>
-        `<span class="task-label">${l.trim()}</span>`
-    ).join('') : '';
+  const labels = task.labels ? task.labels.split(',').map(l =>
+    `<span class="task-label">${l.trim()}</span>`
+  ).join('') : '';
 
-    card.innerHTML = `
+  card.innerHTML = `
     <div class="task-card-header">
       <div class="task-title">${task.title}</div>
       <span class="task-priority ${task.priority}">${task.priority}</span>
@@ -213,105 +213,105 @@ function createTaskCard(task) {
     </div>
   `;
 
-    return card;
+  return card;
 }
 
 // Drag and drop handlers
 function handleDragStart(e) {
-    e.target.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/html', e.target.innerHTML);
-    e.dataTransfer.setData('taskId', e.target.dataset.taskId);
-    e.dataTransfer.setData('currentAssignedUserId', e.target.dataset.assignedUserId);
+  e.target.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/html', e.target.innerHTML);
+  e.dataTransfer.setData('taskId', e.target.dataset.taskId);
+  e.dataTransfer.setData('currentAssignedUserId', e.target.dataset.assignedUserId);
 }
 
 function handleDragEnd(e) {
-    e.target.classList.remove('dragging');
+  e.target.classList.remove('dragging');
 }
 
 function handleDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    return false;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  return false;
 }
 
 async function handleDrop(e) {
-    e.stopPropagation();
-    e.preventDefault();
+  e.stopPropagation();
+  e.preventDefault();
 
-    const taskId = e.dataTransfer.getData('taskId');
-    const currentAssignedUserId = e.dataTransfer.getData('currentAssignedUserId');
+  const taskId = e.dataTransfer.getData('taskId');
+  const currentAssignedUserId = e.dataTransfer.getData('currentAssignedUserId');
 
-    // Get the column where task was dropped
-    let dropTarget = e.target;
-    while (dropTarget && !dropTarget.classList.contains('kanban-column')) {
-        dropTarget = dropTarget.parentElement;
+  // Get the column where task was dropped
+  let dropTarget = e.target;
+  while (dropTarget && !dropTarget.classList.contains('kanban-column')) {
+    dropTarget = dropTarget.parentElement;
+  }
+
+  if (!dropTarget) return;
+
+  const newStatus = dropTarget.dataset.status;
+  const task = allTasks.find(t => t.id == taskId);
+
+  if (!task) return;
+
+  let updates = { ...task, status: newStatus };
+
+  // Handle assignment logic based on board type
+  if (currentBoard.type === 'MEMBER_BOARD' && currentBoard.ownerUserId) {
+    // Dropped on a member board - assign to that member
+    if (task.assignedUserId != currentBoard.ownerUserId) {
+      updates.assignedUserId = currentBoard.ownerUserId;
     }
+  }
 
-    if (!dropTarget) return;
+  // Update task
+  try {
+    const response = await fetch(`/api/tasks/${taskId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
 
-    const newStatus = dropTarget.dataset.status;
-    const task = allTasks.find(t => t.id == taskId);
-
-    if (!task) return;
-
-    let updates = { ...task, status: newStatus };
-
-    // Handle assignment logic based on board type
-    if (currentBoard.type === 'MEMBER_BOARD' && currentBoard.ownerUserId) {
-        // Dropped on a member board - assign to that member
-        if (task.assignedUserId != currentBoard.ownerUserId) {
-            updates.assignedUserId = currentBoard.ownerUserId;
-        }
+    if (response.ok) {
+      const updatedTask = await response.json();
+      const index = allTasks.findIndex(t => t.id == taskId);
+      allTasks[index] = updatedTask;
+      renderTasks();
     }
-
-    // Update task
-    try {
-        const response = await fetch(`/api/tasks/${taskId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updates)
-        });
-
-        if (response.ok) {
-            const updatedTask = await response.json();
-            const index = allTasks.findIndex(t => t.id == taskId);
-            allTasks[index] = updatedTask;
-            renderTasks();
-        }
-    } catch (error) {
-        console.error('Update task error:', error);
-        showError('Failed to update task');
-    }
+  } catch (error) {
+    console.error('Update task error:', error);
+    showError('Failed to update task');
+  }
 }
 
 function handleFilterChange() {
-    taskFilters.assignee = document.getElementById('filter-assignee').value;
-    taskFilters.status = document.getElementById('filter-status').value;
-    taskFilters.priority = document.getElementById('filter-priority').value;
-    renderTasks();
+  taskFilters.assignee = document.getElementById('filter-assignee').value;
+  taskFilters.status = document.getElementById('filter-status').value;
+  taskFilters.priority = document.getElementById('filter-priority').value;
+  renderTasks();
 }
 
 function filterTasks(query) {
-    if (!query) {
-        renderTasks();
-        return;
-    }
-
-    const filtered = allTasks.filter(task =>
-        task.title.toLowerCase().includes(query) ||
-        (task.description && task.description.toLowerCase().includes(query))
-    );
-
-    // Temporarily replace allTasks for rendering
-    const originalTasks = allTasks;
-    allTasks = filtered;
+  if (!query) {
     renderTasks();
-    allTasks = originalTasks;
+    return;
+  }
+
+  const filtered = allTasks.filter(task =>
+    task.title.toLowerCase().includes(query) ||
+    (task.description && task.description.toLowerCase().includes(query))
+  );
+
+  // Temporarily replace allTasks for rendering
+  const originalTasks = allTasks;
+  allTasks = filtered;
+  renderTasks();
+  allTasks = originalTasks;
 }
 
 function showQuickAddTask() {
-    const modalContent = `
+  const modalContent = `
     <div class="modal-header">
       <h3 class="modal-title">Quick Add Task</h3>
       <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
@@ -351,45 +351,53 @@ function showQuickAddTask() {
     </form>
   `;
 
-    const modal = showModal(modalContent);
+  const modal = showModal(modalContent);
 
-    document.getElementById('quick-add-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
+  document.getElementById('quick-add-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
 
-        const taskData = {
-            title: document.getElementById('task-title').value,
-            description: document.getElementById('task-description').value,
-            priority: document.getElementById('task-priority').value,
-            assignedUserId: document.getElementById('task-assignee').value || null,
-            dueDate: document.getElementById('task-due-date').value || null,
-            status: 'todo'
-        };
+    const taskData = {
+      title: document.getElementById('task-title').value,
+      description: document.getElementById('task-description').value,
+      priority: document.getElementById('task-priority').value,
+      assignedUserId: document.getElementById('task-assignee').value || null,
+      dueDate: document.getElementById('task-due-date').value || null,
+      status: 'todo'
+    };
 
-        try {
-            const response = await fetch('/api/tasks', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(taskData)
-            });
+    try {
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskData)
+      });
 
-            if (response.ok) {
-                const newTask = await response.json();
-                allTasks.unshift(newTask);
-                renderTasks();
-                closeModal(modal);
-            }
-        } catch (error) {
-            console.error('Create task error:', error);
-            showError('Failed to create task');
+      if (response.ok) {
+        const newTask = await response.json();
+        allTasks.unshift(newTask);
+
+        // Only render kanban if retrieving the board
+        if (document.getElementById('kanban-board')) {
+          renderTasks();
+        } else if (typeof loadDashboardStats === 'function') {
+          // Update dashboard if we're there
+          loadDashboardStats();
         }
-    });
+
+        closeModal(modal);
+      }
+    } catch (error) {
+      console.error('Create task error:', error);
+      showError('Failed to create task');
+    }
+  });
 }
 
 function showTaskDetails(taskId) {
-    const task = allTasks.find(t => t.id == taskId);
-    if (!task) return;
+  const task = allTasks.find(t => t.id == taskId);
+  if (!task) return;
 
-    const modalContent = `
+  const modalContent = `
     <div class="modal-header">
       <h3 class="modal-title">Task Details</h3>
       <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
@@ -444,54 +452,54 @@ function showTaskDetails(taskId) {
     </form>
   `;
 
-    const modal = showModal(modalContent);
+  const modal = showModal(modalContent);
 
-    document.getElementById('edit-task-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
+  document.getElementById('edit-task-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
 
-        const updates = {
-            title: document.getElementById('edit-task-title').value,
-            description: document.getElementById('edit-task-description').value,
-            status: document.getElementById('edit-task-status').value,
-            priority: document.getElementById('edit-task-priority').value,
-            assignedUserId: document.getElementById('edit-task-assignee').value || null,
-            dueDate: document.getElementById('edit-task-due-date').value || null,
-            labels: document.getElementById('edit-task-labels').value
-        };
+    const updates = {
+      title: document.getElementById('edit-task-title').value,
+      description: document.getElementById('edit-task-description').value,
+      status: document.getElementById('edit-task-status').value,
+      priority: document.getElementById('edit-task-priority').value,
+      assignedUserId: document.getElementById('edit-task-assignee').value || null,
+      dueDate: document.getElementById('edit-task-due-date').value || null,
+      labels: document.getElementById('edit-task-labels').value
+    };
 
-        try {
-            const response = await fetch(`/api/tasks/${taskId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updates)
-            });
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
 
-            if (response.ok) {
-                const updatedTask = await response.json();
-                const index = allTasks.findIndex(t => t.id == taskId);
-                allTasks[index] = updatedTask;
-                renderTasks();
-                closeModal(modal);
-            }
-        } catch (error) {
-            console.error('Update task error:', error);
-            showError('Failed to update task');
-        }
-    });
+      if (response.ok) {
+        const updatedTask = await response.json();
+        const index = allTasks.findIndex(t => t.id == taskId);
+        allTasks[index] = updatedTask;
+        renderTasks();
+        closeModal(modal);
+      }
+    } catch (error) {
+      console.error('Update task error:', error);
+      showError('Failed to update task');
+    }
+  });
 
-    document.getElementById('delete-task-btn').addEventListener('click', async () => {
-        if (!confirm('Are you sure you want to delete this task?')) return;
+  document.getElementById('delete-task-btn').addEventListener('click', async () => {
+    if (!confirm('Are you sure you want to delete this task?')) return;
 
-        try {
-            const response = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
-            if (response.ok) {
-                allTasks = allTasks.filter(t => t.id != taskId);
-                renderTasks();
-                closeModal(modal);
-            }
-        } catch (error) {
-            console.error('Delete task error:', error);
-            showError('Failed to delete task');
-        }
-    });
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+      if (response.ok) {
+        allTasks = allTasks.filter(t => t.id != taskId);
+        renderTasks();
+        closeModal(modal);
+      }
+    } catch (error) {
+      console.error('Delete task error:', error);
+      showError('Failed to delete task');
+    }
+  });
 }
