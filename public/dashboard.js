@@ -42,9 +42,6 @@ async function loadDashboardStats() {
     }
 }
 
-    }
-}
-
 // Load attendance widget
 async function loadAttendanceWidget() {
     try {
