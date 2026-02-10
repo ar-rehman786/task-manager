@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ['nodejs-18_x']
+
+[phases.install]
+cmds = ['cd task-manager-next && npm ci']
+
+[phases.build]
+cmds = ['cd task-manager-next && npm run build']
+
+[start]
+cmd = 'cd task-manager-next && npm start'
