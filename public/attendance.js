@@ -155,6 +155,12 @@ function showClockOutModal() {
 
 // Clock in
 async function clockIn() {
+    const btn = document.querySelector('#clock-in-form button[type="submit"]');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading-spinner">⌛</span> Clocking in...';
+    }
+
     const notes = document.getElementById('clock-in-notes')?.value;
 
     try {
@@ -169,19 +175,33 @@ async function clockIn() {
             renderAttendanceWidget();
             startTimer();
             await loadAttendanceHistory();
-            showSuccess('Clocked in successfully!');
+            // Modal closes, no need to reset button
         } else {
             const error = await response.json();
             showError(error.error || 'Failed to clock in');
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = 'Clock In Now';
+            }
         }
     } catch (error) {
         console.error('Clock in error:', error);
         showError('Failed to clock in');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = 'Clock In Now';
+        }
     }
 }
 
 // Clock out
 async function clockOut() {
+    const btn = document.querySelector('#clock-out-form button[type="submit"]');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading-spinner">⌛</span> Clocking out...';
+    }
+
     const notes = document.getElementById('clock-out-notes')?.value;
 
     try {
@@ -201,10 +221,18 @@ async function clockOut() {
         } else {
             const error = await response.json();
             showError(error.error || 'Failed to clock out');
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = 'Clock Out Now';
+            }
         }
     } catch (error) {
         console.error('Clock out error:', error);
         showError('Failed to clock out');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = 'Clock Out Now';
+        }
     }
 }
 
