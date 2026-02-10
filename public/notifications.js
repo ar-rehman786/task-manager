@@ -348,10 +348,34 @@ style.textContent = `
         align-items: center;
         min-width: 300px;
         border-left: 4px solid var(--primary, #6366f1);
-        animation: slideIn 0.3s ease-out;
-        transition: opacity 0.3s ease;
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.3s ease-out;
         cursor: pointer;
     }
+    .toast.show {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    
+    /* Toast type colors */
+    .toast-success {
+        border-left-color: #10b981;
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), var(--bg-secondary, #1e293b));
+    }
+    .toast-error {
+        border-left-color: #ef4444;
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), var(--bg-secondary, #1e293b));
+    }
+    .toast-warning {
+        border-left-color: #f59e0b;
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), var(--bg-secondary, #1e293b));
+    }
+    .toast-info {
+        border-left-color: #6366f1;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), var(--bg-secondary, #1e293b));
+    }
+    
     .toast-content {
         display: flex;
         align-items: center;

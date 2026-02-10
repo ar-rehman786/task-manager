@@ -58,6 +58,33 @@ io.on('connection', (socket) => {
     });
 });
 
+// Helper function to send notifications
+async function sendNotification(userId, type, message, data = {}) {
+    try {
+        console.log(`[NOTIFICATION] Sending to user ${userId}: ${message}`);
+
+        // 1. Save to database
+        await query(`
+            INSERT INTO notifications ("userId", type, message, data)
+            VALUES ($1, $2, $3, $4)
+        `, [userId, type, message, JSON.stringify(data)]);
+
+        // 2. Emit via Socket.io
+        const notification = {
+            type,
+            message,
+            data,
+            createdAt: new Date().toISOString()
+        };
+
+        io.to(`user:${userId}`).emit('notification', notification);
+        console.log(`[NOTIFICATION] Emitted to user:${userId}`);
+
+    } catch (error) {
+        console.error('[NOTIFICATION ERROR]', error);
+    }
+}
+
 
 
 
