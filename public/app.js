@@ -56,20 +56,17 @@ function setupNavigation() {
     });
 }
 
-// interval tracker
-let dashboardInterval = null;
-
 function loadWorkspace(workspace) {
     try {
         console.log(`Loading workspace: ${workspace}`);
 
         // Clear existing interval if any
-        if (dashboardInterval) {
-            clearInterval(dashboardInterval);
-            dashboardInterval = null;
+        if (window.dashboardInterval) {
+            clearInterval(window.dashboardInterval);
+            window.dashboardInterval = null;
         }
 
-        currentWorkspace = workspace;
+        window.currentWorkspace = workspace;
         const contentArea = document.getElementById('content-area');
 
         // Update active class if loading from storage/init

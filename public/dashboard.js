@@ -12,12 +12,9 @@ async function initDashboard() {
         await loadAttendanceWidget();
 
         // Refresh stats every 30 seconds
-        if (typeof dashboardInterval !== 'undefined') {
-            if (dashboardInterval) clearInterval(dashboardInterval);
-            dashboardInterval = setInterval(loadDashboardStats, 30000);
-        } else {
-            setInterval(loadDashboardStats, 30000);
-        }
+        if (window.dashboardInterval) clearInterval(window.dashboardInterval);
+        window.dashboardInterval = setInterval(loadDashboardStats, 30000);
+
     } catch (err) {
         console.error("Dashboard init failed", err);
     }
