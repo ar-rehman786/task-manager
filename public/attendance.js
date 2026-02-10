@@ -31,34 +31,69 @@ async function initAttendance() {
 
     try {
         if (attendanceUser && attendanceUser.role === 'admin') {
-            const adminSection = document.getElementById('admin-section');
-            if (adminSection) {
-                adminSection.style.display = 'block';
+            console.log('User is admin. Injecting Admin Panel...');
+
+            // construct HTML
+            const adminHtml = `
+                <div id="dynamic-admin-section" style="
+                    margin-bottom: 2rem; 
+                    padding: 1.5rem; 
+                    background: #fdf2f8; 
+                    border: 1px solid #fbcfe8; 
+                    border-radius: 1rem;
+                ">
+                    <h3 style="color: #be185d; margin-bottom: 1rem;">👑 Admin Attendance Overview</h3>
+                    
+                    <h4 style="margin-top: 1rem;">Today's Team Activity</h4>
+                    <table class="data-table" id="today-table" style="background: white;">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Clock In</th>
+                                <th>Clock Out</th>
+                                <th>Duration</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="6" style="text-align: center;">Loading...</td></tr>
+                        </tbody>
+                    </table>
+
+                    <h4 style="margin-top: 2rem;">Full History (All Members)</h4>
+                    <table class="data-table" id="admin-history-table" style="background: white;">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Date</th>
+                                <th>Clock In</th>
+                                <th>Clock Out</th>
+                                <th>Duration</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="6" style="text-align: center;">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            // Inject at the top of content-area (after header)
+            const header = document.querySelector('.workspace-header');
+            if (header) {
+                header.insertAdjacentHTML('afterend', adminHtml);
+
+                // Now load data into these new tables
                 await loadTodayAttendance();
                 await loadAllAttendanceHistory();
-
-                // Ensure user sees it
-                // DEBUG: Move to top of page to verify visibility
-                const attendanceWidget = document.getElementById('attendance-widget');
-                if (attendanceWidget && adminSection) {
-                    console.log('Moving admin section to top...');
-                    attendanceWidget.parentNode.insertBefore(adminSection, attendanceWidget);
-
-                    // Add debug styling to make it impossible to miss
-                    adminSection.style.border = '2px solid #f59e0b'; // Orange border
-                    adminSection.style.padding = '1rem';
-                    adminSection.style.marginBottom = '2rem';
-                    adminSection.style.background = 'rgba(245, 158, 11, 0.1)';
-                }
-
-                setTimeout(() => {
-                    console.log('Scrolling admin section into view');
-                    adminSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }, 500);
+            } else {
+                console.error('Could not find .workspace-header to inject admin panel');
             }
         }
     } catch (e) {
-        console.error('Error in admin check section:', e);
+        console.error('Error in admin injection:', e);
     }
 }
 

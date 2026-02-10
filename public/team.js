@@ -35,36 +35,38 @@ function renderTeamMembers() {
 
   container.innerHTML = `
     <div style="display: grid; gap: 1rem;">
-      ${teamMembers.map(member => `
-        <div class="card">
-          <div style="display: flex; justify-content: space-between; align-items: start;">
-            <div>
-              <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem;">${member.name}</h3>
-              <p style="color: var(--text-secondary); font-size: 0.875rem;">${member.email}</p>
-              <span style="display: inline-block; margin-top: 0.5rem; padding: 0.25rem 0.75rem; background: ${member.role === 'admin' ? 'var(--primary)' : 'var(--bg-tertiary)'}; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600;">
-                ${member.role}
-              </span>
-            </div>
-            <div style="display: flex; gap: 0.5rem;">
-              ${member.role !== 'admin' ? `
-                <button class="btn btn-danger btn-sm" onclick="deactivateMember(${member.id}, '${member.name}')">
-                  Deactivate
-                </button>
-              ` : ''}
-            </div>
-          </div>
-        </div>
-      `).join('')}
-    </div>
-  `;
+// Render team members
+function renderTeamMembers(users) {
+    const tbody = document.getElementById('team-table-body');
+    if (!tbody) return; // Guard clause
+
+    tbody.innerHTML = users.map(user => `
+    < tr >
+            <td>
+                <div class="user-info">
+                    <div class="user-avatar">${user.name.charAt(0)}</div>
+                    <div>
+                        <div class="user-name">${user.name}</div>
+                        <div class="user-email">${user.email}</div>
+                    </div>
+                </div>
+            </td>
+            <td><span class="badge badge-${user.role === 'admin' ? 'primary' : 'secondary'}">${user.role}</span></td>
+            <td><span class="badge badge-${user.active ? 'success' : 'danger'}">${user.active ? 'Active' : 'Inactive'}</span></td>
+            <td>${new Date(user.createdAt).toLocaleDateString()}</td>
+            <td>
+                <button class="btn btn-sm btn-secondary" onclick="editUser(${user.id})">Edit</button>
+            </td>
+        </tr >
+    `).join('');
 }
 
 function showAddMember() {
   const modalContent = `
-    <div class="modal-header">
+    < div class="modal-header" >
       <h3 class="modal-title">Add Team Member</h3>
       <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
-    </div>
+    </div >
     <form id="add-member-form">
       <div class="form-group">
         <label class="form-label">Name *</label>
@@ -77,9 +79,9 @@ function showAddMember() {
       <div class="form-group">
         <label class="form-label">Password</label>
         <input type="password" class="form-input" id="member-password" placeholder="Default: member123">
-        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
-          Leave blank to use default password: member123
-        </p>
+          <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+            Leave blank to use default password: member123
+          </p>
       </div>
       <div class="form-actions">
         <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
@@ -136,12 +138,12 @@ function showAddMember() {
 }
 
 async function deactivateMember(memberId, memberName) {
-  if (!confirm(`Are you sure you want to deactivate ${memberName}? Their tasks will become unassigned.`)) {
+  if (!confirm(`Are you sure you want to deactivate ${ memberName }? Their tasks will become unassigned.`)) {
     return;
   }
 
   try {
-    const response = await fetch(`/api/users/${memberId}`, {
+    const response = await fetch(`/ api / users / ${ memberId } `, {
       method: 'DELETE'
     });
 
