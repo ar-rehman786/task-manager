@@ -512,9 +512,6 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
             SELECT t.*, u.name as "assignedUserName", c.name as "createdByName", p.name as "projectName"
             FROM tasks t
             LEFT JOIN users u ON t."assignedUserId" = u.id
-            LEFT JOIN users c ON t."createdBy" = c.id
-            LEFT JOIN projects p ON t."projectId" = p.id
-            WHERE t.id = $1
         `, [task.id]);
 
         // Send Notification to Assignee

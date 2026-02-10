@@ -161,8 +161,36 @@ function toggleNotifications() {
 
 // ... Helper functions (playNotificationSound, showToast, getIconForType, formatTimeAgo) ...
 function playNotificationSound(type) {
-    const audio = new Audio(type === 'error' ? '/assets/error.mp3' : '/assets/notification.mp3');
-    audio.play().catch(e => console.log('Audio play failed', e));
+    // Simple beep sound (Base64) to avoid missing file issues
+    const audioSrc = 'data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU';
+    // This is a very short placeholder. For a real sound, we'd need a longer string.
+    // Let's use a slightly longer one for a "pop" sound effect.
+    const popSound = 'data:audio/mpeg;base64,//uQxAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//uQxAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq';
+
+    // Better approach: Use the browser's AudioContext for a synthesized beep if file fails
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    if (audioContext.state === 'suspended') {
+        audioContext.resume();
+    }
+
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.type = type === 'error' ? 'sawtooth' : 'sine';
+    oscillator.frequency.setValueAtTime(type === 'error' ? 150 : 500, audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(type === 'error' ? 100 : 300, audioContext.currentTime + 0.1);
+
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.1);
 }
 
 function showToast(message, type = 'info') {
