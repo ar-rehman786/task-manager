@@ -1,4 +1,6 @@
+console.log('🔹 SERVER.JS: Starting...');
 require('dotenv').config();
+console.log('🔹 SERVER.JS: Dotenv loaded');
 const express = require('express');
 const session = require('express-session');
 const bodyParser = require('body-parser');
@@ -7,13 +9,25 @@ const path = require('path');
 const { pool, query, initializeDatabase } = require('./database');
 const http = require('http');
 
+console.log('🔹 SERVER.JS: Modules loaded');
+
 const { Server } = require('socket.io');
 const multer = require('multer');
 const fs = require('fs');
 const next = require('next');
 
+console.log('🔹 SERVER.JS: Next.js module loaded');
+
 const dev = process.env.NODE_ENV !== 'production';
-const nextApp = next({ dev, dir: '.' });
+let nextApp;
+try {
+    console.log('🔹 SERVER.JS: Initializing Next.js app...');
+    nextApp = next({ dev, dir: '.' });
+    console.log('🔹 SERVER.JS: Next.js app initialized');
+} catch (err) {
+    console.error('❌ SERVER.JS: Failed to initialize Next.js app:', err);
+    process.exit(1);
+}
 const handle = nextApp.getRequestHandler();
 
 const app = express();
@@ -852,9 +866,13 @@ app.post('/api/tasks/:id/activity', requireAuth, async (req, res) => {
 app.get('/api/projects', requireAuth, async (req, res) => {
     try {
         const projects = await query(`
-            SELECT p.*, u.name as "managerName"
+            SELECT p.*, 
+                   u.name as "managerName",
+                   ua.name as "assignedUserName",
+                   (SELECT COUNT(*) FROM project_access_items pai WHERE pai."projectId" = p.id AND pai."isGranted" = 0)::int as "pendingAccessCount"
             FROM projects p
             LEFT JOIN users u ON p."managerId" = u.id
+            LEFT JOIN users ua ON p."assignedUserId" = ua.id
             ORDER BY p."createdAt" DESC
         `);
         res.json(projects.rows);
@@ -864,13 +882,13 @@ app.get('/api/projects', requireAuth, async (req, res) => {
 });
 
 app.post('/api/projects', requireAdmin, async (req, res) => {
-    const { name, client, status, startDate, endDate, description, managerId, initialTasks } = req.body;
+    const { name, client, status, startDate, endDate, description, managerId, assignedUserId, initialTasks } = req.body;
 
     try {
         const result = await query(`
-            INSERT INTO projects (name, client, status, "startDate", "endDate", description, "managerId")
-            VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
-        `, [name, client, status || 'active', startDate, endDate, description, managerId || null]);
+            INSERT INTO projects (name, client, status, "startDate", "endDate", description, "managerId", "assignedUserId")
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *
+        `, [name, client, status || 'active', startDate, endDate, description, managerId || null, assignedUserId || null]);
 
         const project = result.rows[0];
 
@@ -886,6 +904,12 @@ app.post('/api/projects', requireAdmin, async (req, res) => {
             }
         }
 
+        // Log creation
+        await query(`
+            INSERT INTO project_logs ("projectId", type, message, "createdBy")
+            VALUES ($1, 'project_update', $2, $3)
+        `, [project.id, `Project "${name}" created`, req.session.userId]);
+
         res.json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Error creating project' });
@@ -894,16 +918,22 @@ app.post('/api/projects', requireAdmin, async (req, res) => {
 
 app.put('/api/projects/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
-    const { name, client, status, startDate, endDate, description, managerId } = req.body;
+    const { name, client, status, startDate, endDate, description, managerId, assignedUserId } = req.body;
 
     try {
         await query(`
             UPDATE projects 
-            SET name = $1, client = $2, status = $3, "startDate" = $4, "endDate" = $5, description = $6, "managerId" = $7, "updatedAt" = CURRENT_TIMESTAMP
-            WHERE id = $8
-        `, [name, client, status, startDate, endDate, description, managerId, id]);
+            SET name = $1, client = $2, status = $3, "startDate" = $4, "endDate" = $5, description = $6, "managerId" = $7, "assignedUserId" = $8, "updatedAt" = CURRENT_TIMESTAMP
+            WHERE id = $9
+        `, [name, client, status, startDate, endDate, description, managerId, assignedUserId, id]);
 
         const project = await query('SELECT * FROM projects WHERE id = $1', [id]);
+        // Log update
+        await query(`
+            INSERT INTO project_logs ("projectId", type, message, "createdBy")
+            VALUES ($1, 'project_update', $2, $3)
+        `, [id, `Project updated`, req.session.userId]);
+
         res.json(project.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating project' });
@@ -932,7 +962,7 @@ app.get('/api/projects/:projectId/milestones', requireAuth, async (req, res) => 
     }
 });
 
-app.post('/api/projects/:projectId/milestones', requireAdmin, async (req, res) => {
+app.post('/api/projects/:projectId/milestones', requireAuth, async (req, res) => {
     const { projectId } = req.params;
     const { title, dueDate, status, details } = req.body;
 
@@ -944,6 +974,13 @@ app.post('/api/projects/:projectId/milestones', requireAdmin, async (req, res) =
             INSERT INTO milestones ("projectId", title, "dueDate", status, details, "orderIndex")
             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
         `, [projectId, title, dueDate, status || 'not_started', details, orderIndex]);
+
+        // Log milestone creation
+        await query(`
+            INSERT INTO project_logs ("projectId", type, message, "createdBy")
+            VALUES ($1, 'milestone_update', $2, $3)
+        `, [projectId, `Milestone "${title}" created`, req.session.userId]);
+
         res.json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Error creating milestone' });
@@ -1081,7 +1118,7 @@ app.get('/api/projects/:projectId/access', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/api/projects/:projectId/access', requireAdmin, async (req, res) => {
+app.post('/api/projects/:projectId/access', requireAuth, async (req, res) => {
     const { projectId } = req.params;
     const { platform, description, notes } = req.body;
 
@@ -1090,8 +1127,16 @@ app.post('/api/projects/:projectId/access', requireAdmin, async (req, res) => {
             INSERT INTO project_access_items ("projectId", platform, description, notes)
             VALUES ($1, $2, $3, $4) RETURNING *
         `, [projectId, platform, description || null, notes || null]);
+
+        // Log access request
+        await query(`
+            INSERT INTO project_logs ("projectId", type, message, "createdBy")
+            VALUES ($1, 'access_update', $2, $3)
+        `, [projectId, `Access requested for ${platform}`, req.session.userId]);
+
         res.json(result.rows[0]);
     } catch (error) {
+        console.error('Error creating access item:', error);
         res.status(500).json({ error: 'Error creating access item' });
     }
 });
@@ -1110,6 +1155,16 @@ app.put('/api/access/:id', requireAdmin, async (req, res) => {
         `, [platform, description, isGranted ? 1 : 0, grantedAt, grantedEmail || null, notes, id]);
 
         const item = await query('SELECT * FROM project_access_items WHERE id = $1', [id]);
+
+        // Log access grant/update
+        if (isGranted) {
+            const accessItem = item.rows[0];
+            await query(`
+                INSERT INTO project_logs ("projectId", type, message, "createdBy")
+                VALUES ($1, 'access_update', $2, $3)
+            `, [accessItem.projectId, `Access granted for ${accessItem.platform}`, req.session.userId]);
+        }
+
         res.json(item.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Error updating access item' });
@@ -1498,6 +1553,48 @@ app.put('/api/notifications/read', requireAuth, async (req, res) => {
     }
 });
 
+// ============= TRANSCRIPTION ROUTES =============
+
+app.get('/api/projects/:projectId/transcriptions', requireAuth, async (req, res) => {
+    const { projectId } = req.params;
+    try {
+        const result = await query(`
+            SELECT pt.*, u.name as "createdByName"
+            FROM project_transcriptions pt
+            LEFT JOIN users u ON pt."createdBy" = u.id
+            WHERE pt."projectId" = $1
+            ORDER BY pt."createdAt" DESC
+        `, [projectId]);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching transcriptions:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.post('/api/projects/:projectId/transcriptions', requireAuth, async (req, res) => {
+    const { projectId } = req.params;
+    const { title, content } = req.body;
+
+    try {
+        const result = await query(`
+            INSERT INTO project_transcriptions ("projectId", title, content, "createdBy")
+            VALUES ($1, $2, $3, $4) RETURNING *
+        `, [projectId, title, content, req.session.userId]);
+
+        // Log activity
+        await query(`
+            INSERT INTO project_logs ("projectId", type, message, "createdBy")
+            VALUES ($1, 'project_update', $2, $3)
+        `, [projectId, `Added transcription: ${title}`, req.session.userId]);
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Error creating transcription:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 // Next.js Request Handler
 app.all(/(.*)/, (req, res) => {
     return handle(req, res);
@@ -1514,11 +1611,21 @@ app.use((err, req, res, next) => {
 });
 
 nextApp.prepare().then(() => {
+    server.on('error', (err) => {
+        console.error('❌ Server Listen Error:', err);
+        require('fs').writeFileSync('server_error.log', JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
+        process.exit(1);
+    });
+
     server.listen(PORT, async () => {
         console.log(`\n🚀 Server running on http://localhost:${PORT}`);
 
         try {
             console.log('🔄 Initializing database...');
+            const dbUrl = process.env.DATABASE_URL || '';
+            console.log(`[SERVER-DEBUG] DATABASE_URL length: ${dbUrl.length}`);
+            console.log(`[SERVER-DEBUG] DATABASE_URL start: ${dbUrl.substring(0, 10)}...`);
+
             await initializeDatabase();
             console.log('✅ Database initialized.');
 
@@ -1527,8 +1634,18 @@ nextApp.prepare().then(() => {
             console.log(`📝 Login at http://localhost:${PORT}\n`);
         } catch (error) {
             console.error('❌ Failed to initialize database:', error);
+            const fs = require('fs');
+            fs.writeFileSync('error.log', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+            if (error instanceof AggregateError) {
+                console.error('AggregateError details:', error.errors);
+                error.errors.forEach(e => console.error(e));
+                fs.appendFileSync('error.log', '\n' + JSON.stringify(error.errors, null, 2));
+            }
             startupError = error;
             // Do NOT process.exit(1) - keep server running to show error page
         }
     });
+}).catch((err) => {
+    console.error('❌ Next.js Prepare Error:', err);
+    process.exit(1);
 });
