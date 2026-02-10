@@ -2,10 +2,14 @@
 let allProjects = [];
 let currentProject = null;
 
+console.log('Projects JS loaded');
+
 async function loadProjectsWorkspace() {
+  console.log('loadProjectsWorkspace called');
   const contentArea = document.getElementById('content-area');
 
-  contentArea.innerHTML = `
+  try {
+    contentArea.innerHTML = `
     <div class="board-header">
       <h2 class="board-title">Projects</h2>
       <div class="board-actions">
@@ -15,11 +19,16 @@ async function loadProjectsWorkspace() {
     <div class="projects-grid" id="projects-grid"></div>
   `;
 
-  await loadProjects();
-  renderProjects();
+    await loadProjects();
+    renderProjects();
 
-  if (currentUser.role === 'admin') {
-    document.getElementById('create-project-btn').addEventListener('click', showCreateProject);
+    if (currentUser.role === 'admin') {
+      const createBtn = document.getElementById('create-project-btn');
+      if (createBtn) createBtn.addEventListener('click', showCreateProject);
+    }
+  } catch (error) {
+    console.error('Error loading projects workspace:', error);
+    contentArea.innerHTML = '<div style="padding: 2rem; color: red;">Error loading projects. Check console.</div>';
   }
 }
 
