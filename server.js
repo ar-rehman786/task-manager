@@ -162,13 +162,15 @@ app.use(session({
     }
 }));
 
-// Debug Route: Force create notifications table
+// Debug Route: Force create notifications table & DIAGNOSE
 app.get('/api/debug/init-notifications', async (req, res) => {
     console.log('[DEBUG_ROUTE] hit');
+    const diagnosis = { steps: [] };
+
     try {
         // 1. Test connection
         await query('SELECT 1');
-        console.log('[DEBUG_ROUTE] DB Connection OK');
+        diagnosis.steps.push('DB Connection OK');
 
         // 2. Create Table
         await query(`
@@ -182,11 +184,35 @@ app.get('/api/debug/init-notifications', async (req, res) => {
                 "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
-        console.log('[DEBUG_ROUTE] Table created');
+        diagnosis.steps.push('Table CREATE/CHECK OK');
+
+        // 3. Verify Table Exists
+        const checkTable = await query(`
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_name = 'notifications'
+        `);
+        if (checkTable.rows.length === 0) throw new Error('Table was NOT found after creation query!');
+        diagnosis.steps.push('Table Exists in information_schema');
+
+        // 4. Verify Columns
+        const checkColumns = await query(`
+            SELECT column_name, data_type 
+            FROM information_schema.columns 
+            WHERE table_name = 'notifications'
+        `);
+        diagnosis.columns = checkColumns.rows;
+
+        // 5. Try a SELECT
+        const count = await query('SELECT COUNT(*) FROM notifications');
+        diagnosis.rowCount = count.rows[0].count;
+        diagnosis.steps.push('SELECT COUNT(*) OK');
 
         res.json({
             success: true,
-            message: 'Notifications table created successfully',
+            message: 'Diagnosis Complete',
+            diagnosis: diagnosis,
             timestamp: new Date().toISOString()
         });
     } catch (error) {
@@ -194,7 +220,8 @@ app.get('/api/debug/init-notifications', async (req, res) => {
         res.status(500).json({
             success: false,
             error: error.message,
-            stack: error.stack
+            stack: error.stack,
+            diagnosis: diagnosis
         });
     }
 });
