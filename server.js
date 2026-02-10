@@ -124,6 +124,30 @@ app.use((req, res, next) => {
     next();
 });
 
+// CORS middleware for Next.js frontend
+app.use((req, res, next) => {
+    const allowedOrigins = [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        process.env.FRONTEND_URL
+    ].filter(Boolean);
+
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes(origin)) {
+        res.header('Access-Control-Allow-Origin', origin);
+    }
+
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+
+    next();
+});
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -277,6 +301,43 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Login endpoint (both /api/auth/login and /api/login for compatibility)
+app.post('/api/login', async (req, res) => {
+    const { email, password } = req.body;
+
+    try {
+        const result = await query('SELECT * FROM users WHERE email = $1 AND active = 1', [email]);
+        const user = result.rows[0];
+
+        if (!user) {
+            return res.json({ success: false, message: 'User not found' });
+        }
+
+        const validPassword = await bcrypt.compare(password, user.password);
+
+        if (!validPassword) {
+            return res.json({ success: false, message: 'Invalid password' });
+        }
+
+        req.session.userId = user.id;
+        req.session.userRole = user.role;
+        req.session.userName = user.name;
+
+        res.json({
+            success: true,
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role
+            }
+        });
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
     }
 });
 
