@@ -59,6 +59,7 @@ io.on('connection', (socket) => {
 
 // Helper to send notifications
 async function sendNotification(userId, type, message, data = {}) {
+    console.log(`[DEEP_DEBUG] sendNotification called for User ${userId}, Message: ${message}`);
     try {
         // Save to database
         const result = await query(
@@ -66,14 +67,23 @@ async function sendNotification(userId, type, message, data = {}) {
             [userId, type, message, JSON.stringify(data)]
         );
 
+        console.log(`[DEEP_DEBUG] Notification saved to DB with ID: ${result.rows[0].id}`);
+
         const notification = result.rows[0];
 
         // Emit to specific user via Socket.io
         // We need to map userId to socketId or emit to a room named "user:{userId}"
-        io.to(`user:${userId}`).emit('notification', notification);
+        const roomName = `user:${userId}`;
+        console.log(`[DEEP_DEBUG] Emitting socket event 'notification' to room: ${roomName}`);
+
+        // check if room has members
+        const sockets = await io.in(roomName).fetchSockets();
+        console.log(`[DEEP_DEBUG] Sockets in room ${roomName}: ${sockets.length}`);
+
+        io.to(roomName).emit('notification', notification);
 
     } catch (err) {
-        console.error('Failed to send notification:', err);
+        console.error('[DEEP_DEBUG] Failed to send notification:', err);
     }
 }
 

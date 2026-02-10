@@ -11,31 +11,8 @@ const SOUNDS = {
     alert: 'data:audio/wav;base64,...'
 };
 
-// We will use the Web Audio API for synthetic beeps if files are missing
-const playBeep = (freq = 440, type = 'sine', duration = 0.1) => {
-    if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = audioContext.createOscillator();
-    const gain = audioContext.createGain();
-    osc.type = type;
-    osc.frequency.value = freq;
-    osc.connect(gain);
-    gain.connect(audioContext.destination);
-    osc.start();
-    gain.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + duration);
-    osc.stop(audioContext.currentTime + duration);
-};
-
-const playNotificationSound = (type) => {
-    // Mapping events to sounds
-    switch (type) {
-        case 'new_task': playBeep(523.25, 'sine', 0.2); break; // C5
-        case 'task_update': playBeep(440, 'sine', 0.1); break; // A4
-        case 'new_member': playBeep(659.25, 'triangle', 0.3); break; // E5
-        case 'attendance': playBeep(329.63, 'square', 0.15); break; // E4
-        case 'alert': playBeep(880, 'sawtooth', 0.3); break; // A5
-        default: playBeep(440, 'sine', 0.1);
-    }
-};
+// Sound assets (Base64 encoded short beeps/sounds)
+// Replaced by the function below using AudioContext directly
 
 // Request audio permission interaction (kept as not explicitly removed)
 document.addEventListener('click', () => {
@@ -67,10 +44,14 @@ async function initNotifications() {
 
     // Join user room
     try {
+        console.log('[DEEP_DEBUG] Fetching /api/auth/me...');
         const res = await fetch('/api/auth/me');
         if (res.ok) {
             const user = await res.json();
+            console.log(`[DEEP_DEBUG] User identified: ${user.id}. Joining room...`);
             socket.emit('join', user.id);
+        } else {
+            console.error('[DEEP_DEBUG] Failed to auth for notifications');
         }
     } catch (e) {
         console.error('Failed to join notification room', e);
@@ -78,6 +59,7 @@ async function initNotifications() {
 
     // Listen for notifications
     socket.on('notification', (data) => {
+        console.log(`[DEEP_DEBUG] RECEIVED NOTIFICATION:`, data);
         playNotificationSound(data.type);
         showToast(data.message, data.type);
         addNotificationToDropdown(data);
