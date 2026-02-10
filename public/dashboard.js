@@ -319,7 +319,7 @@ function renderClockInWidget(activeSession) {
             ` : `
                 <div class="clock-action-area">
                     <button class="btn-clock-in-large" onclick="quickClockIn()">
-                        ▶ Start Session
+                        ▶ Clock In
                     </button>
                 </div>
             `}
