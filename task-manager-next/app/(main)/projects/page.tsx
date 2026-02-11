@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { projectsApi } from '@/lib/api/projects';
+import api from '@/lib/api/client';
 import { Project, Milestone, AccessItem, ProjectLog } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -17,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Edit3 } from 'lucide-react';
 
 export default function ProjectsPage() {
     return (
@@ -442,6 +444,8 @@ function ProjectDetail({
                                                             </SelectContent>
                                                         </Select>
                                                     </div>
+                                                    <div className="grid grid-cols-3 items-center gap-4">
+                                                        <label htmlFor="email" className="text-xs">Email</label>
                                                         <Input
                                                             id="email"
                                                             value={adminEmail}
