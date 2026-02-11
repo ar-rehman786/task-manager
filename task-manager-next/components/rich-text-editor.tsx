@@ -9,7 +9,6 @@ import {
     Heading1, Heading2, Image as ImageIcon,
     Undo, Redo, Quote
 } from 'lucide-react';
-import { useCallback } from 'react';
 
 interface RichTextEditorProps {
     content: string;
@@ -37,15 +36,15 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
         },
     });
 
-    const addImage = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const addImage = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (!file) return;
+        if (!file || !editor) return;
 
         // Convert image to base64 data URI to avoid ephemeral file storage issues
         const reader = new FileReader();
         reader.onload = () => {
             const base64Url = reader.result as string;
-            if (editor && base64Url) {
+            if (base64Url) {
                 editor.chain().focus().setImage({ src: base64Url }).run();
             }
         };
@@ -53,7 +52,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
 
         // Reset the input so the same file can be selected again
         event.target.value = '';
-    }, [editor]);
+    };
 
     if (!editor) {
         return null;
