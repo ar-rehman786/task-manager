@@ -52,11 +52,13 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
     fileFilter: (req, file, cb) => {
+        console.log(`[UPLOAD-DEBUG] Filtering file: ${file.originalname}, mimetype: ${file.mimetype}`);
         if (file.mimetype.startsWith('image/')) {
             cb(null, true);
         } else {
+            console.warn(`[UPLOAD-DEBUG] File rejected: ${file.mimetype}`);
             cb(new Error('Only images are allowed'));
         }
     }
@@ -192,8 +194,8 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 app.set('trust proxy', 1); // Trust first proxy (Railway)
 
@@ -501,6 +503,9 @@ app.post('/api/users', requireAdmin, async (req, res) => {
 
 // Update Profile API
 app.put('/api/users/profile', requireAuth, upload.fields([{ name: 'profilePicture', maxCount: 1 }, { name: 'coverImage', maxCount: 1 }]), async (req, res) => {
+    console.log('[PROFILE-UPDATE] Request body keys:', Object.keys(req.body));
+    console.log('[PROFILE-UPDATE] Files received:', req.files ? Object.keys(req.files) : 'none');
+
     const userId = req.session.userId;
     const { name, title, department, location, phone, employeeId, managerId } = req.body;
 
