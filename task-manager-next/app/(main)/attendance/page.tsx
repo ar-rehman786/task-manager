@@ -56,6 +56,15 @@ function AttendanceContent() {
         },
     });
 
+    const { data: adminHistory = [] } = useQuery({
+        queryKey: ['attendance-admin-history'],
+        queryFn: async () => {
+            const response = await api.get<AttendanceSession[]>('/api/attendance/admin/history?limit=50');
+            return response.data;
+        },
+        enabled: user?.role === 'admin'
+    });
+
     // Clock in/out mutations
     const clockInMutation = useMutation({
         mutationFn: async (notes?: string) => {
@@ -136,6 +145,9 @@ function AttendanceContent() {
                             <div className="text-sm text-muted-foreground mt-1">
                                 Started at {new Date(activeSession.clockInTime).toLocaleTimeString()}
                             </div>
+                            <div className="text-xs text-muted-foreground">
+                                Shift: 7 PM - 4 AM
+                            </div>
                         </div>
                     )}
 
@@ -177,14 +189,19 @@ function AttendanceContent() {
                         </div>
                     </div>
                     <div className="text-center">
-                        <div className="text-sm text-muted-foreground">Total Duration</div>
+                        <div className="text-sm text-muted-foreground">Current Shift Duration</div>
                         <div className="text-xl font-semibold">
                             {formatDuration(
                                 history
-                                    .filter(
-                                        (r) =>
-                                            new Date(r.clockInTime).toDateString() === new Date().toDateString()
-                                    )
+                                    .filter((r) => {
+                                        const getShiftDate = (d: string) => {
+                                            const date = new Date(d);
+                                            // 12:00 PM boundary for graveyard shift
+                                            if (date.getHours() < 12) date.setDate(date.getDate() - 1);
+                                            return date.toDateString();
+                                        };
+                                        return getShiftDate(r.clockInTime) === getShiftDate(new Date().toISOString());
+                                    })
                                     .reduce((sum, r) => sum + (r.workDuration || 0), 0)
                             )}
                         </div>
@@ -192,9 +209,9 @@ function AttendanceContent() {
                 </div>
             </Card>
 
-            {/* History */}
+            {/* User History */}
             <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Attendance History (Last 30 Days)</h3>
+                <h3 className="text-lg font-semibold mb-4">My Attendance History (Last 30 Days)</h3>
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
@@ -236,6 +253,50 @@ function AttendanceContent() {
                     </table>
                 </div>
             </Card>
+
+            {/* Team History for Admins */}
+            {user?.role === 'admin' && (
+                <Card className="p-6">
+                    <h3 className="text-lg font-semibold mb-4">Team Attendance History</h3>
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead>
+                                <tr className="border-b">
+                                    <th className="text-left py-3 px-4">Member</th>
+                                    <th className="text-left py-3 px-4">Date</th>
+                                    <th className="text-left py-3 px-4">Clock In</th>
+                                    <th className="text-left py-3 px-4">Clock Out</th>
+                                    <th className="text-left py-3 px-4">Duration</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {adminHistory.map((record: any) => (
+                                    <tr key={record.id} className="border-b hover:bg-muted/50">
+                                        <td className="py-3 px-4 font-medium">
+                                            {record.userName}
+                                            <div className="text-xs text-muted-foreground">{record.userEmail}</div>
+                                        </td>
+                                        <td className="py-3 px-4">
+                                            {new Date(record.clockInTime).toLocaleDateString()}
+                                        </td>
+                                        <td className="py-3 px-4">
+                                            {new Date(record.clockInTime).toLocaleTimeString()}
+                                        </td>
+                                        <td className="py-3 px-4">
+                                            {record.clockOutTime
+                                                ? new Date(record.clockOutTime).toLocaleTimeString()
+                                                : 'Active'}
+                                        </td>
+                                        <td className="py-3 px-4">
+                                            {record.workDuration ? formatDuration(record.workDuration) : '--'}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+            )}
         </div>
     );
 }

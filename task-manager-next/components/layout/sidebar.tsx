@@ -16,6 +16,7 @@ import {
     ChevronRight,
     Lightbulb,
     StickyNote,
+    Building2,
 } from 'lucide-react';
 import { useStickyStore } from '@/lib/store/stickyStore';
 
@@ -24,6 +25,7 @@ const navigation = [
     { name: 'Tasks', href: '/tasks', icon: CheckSquare },
     { name: 'Projects', href: '/projects', icon: FolderKanban },
     { name: 'Ideation', href: '/ideation', icon: Lightbulb },
+    { name: 'Organization', href: '/organization', icon: Building2 },
     { name: 'Team', href: '/team', icon: Users },
     { name: 'Attendance', href: '/attendance', icon: Clock },
     { name: 'Profile', href: '/profile', icon: UserCircle },

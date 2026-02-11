@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { projectsApi } from '@/lib/api/projects';
 import api from '@/lib/api/client';
-import { Project, Milestone, AccessItem, ProjectLog } from '@/lib/types';
+import { Project, Milestone, AccessItem, ProjectLog, Transcription, Task } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import ProtectedRoute from '@/components/protected-route';
@@ -228,6 +228,11 @@ function ProjectDetail({
         },
     });
 
+    const { data: projectTasks = [] } = useQuery({
+        queryKey: ['tasks', 'project', project.id],
+        queryFn: () => projectsApi.getProjectTasks(project.id),
+    });
+
     // Mutations
     const createMilestoneMutation = useMutation({
         mutationFn: (data: Partial<Milestone>) => projectsApi.createMilestone(project.id, data),
@@ -380,6 +385,20 @@ function ProjectDetail({
                                             dangerouslySetInnerHTML={{ __html: m.details }}
                                         />
                                     )}
+
+                                    {/* Milestone Tasks */}
+                                    <div className="mt-3 space-y-2">
+                                        {projectTasks
+                                            .filter((t: Task) => t.milestoneId === m.id)
+                                            .map((t: Task) => (
+                                                <div key={t.id} className="bg-muted/30 rounded p-2 text-xs border border-muted flex justify-between items-center">
+                                                    <span className="font-medium">{t.title}</span>
+                                                    <Badge variant="outline" className="text-[10px] h-4">
+                                                        {t.status.replace('_', ' ')}
+                                                    </Badge>
+                                                </div>
+                                            ))}
+                                    </div>
                                 </div>
                             ))
                         )}

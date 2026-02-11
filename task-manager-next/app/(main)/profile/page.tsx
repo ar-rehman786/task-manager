@@ -31,7 +31,7 @@ export default function ProfilePage() {
 
 function ProfileContent() {
     const user = useAuthStore((state) => state.user);
-    const setUser = useAuthStore((state) => state.setUser);
+    const updateUser = useAuthStore((state) => state.updateUser);
     const queryClient = useQueryClient();
 
     const [isEditing, setIsEditing] = useState(false);
@@ -52,11 +52,19 @@ function ProfileContent() {
 
     const updateProfileMutation = useMutation({
         mutationFn: async (data: Partial<typeof formData>) => {
-            const response = await api.put('/api/users/profile', data);
+            const uploadData = new FormData();
+            Object.entries(data).forEach(([key, value]) => {
+                if (value !== undefined && value !== null) {
+                    uploadData.append(key, value.toString());
+                }
+            });
+            const response = await api.put('/api/users/profile', uploadData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
             return response.data;
         },
         onSuccess: (updatedUser) => {
-            setUser(updatedUser);
+            updateUser(updatedUser);
             setIsEditing(false);
             queryClient.invalidateQueries({ queryKey: ['users'] });
         },
@@ -72,7 +80,7 @@ function ProfileContent() {
             return response.data;
         },
         onSuccess: (updatedUser) => {
-            setUser(updatedUser);
+            updateUser(updatedUser);
             queryClient.invalidateQueries({ queryKey: ['users'] });
         },
     });

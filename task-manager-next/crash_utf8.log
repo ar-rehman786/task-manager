@@ -1,0 +1,55 @@
+﻿[dotenv@17.2.4] injecting env (2) from .env -- tip: ≡ƒùé∩╕Å backup and recover secrets: https://dotenvx.com/ops
+Γä╣∩╕Å DATABASE_URL detected. Length: 95
+Γä╣∩╕Å Starts with: postgresql://po...
+node : ΓÜá Warning: 
+Next.js inferred your 
+workspace root, but it 
+may not be correct.
+At line:1 char:1
++ node server.js > 
+crash.log 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~
+    + CategoryInfo        
+      : NotSpecified: (Γ  
+  Üá Warning: Ne...not    
+ be correct.:String) [    
+], RemoteException
+    + FullyQualifiedError 
+   Id : NativeCommandErr  
+  or
+ 
+ We detected multiple 
+lockfiles and selected 
+the directory of C:\Users\
+TRONYX\Downloads\Antigravi
+ty testing\Task 
+manager\package-lock.json 
+as the root directory.
+ To silence this warning, 
+set `turbopack.root` in 
+your Next.js config, or 
+consider removing one of 
+the lockfiles if it's not 
+needed.
+   See https://nextjs.org/
+docs/app/api-reference/con
+fig/next-config-js/turbopa
+ck#root-directory for 
+more information.
+ Detected additional 
+lockfiles: 
+   * C:\Users\TRONYX\Downl
+oads\Antigravity 
+testing\Task manager\task-
+manager-next\package-lock.
+json
+
+Γ¿» Unable to acquire 
+lock at C:\Users\TRONYX\Do
+wnloads\Antigravity 
+testing\Task manager\task-
+manager-next\.next\dev\loc
+k, is another instance of 
+next dev running?
+  Suggestion: If you intended to restart next dev, terminate the other process, and then try again.

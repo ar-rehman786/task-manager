@@ -209,10 +209,12 @@ export function ProjectDialog({
 
                     <div className="grid gap-2">
                         <Label htmlFor="description">Description (Support formatting & images)</Label>
-                        <RichTextEditor
-                            content={description}
-                            onChange={setDescription}
-                        />
+                        <div className="max-h-[300px] overflow-y-auto pr-2 border rounded-md">
+                            <RichTextEditor
+                                content={description}
+                                onChange={setDescription}
+                            />
+                        </div>
                     </div>
 
                     <DialogFooter>

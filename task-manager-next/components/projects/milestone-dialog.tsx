@@ -1,5 +1,6 @@
 "use client"
 
+import { Milestone } from "@/lib/types"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -76,10 +77,12 @@ export function MilestoneDialog({ open, onOpenChange, onSubmit, milestone }: Mil
                     </div>
                     <div className="grid gap-2">
                         <label htmlFor="details" className="text-sm font-medium">Details (Support formatting & images)</label>
-                        <RichTextEditor
-                            content={details}
-                            onChange={setDetails}
-                        />
+                        <div className="max-h-[250px] overflow-y-auto pr-2 border rounded-md">
+                            <RichTextEditor
+                                content={details}
+                                onChange={setDetails}
+                            />
+                        </div>
                     </div>
                 </div>
                 <DialogFooter>

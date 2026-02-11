@@ -459,9 +459,15 @@ app.get('/api/setup-super-user', async (req, res) => {
 
 // ============= USER ROUTES =============
 
+// Get all users (Safe for organization directory)
 app.get('/api/users', requireAuth, async (req, res) => {
     try {
-        const result = await query('SELECT id, name, email, role, active FROM users WHERE active = 1');
+        const result = await query(`
+            SELECT id, name, email, role, active, "createdAt", title, department, location, phone, "employeeId", "profilePicture", "coverImage", "managerId"
+            FROM users 
+            WHERE active = 1 
+            ORDER BY name ASC
+        `);
         res.json(result.rows);
     } catch (error) {
         res.status(500).json({ error: 'Server error' });
@@ -514,19 +520,28 @@ app.put('/api/users/profile', requireAuth, upload.fields([{ name: 'profilePictur
         const params = [];
         let idx = 1;
 
-        // Text fields - use COALESCE for optional updates
-        const textFields = { name, title, department, location, phone, employeeId };
+        // Text fields - handle both standard req.body and multer's req.body
+        const data = req.body;
+        const textFields = {
+            name: data.name,
+            title: data.title,
+            department: data.department,
+            location: data.location,
+            phone: data.phone,
+            employeeId: data.employeeId
+        };
+
         for (const [key, val] of Object.entries(textFields)) {
-            if (val !== undefined) {
+            if (val !== undefined && val !== null) {
                 const dbCol = key === 'employeeId' ? '"employeeId"' : key;
                 fields.push(`${dbCol} = $${idx++}`);
                 params.push(val);
             }
         }
 
-        if (managerId !== undefined) {
+        if (data.managerId !== undefined && data.managerId !== '') {
             fields.push(`"managerId" = $${idx++}`);
-            params.push(managerId || null);
+            params.push(parseInt(data.managerId) || null);
         }
 
         // Handle profile picture - convert to base64 for persistence on ephemeral filesystems
@@ -689,28 +704,31 @@ app.get('/api/boards', requireAuth, async (req, res) => {
     try {
         let result;
         if (req.session.userRole === 'admin') {
+            // Admin sees all active member boards
             result = await query(`
                 SELECT b.* 
                 FROM boards b
-                LEFT JOIN users u ON b."ownerUserId" = u.id
+                JOIN users u ON b."ownerUserId" = u.id
                 WHERE b.workspace = $1 
-                AND (u.active = 1 OR b."ownerUserId" IS NULL)
-                ORDER BY b.type, b.name
+                AND u.role = 'member'
+                AND u.active = 1
+                ORDER BY b.name
             `, ['tasks']);
         } else {
-            // Members only see All Tasks board and their own board (if active)
+            // Members only see their own board renamed to "My Tasks"
             result = await query(`
-                SELECT b.* 
+                SELECT b.id, b.workspace, 'My Tasks' as name, b.type, b."ownerUserId", b."createdAt"
                 FROM boards b
-                LEFT JOIN users u ON b."ownerUserId" = u.id
+                JOIN users u ON b."ownerUserId" = u.id
                 WHERE b.workspace = $1 
-                AND (b.type = $2 OR b."ownerUserId" = $3)
-                AND (u.active = 1 OR b."ownerUserId" IS NULL)
-                ORDER BY b.type, b.name
-            `, ['tasks', 'ALL_TASKS', req.session.userId]);
+                AND b."ownerUserId" = $2
+                AND u.active = 1
+                LIMIT 1
+            `, ['tasks', req.session.userId]);
         }
         res.json(result.rows);
     } catch (error) {
+        console.error('Fetch boards error:', error);
         res.status(500).json({ error: 'Server error' });
     }
 });
@@ -1017,6 +1035,14 @@ app.post('/api/tasks/:id/activity', requireAuth, async (req, res) => {
 
 app.get('/api/projects', requireAuth, async (req, res) => {
     try {
+        let whereClause = '';
+        let params = [];
+
+        if (req.session.userRole !== 'admin') {
+            whereClause = 'WHERE p."managerId" = $1 OR p."assignedUserId" = $1';
+            params = [req.session.userId];
+        }
+
         const projects = await query(`
             SELECT p.*, 
                    u.name as "managerName",
@@ -1025,8 +1051,9 @@ app.get('/api/projects', requireAuth, async (req, res) => {
             FROM projects p
             LEFT JOIN users u ON p."managerId" = u.id
             LEFT JOIN users ua ON p."assignedUserId" = ua.id
+            ${whereClause}
             ORDER BY p."createdAt" DESC
-        `);
+        `, params);
         res.json(projects.rows);
     } catch (error) {
         res.status(500).json({ error: 'Error fetching projects' });
@@ -1156,6 +1183,26 @@ app.get('/api/projects/:projectId/milestones', requireAuth, async (req, res) => 
         res.json(milestones.rows);
     } catch (error) {
         res.status(500).json({ error: 'Error fetching milestones' });
+    }
+});
+
+app.get('/api/projects/:projectId/tasks', requireAuth, async (req, res) => {
+    const { projectId } = req.params;
+    try {
+        const result = await query(`
+            SELECT t.*, u.name as "assignedUserName", c.name as "createdByName", p.name as "projectName", m.title as "milestoneTitle"
+            FROM tasks t
+            LEFT JOIN users u ON t."assignedUserId" = u.id
+            LEFT JOIN users c ON t."createdBy" = c.id
+            LEFT JOIN projects p ON t."projectId" = p.id
+            LEFT JOIN milestones m ON t."milestoneId" = m.id
+            WHERE t."projectId" = $1
+            ORDER BY t."createdAt" DESC
+        `, [projectId]);
+        res.json(result.rows);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error fetching project tasks' });
     }
 });
 
@@ -1652,11 +1699,21 @@ app.get('/api/attendance/history', requireAuth, async (req, res) => {
 
 app.get('/api/attendance/today', requireAdmin, async (req, res) => {
     try {
+        // Shift logic: If before 12 PM, today's shift started yesterday.
+        // If after 12 PM, today's shift starts today.
         const records = await query(`
-            SELECT a.*, u.name as "userName", u.email as "userEmail"
+            SELECT a.*, u.name as "userName"
             FROM attendance a
             JOIN users u ON a."userId" = u.id
-            WHERE date(a."clockInTime") = CURRENT_DATE
+            WHERE 
+                (CASE 
+                    WHEN EXTRACT(HOUR FROM a."clockInTime") >= 12 THEN CAST(a."clockInTime" AS DATE)
+                    ELSE CAST(a."clockInTime" - INTERVAL '1 day' AS DATE)
+                END) = 
+                (CASE 
+                    WHEN EXTRACT(HOUR FROM CURRENT_TIMESTAMP) >= 12 THEN CAST(CURRENT_TIMESTAMP AS DATE)
+                    ELSE CAST(CURRENT_TIMESTAMP - INTERVAL '1 day' AS DATE)
+                END)
             ORDER BY a."clockInTime" DESC
         `);
         res.json(records.rows);
@@ -1668,15 +1725,36 @@ app.get('/api/attendance/today', requireAdmin, async (req, res) => {
 
 app.get('/api/attendance/admin/history', requireAdmin, async (req, res) => {
     const { limit = 100 } = req.query;
+    const userId = req.session.userId;
+    const superAdminEmail = 'abdulrehmanhameed4321@gmail.com';
+
     try {
-        const records = await query(`
-            SELECT a.*, u.name as "userName", u.email as "userEmail"
-            FROM attendance a
-            JOIN users u ON a."userId" = u.id
-            ORDER BY a."clockInTime" DESC
-            LIMIT $1
-        `, [limit]);
-        res.json(records.rows);
+        // Fetch current user email to check for super admin
+        const userRes = await query('SELECT email FROM users WHERE id = $1', [userId]);
+        const userEmail = userRes.rows[0]?.email;
+
+        let result;
+        if (userEmail === superAdminEmail) {
+            // Super Admin sees all
+            result = await query(`
+                SELECT a.*, u.name as "userName", u.email as "userEmail"
+                FROM attendance a
+                JOIN users u ON a."userId" = u.id
+                ORDER BY a."clockInTime" DESC
+                LIMIT $1
+            `, [limit]);
+        } else {
+            // Regular Admin sees members only
+            result = await query(`
+                SELECT a.*, u.name as "userName", u.email as "userEmail"
+                FROM attendance a
+                JOIN users u ON a."userId" = u.id
+                WHERE u.role = 'member'
+                ORDER BY a."clockInTime" DESC
+                LIMIT $1
+            `, [limit]);
+        }
+        res.json(result.rows);
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Error fetching all attendance history' });

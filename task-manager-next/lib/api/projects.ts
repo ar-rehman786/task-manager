@@ -1,4 +1,4 @@
-import { Project, Milestone, AccessItem, ProjectLog, Transcription } from '../types';
+import { Project, Milestone, AccessItem, ProjectLog, Transcription, Task } from '../types';
 import api from './client';
 
 export const projectsApi = {
@@ -30,6 +30,11 @@ export const projectsApi = {
     // Milestones
     getMilestones: async (projectId: number) => {
         const response = await api.get<Milestone[]>(`/api/projects/${projectId}/milestones`);
+        return response.data;
+    },
+
+    getProjectTasks: async (projectId: number) => {
+        const response = await api.get<Task[]>(`/api/projects/${projectId}/tasks`);
         return response.data;
     },
 
