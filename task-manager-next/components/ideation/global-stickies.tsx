@@ -21,6 +21,9 @@ export function GlobalStickies() {
         }
 
         try {
+            // Mark sticky as popped out to hide it from main view
+            updateSticky(sticky.id, { isPoppedOut: true });
+
             // @ts-ignore - Experimental API
             const pipWindow = await window.documentPictureInPicture.requestWindow({
                 width: sticky.width,
@@ -81,17 +84,23 @@ export function GlobalStickies() {
                 if (!current) pipWindow.close();
             }, 500);
 
-            pipWindow.onpagehide = () => clearInterval(syncInterval);
+            pipWindow.onpagehide = () => {
+                clearInterval(syncInterval);
+                // Restore sticky when PiP window closes
+                updateSticky(sticky.id, { isPoppedOut: false });
+            };
 
         } catch (err) {
             console.error('Failed to open PiP window:', err);
+            // Restore sticky if popping out failed
+            updateSticky(sticky.id, { isPoppedOut: false });
         }
     };
 
     return (
         <div className="fixed inset-0 pointer-events-none z-[9999]">
             <AnimatePresence>
-                {stickies.map((sticky) => (
+                {stickies.filter(sticky => !sticky.isPoppedOut).map((sticky) => (
                     <motion.div
                         key={sticky.id}
                         drag
@@ -144,19 +153,17 @@ export function GlobalStickies() {
                 ))}
             </AnimatePresence>
 
-            {/* Quick Fab to add sticky - ONLY show if list empty or as a main utility */}
-            {stickies.length === 0 && (
-                <div className="absolute bottom-8 right-8 pointer-events-auto">
-                    <Button
-                        size="icon"
-                        className="h-14 w-14 rounded-full shadow-xl animate-bounce"
-                        onClick={addSticky}
-                        title="New Floating Sticky"
-                    >
-                        <Plus size={24} />
-                    </Button>
-                </div>
-            )}
+            {/* Add sticky button - always visible on bottom-left with jumping animation */}
+            <div className="absolute bottom-8 left-8 pointer-events-auto">
+                <Button
+                    size="icon"
+                    className="h-14 w-14 rounded-full shadow-xl animate-bounce"
+                    onClick={addSticky}
+                    title="New Floating Sticky"
+                >
+                    <Plus size={24} />
+                </Button>
+            </div>
         </div>
     );
 }

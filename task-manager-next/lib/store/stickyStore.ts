@@ -9,6 +9,7 @@ export interface FloatingSticky {
     y: number;
     width: number;
     height: number;
+    isPoppedOut?: boolean;
 }
 
 interface StickyState {

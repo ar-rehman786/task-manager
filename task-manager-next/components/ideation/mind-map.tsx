@@ -305,7 +305,7 @@ export function MindMap({ id, initialData, name }: MindMapProps) {
                 <Controls />
                 <MiniMap className="!bg-background/80 !backdrop-blur" />
 
-                <Panel position="top-left" className="bg-card/95 backdrop-blur-md p-6 rounded-2xl border shadow-2xl flex flex-col gap-6 max-w-[340px] max-h-[85%] overflow-auto">
+                <Panel position="top-right" className="bg-card/95 backdrop-blur-md p-6 rounded-2xl border shadow-2xl flex flex-col gap-6 max-w-[340px] max-h-[85%] overflow-auto">
                     <div>
                         <h2 className="font-black text-2xl mb-1 text-primary tracking-tight">{name}</h2>
                         <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase font-black tracking-widest bg-primary/5 p-1 rounded w-fit">
@@ -337,7 +337,7 @@ export function MindMap({ id, initialData, name }: MindMapProps) {
 
                     <div className="flex gap-2 pt-4 border-t mt-2">
                         <Button size="sm" className="flex-1 font-bold shadow-lg" onClick={handleSave} disabled={updateMutation.isPending}>
-                            <Save size={14} className="mr-2" /> {updateMutation.isPending ? 'Syncing...' : 'Save Draft'}
+                            <Save size={14} className="mr-2" /> {updateMutation.isPending ? 'Syncing...' : 'Save Mind Map'}
                         </Button>
                         <Button size="sm" variant="outline" className="px-3" title="Download Image">
                             <Download size={14} />
@@ -345,7 +345,7 @@ export function MindMap({ id, initialData, name }: MindMapProps) {
                     </div>
                 </Panel>
 
-                <Panel position="top-right">
+                <Panel position="top-left">
                     <Link href="/ideation">
                         <Button variant="outline" size="sm" className="bg-card/90 backdrop-blur shadow-sm font-bold border-2 hover:bg-accent transition-colors">
                             <ChevronLeft size={16} className="mr-1" /> Board Gallery
