@@ -983,27 +983,62 @@ app.post('/api/projects', requireAdmin, async (req, res) => {
 
 app.put('/api/projects/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
-    const { name, client, status, startDate, endDate, description, managerId, assignedUserId } = req.body;
+    const updates = req.body;
 
     try {
-        await query(`
-            UPDATE projects 
-            SET name = $1, client = $2, status = $3, "startDate" = $4, "endDate" = $5, description = $6, "managerId" = $7, "assignedUserId" = $8, "updatedAt" = CURRENT_TIMESTAMP
-            WHERE id = $9
-        `, [name, client, status, startDate, endDate, description, managerId, assignedUserId, id]);
+        // Build dynamic query for partial updates
+        const fields = [];
+        const values = [];
+        let idx = 1;
 
-        const project = await query('SELECT * FROM projects WHERE id = $1', [id]);
+        const allowedFields = {
+            name: 'name',
+            client: 'client',
+            status: 'status',
+            startDate: '"startDate"',
+            endDate: '"endDate"',
+            description: 'description',
+            managerId: '"managerId"',
+            assignedUserId: '"assignedUserId"'
+        };
+
+        for (const [key, dbCol] of Object.entries(allowedFields)) {
+            if (updates[key] !== undefined) {
+                fields.push(`${dbCol} = $${idx++}`);
+                values.push(updates[key]);
+            }
+        }
+
+        if (fields.length === 0) {
+            return res.status(400).json({ error: 'No valid fields provided for update' });
+        }
+
+        values.push(id);
+        const updateQuery = `
+            UPDATE projects 
+            SET ${fields.join(', ')}, "updatedAt" = CURRENT_TIMESTAMP
+            WHERE id = $${idx}
+            RETURNING *
+        `;
+
+        const result = await query(updateQuery, values);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+
         // Log update
         await query(`
             INSERT INTO project_logs ("projectId", type, message, "createdBy")
             VALUES ($1, 'project_update', $2, $3)
-        `, [id, `Project updated`, req.session.userId]);
+        `, [id, `Project updated: ${Object.keys(updates).join(', ')}`, req.session.userId]);
 
         // Broadcast data update
         io.emit('dataUpdate', { type: 'projects' });
 
-        res.json(project.rows[0]);
+        res.json(result.rows[0]);
     } catch (error) {
+        console.error('Error updating project:', error);
         res.status(500).json({ error: 'Error updating project' });
     }
 });
