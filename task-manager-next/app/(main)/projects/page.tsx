@@ -193,6 +193,7 @@ function ProjectDetail({
     const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
     const [isAccessDialogOpen, setIsAccessDialogOpen] = useState(false);
     const [isTranscriptionDialogOpen, setIsTranscriptionDialogOpen] = useState(false);
+    const [expandedMilestones, setExpandedMilestones] = useState<Record<number, boolean>>({});
     const [grantingAccessId, setGrantingAccessId] = useState<number | null>(null);
     const [adminEmail, setAdminEmail] = useState("");
     const [adminNotes, setAdminNotes] = useState("");
@@ -313,6 +314,13 @@ function ProjectDetail({
     const handleRequestAccess = (data: any) => createAccessMutation.mutate(data);
     const handleAddTranscription = (data: any) => createTranscriptionMutation.mutate(data);
 
+    const toggleMilestoneTasks = (milestoneId: number) => {
+        setExpandedMilestones(prev => ({
+            ...prev,
+            [milestoneId]: !prev[milestoneId]
+        }));
+    };
+
     const handleGrantAccess = (item: AccessItem) => {
         updateAccessMutation.mutate({
             id: item.id,
@@ -402,24 +410,30 @@ function ProjectDetail({
 
                                     {/* Milestone Tasks */}
                                     <div className="mt-3 space-y-2">
-                                        {/* Milestone Tasks */}
-                                        <div className="mt-3 space-y-2">
-                                            {(() => {
-                                                const tasksForMilestone = tasksByMilestone[m.id] || [];
-                                                // Optimization: If many tasks, consider showing only top 5 or a summary
-                                                // For now, filtering here is okay if total tasks < 1000, but memoizing outside map is better.
-                                                // Given the context, we will use the filtered list but we should optimize the parent component to group them first.
-                                                // However, for this specific block, let's keep it simple but add a limit if needed.
-                                                return tasksForMilestone.map((t: Task) => (
-                                                    <div key={t.id} className="bg-muted/30 rounded p-2 text-xs border border-muted flex justify-between items-center">
-                                                        <span className="font-medium">{t.title}</span>
-                                                        <Badge variant="outline" className="text-[10px] h-4">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="w-full justify-between h-7 text-[10px] hover:bg-muted/50"
+                                            onClick={() => toggleMilestoneTasks(m.id)}
+                                        >
+                                            <span>Tasks ({(tasksByMilestone[m.id] || []).length})</span>
+                                            <span className="text-muted-foreground">{expandedMilestones[m.id] ? 'Hide' : 'Show'}</span>
+                                        </Button>
+                                        {expandedMilestones[m.id] && (
+                                            <div className="space-y-1.5 pt-1 border-t border-muted/20">
+                                                {(tasksByMilestone[m.id] || []).map((t: Task) => (
+                                                    <div key={t.id} className="bg-muted/30 rounded p-2 text-xs border border-muted flex justify-between items-center group hover:bg-muted/50 transition-colors">
+                                                        <span className="font-medium truncate mr-2" title={t.title}>{t.title}</span>
+                                                        <Badge variant="outline" className="text-[10px] h-4 shrink-0 px-1">
                                                             {t.status.replace('_', ' ')}
                                                         </Badge>
                                                     </div>
-                                                ));
-                                            })()}
-                                        </div>
+                                                ))}
+                                                {(tasksByMilestone[m.id] || []).length === 0 && (
+                                                    <p className="text-[10px] text-muted-foreground text-center py-2 italic">No tasks found</p>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ))

@@ -971,9 +971,6 @@ app.get('/api/tasks/:id', requireAuth, async (req, res) => {
             return res.status(403).json({ error: 'Access denied' });
         }
 
-        // Broadcast data update
-        io.emit('dataUpdate', { type: 'tasks' });
-
         res.json(task);
     } catch (error) {
         console.error('Get task error:', error);
