@@ -311,6 +311,81 @@ function DashboardContent() {
                 </Card>
             )}
 
+            {/* Team Availability */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Available Members */}
+                <Card className="p-6 border-l-4 border-l-green-500">
+                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <span>🟢</span> Available Team Members
+                    </h2>
+                    <div className="space-y-3">
+                        {teamWorkload.filter((u: any) => u.activeProjects.length === 0).length > 0 ? (
+                            teamWorkload.filter((u: any) => u.activeProjects.length === 0).map((u: any) => (
+                                <div key={u.id} className="flex items-center justify-between p-3 bg-green-50/10 rounded-lg border border-green-100/20">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-700 dark:text-green-300 font-bold text-xs">
+                                            {u.profilePicture ? (
+                                                <img src={u.profilePicture} alt={u.name} className="w-full h-full rounded-full object-cover" />
+                                            ) : (
+                                                u.name.charAt(0)
+                                            )}
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-sm">{u.name}</p>
+                                            <p className="text-xs text-muted-foreground">{u.role}</p>
+                                        </div>
+                                    </div>
+                                    <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+                                        Free
+                                    </Badge>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="text-muted-foreground text-sm italic">Everyone is currently busy!</p>
+                        )}
+                    </div>
+                </Card>
+
+                {/* Busy Members */}
+                <Card className="p-6 border-l-4 border-l-orange-500">
+                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <span>🔴</span> Busy Team Members
+                    </h2>
+                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                        {teamWorkload.filter((u: any) => u.activeProjects.length > 0).length > 0 ? (
+                            teamWorkload.filter((u: any) => u.activeProjects.length > 0).map((u: any) => (
+                                <div key={u.id} className="p-3 bg-orange-50/5 rounded-lg border border-orange-100/20">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-700 dark:text-orange-300 font-bold text-xs">
+                                                {u.profilePicture ? (
+                                                    <img src={u.profilePicture} alt={u.name} className="w-full h-full rounded-full object-cover" />
+                                                ) : (
+                                                    u.name.charAt(0)
+                                                )}
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-sm">{u.name}</p>
+                                                <p className="text-xs text-muted-foreground">{u.activeProjects.length} Active Project{u.activeProjects.length !== 1 ? 's' : ''}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1 ml-11">
+                                        {u.activeProjects.map((p: any) => (
+                                            <Link key={p.id} href={`/projects?id=${p.id}`} className="block text-xs text-primary hover:underline truncate">
+                                                • {p.name}
+                                            </Link>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="text-muted-foreground text-sm italic">No one is currently working on active projects.</p>
+                        )}
+                    </div>
+                </Card>
+            </div>
+
             {/* Recent Activity */}
             <Card className="p-6">
                 <h2 className="text-xl font-semibold mb-4">Recent Tasks</h2>

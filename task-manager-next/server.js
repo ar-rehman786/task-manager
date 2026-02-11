@@ -1206,7 +1206,14 @@ app.get('/api/milestones', requireAuth, async (req, res) => {
 app.get('/api/projects/:projectId/milestones', requireAuth, async (req, res) => {
     const { projectId } = req.params;
     try {
-        const milestones = await query('SELECT * FROM milestones WHERE "projectId" = $1 ORDER BY "orderIndex"', [projectId]);
+        const milestones = await query(`
+            SELECT m.*, 
+            (SELECT COUNT(*) FROM tasks t WHERE t."milestoneId" = m.id) as "totalTasks",
+            (SELECT COUNT(*) FROM tasks t WHERE t."milestoneId" = m.id AND t.status = 'done') as "completedTasks"
+            FROM milestones m 
+            WHERE m."projectId" = $1 
+            ORDER BY m."orderIndex"
+        `, [projectId]);
         res.json(milestones.rows);
     } catch (error) {
         res.status(500).json({ error: 'Error fetching milestones' });

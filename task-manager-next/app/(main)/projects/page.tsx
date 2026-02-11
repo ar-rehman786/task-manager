@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { projectsApi } from '@/lib/api/projects';
 import api from '@/lib/api/client';
@@ -233,6 +233,20 @@ function ProjectDetail({
         queryFn: () => projectsApi.getProjectTasks(project.id),
     });
 
+    // Optimization: Group tasks by milestone ID to avoid partial filtering in render loop
+    const tasksByMilestone = useMemo(() => {
+        const acc: Record<number, Task[]> = {};
+        if (Array.isArray(projectTasks)) {
+            projectTasks.forEach((t: Task) => {
+                if (t.milestoneId) {
+                    if (!acc[t.milestoneId]) acc[t.milestoneId] = [];
+                    acc[t.milestoneId].push(t);
+                }
+            });
+        }
+        return acc;
+    }, [projectTasks]);
+
     // Mutations
     const createMilestoneMutation = useMutation({
         mutationFn: (data: Partial<Milestone>) => projectsApi.createMilestone(project.id, data),
@@ -388,16 +402,24 @@ function ProjectDetail({
 
                                     {/* Milestone Tasks */}
                                     <div className="mt-3 space-y-2">
-                                        {projectTasks
-                                            .filter((t: Task) => t.milestoneId === m.id)
-                                            .map((t: Task) => (
-                                                <div key={t.id} className="bg-muted/30 rounded p-2 text-xs border border-muted flex justify-between items-center">
-                                                    <span className="font-medium">{t.title}</span>
-                                                    <Badge variant="outline" className="text-[10px] h-4">
-                                                        {t.status.replace('_', ' ')}
-                                                    </Badge>
-                                                </div>
-                                            ))}
+                                        {/* Milestone Tasks */}
+                                        <div className="mt-3 space-y-2">
+                                            {(() => {
+                                                const tasksForMilestone = tasksByMilestone[m.id] || [];
+                                                // Optimization: If many tasks, consider showing only top 5 or a summary
+                                                // For now, filtering here is okay if total tasks < 1000, but memoizing outside map is better.
+                                                // Given the context, we will use the filtered list but we should optimize the parent component to group them first.
+                                                // However, for this specific block, let's keep it simple but add a limit if needed.
+                                                return tasksForMilestone.map((t: Task) => (
+                                                    <div key={t.id} className="bg-muted/30 rounded p-2 text-xs border border-muted flex justify-between items-center">
+                                                        <span className="font-medium">{t.title}</span>
+                                                        <Badge variant="outline" className="text-[10px] h-4">
+                                                            {t.status.replace('_', ' ')}
+                                                        </Badge>
+                                                    </div>
+                                                ));
+                                            })()}
+                                        </div>
                                     </div>
                                 </div>
                             ))

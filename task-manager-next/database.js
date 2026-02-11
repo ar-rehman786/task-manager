@@ -228,17 +228,31 @@ async function initializeDatabase() {
     // Indexes
     await client.query('CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks("assignedUserId")');
     await client.query('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_tasks_milestone ON tasks("milestoneId")');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_milestones_project ON milestones("projectId")');
     await client.query('CREATE INDEX IF NOT EXISTS idx_boards_owner ON boards("ownerUserId")');
     await client.query('CREATE INDEX IF NOT EXISTS idx_attendance_user ON attendance("userId")');
     await client.query('CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications("userId")');
 
     // Schema Updates (Safe to run multiple times)
-    // Add projectId to tasks
+    // Add projectId and milestoneId to tasks
     await client.query(`
       DO $$
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='projectId') THEN
           ALTER TABLE tasks ADD COLUMN "projectId" INTEGER REFERENCES projects(id) ON DELETE SET NULL;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='milestoneId') THEN
+          ALTER TABLE tasks ADD COLUMN "milestoneId" INTEGER REFERENCES milestones(id) ON DELETE SET NULL;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='loomVideo') THEN
+          ALTER TABLE tasks ADD COLUMN "loomVideo" TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='workflowLink') THEN
+          ALTER TABLE tasks ADD COLUMN "workflowLink" TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='workflowStatus') THEN
+          ALTER TABLE tasks ADD COLUMN "workflowStatus" TEXT;
         END IF;
       END
       $$;
