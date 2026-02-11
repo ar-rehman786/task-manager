@@ -408,7 +408,9 @@ function ProjectDetail({
                                 }}>
                                     <PopoverTrigger asChild>
                                         <div
-                                            className={`border rounded-lg p-3 cursor-pointer transition-colors hover:bg-muted/50 ${!item.isGranted ? 'border-l-4 border-l-yellow-500 bg-yellow-50/10' : 'border-l-4 border-l-green-500'
+                                            className={`border rounded-lg p-3 cursor-pointer transition-colors hover:bg-muted/50 ${!item.isGranted
+                                                ? 'border-l-4 border-l-yellow-500 bg-yellow-50/10'
+                                                : 'border-l-4 border-l-green-500'
                                                 }`}
                                         >
                                             <div className="flex justify-between items-center mb-1">
@@ -421,8 +423,8 @@ function ProjectDetail({
                                             {item.isGranted === 1 && item.grantedEmail && <p className="text-xs text-green-600">Access via: {item.grantedEmail}</p>}
                                         </div>
                                     </PopoverTrigger>
-                                    {isAdmin && (
-                                        <PopoverContent className="w-80">
+                                    <PopoverContent className="w-80">
+                                        {isAdmin ? (
                                             <div className="grid gap-4">
                                                 <div className="space-y-2">
                                                     <h4 className="font-medium leading-none">Manage Access</h4>
@@ -467,10 +469,7 @@ function ProjectDetail({
                                                     Update Status
                                                 </Button>
                                             </div>
-                                        </PopoverContent>
-                                    )}
-                                    {!isAdmin && item.isGranted === 1 && (
-                                        <PopoverContent className="w-80">
+                                        ) : item.isGranted === 1 ? (
                                             <div className="space-y-2">
                                                 <h4 className="font-medium leading-none">Access Granted</h4>
                                                 <div className="text-sm text-muted-foreground">
@@ -480,8 +479,12 @@ function ProjectDetail({
                                                     <p className="text-xs mt-2 text-right" suppressHydrationWarning>Granted on {new Date(item.grantedAt || '').toLocaleDateString()}</p>
                                                 </div>
                                             </div>
-                                        </PopoverContent>
-                                    )}
+                                        ) : (
+                                            <div className="text-sm text-muted-foreground">
+                                                Access status: {item.isGranted === 2 ? 'Denied' : 'Pending'}
+                                            </div>
+                                        )}
+                                    </PopoverContent>
                                 </Popover>
                             ))
                         )}
