@@ -279,6 +279,29 @@ function DashboardContent() {
                                 </div>
                             </div>
                         ))}
+
+                        {/* Available / Free Members */}
+                        {teamWorkload.filter((u: any) => u.activeProjects.length === 0).length > 0 && (
+                            <div className="mt-6 pt-6 border-t">
+                                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
+                                    <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                                    Available Members ({teamWorkload.filter((u: any) => u.activeProjects.length === 0).length})
+                                </h3>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                                    {teamWorkload.filter((u: any) => u.activeProjects.length === 0).map((u: any) => (
+                                        <div key={u.id} className="flex items-center gap-3 p-3 rounded-lg border bg-green-500/5 hover:bg-green-500/10 transition-colors">
+                                            <div className="w-9 h-9 rounded-full bg-green-500/15 flex items-center justify-center font-bold text-green-600 text-sm shrink-0">
+                                                {u.name.charAt(0)}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="font-medium text-sm truncate">{u.name}</p>
+                                                <p className="text-[10px] text-muted-foreground capitalize">{u.role}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </Card>
             )}
