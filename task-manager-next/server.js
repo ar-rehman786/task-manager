@@ -1176,6 +1176,33 @@ app.delete('/api/projects/:id', requireAdmin, async (req, res) => {
 
 // ============= MILESTONE ROUTES =============
 
+// Milestones
+app.get('/api/milestones', requireAuth, async (req, res) => {
+    try {
+        let queryStr = `
+            SELECT m.*, p.name as "projectName",
+                   (SELECT COUNT(*) FROM tasks t WHERE t."milestoneId" = m.id)::int as "totalTasks",
+                   (SELECT COUNT(*) FROM tasks t WHERE t."milestoneId" = m.id AND t.status = 'done')::int as "completedTasks"
+            FROM milestones m
+            JOIN projects p ON m."projectId" = p.id
+        `;
+        let params = [];
+
+        if (req.session.userRole !== 'admin') {
+            queryStr += ` WHERE p."managerId" = $1 OR p."assignedUserId" = $1 `;
+            params = [req.session.userId];
+        }
+
+        queryStr += ` ORDER BY m."dueDate" ASC `;
+
+        const result = await query(queryStr, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching milestones:', error);
+        res.status(500).json({ error: 'Failed to fetch milestones' });
+    }
+});
+
 app.get('/api/projects/:projectId/milestones', requireAuth, async (req, res) => {
     const { projectId } = req.params;
     try {
@@ -1527,6 +1554,24 @@ app.delete('/api/access/:id', requireAdmin, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Error deleting access item' });
+    }
+});
+
+// Logs Endpoint
+app.get('/api/projects/:projectId/logs', requireAuth, async (req, res) => {
+    const { projectId } = req.params;
+    try {
+        const result = await query(`
+            SELECT pl.*, u.name as "userName"
+            FROM project_logs pl
+            LEFT JOIN users u ON pl."createdBy" = u.id
+            WHERE pl."projectId" = $1
+            ORDER BY pl."createdAt" DESC
+        `, [projectId]);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching logs:', error);
+        res.status(500).json({ error: 'Error fetching project logs' });
     }
 });
 

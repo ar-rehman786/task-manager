@@ -28,6 +28,11 @@ export const projectsApi = {
     },
 
     // Milestones
+    getGlobalMilestones: async () => {
+        const response = await api.get<Milestone[]>('/api/milestones');
+        return response.data;
+    },
+
     getMilestones: async (projectId: number) => {
         const response = await api.get<Milestone[]>(`/api/projects/${projectId}/milestones`);
         return response.data;

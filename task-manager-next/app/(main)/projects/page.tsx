@@ -381,7 +381,7 @@ function ProjectDetail({
                                     </div>
                                     {m.details && (
                                         <div
-                                            className="text-xs text-muted-foreground mt-2 prose prose-xs dark:prose-invert max-w-none"
+                                            className="text-xs text-muted-foreground mt-2 prose prose-xs dark:prose-invert max-w-none break-words overflow-hidden"
                                             dangerouslySetInnerHTML={{ __html: m.details }}
                                         />
                                     )}

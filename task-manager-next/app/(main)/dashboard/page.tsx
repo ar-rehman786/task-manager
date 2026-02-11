@@ -49,6 +49,11 @@ function DashboardContent() {
         queryFn: usersApi.getUsers,
     });
 
+    const { data: milestones = [] } = useQuery({
+        queryKey: ['milestones', 'global'],
+        queryFn: projectsApi.getGlobalMilestones,
+    });
+
     const { data: attendanceStatus } = useQuery({
         queryKey: ['attendance-status'],
         queryFn: attendanceApi.getStatus,
@@ -188,16 +193,16 @@ function DashboardContent() {
                     </Card>
                 </Link>
 
-                <Link href="/users" className="block">
+                <Link href="/projects" className="block">
                     <Card className="p-6 hover:shadow-lg transition-all cursor-pointer border-transparent hover:border-primary/20">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-muted-foreground">Team</p>
-                                <p className="text-3xl font-bold mt-2">{users.length}</p>
-                                <p className="text-xs text-muted-foreground mt-1">members</p>
+                                <p className="text-sm text-muted-foreground">Upcoming Milestones</p>
+                                <p className="text-3xl font-bold mt-2">{milestones.filter((m: any) => m.status !== 'done').length}</p>
+                                <p className="text-xs text-muted-foreground mt-1">in progress</p>
                             </div>
                             <div className="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center">
-                                <span className="text-2xl">👥</span>
+                                <span className="text-2xl">🚩</span>
                             </div>
                         </div>
                     </Card>
@@ -221,90 +226,67 @@ function DashboardContent() {
                 </Link>
             </div>
 
-            {/* Admin Team Workload */}
-            {isAdmin && (
-                <Card className="p-6">
-                    <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
-                        <span>👥</span> Team Workload & Active Projects
+            {/* Upcoming Milestones */}
+            <Card className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl font-semibold flex items-center gap-2">
+                        <span>🚩</span> Upcoming Milestones
                     </h2>
-                    <div className="space-y-6">
-                        {teamWorkload.filter((u: any) => u.activeProjects.length > 0).map((u: any) => (
-                            <div key={u.id} className="border rounded-xl p-4 bg-muted/20">
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
-                                            {u.name.charAt(0)}
-                                        </div>
-                                        <div>
-                                            <p className="font-bold">{u.name}</p>
-                                            <p className="text-xs text-muted-foreground">{u.role} • {u.activeProjects.length} active project{u.activeProjects.length !== 1 ? 's' : ''}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                    {u.activeProjects.map((p: any) => (
-                                        <div key={p.id} className="bg-white dark:bg-slate-900 border rounded-lg p-3 shadow-sm flex flex-col justify-between group">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <Link href={`/projects?id=${p.id}`} className="font-semibold hover:text-primary transition-colors underline-offset-4 hover:underline">
-                                                    {p.name}
-                                                </Link>
-                                                <Badge variant="outline" className={`${projectStatuses.find(s => s.value === p.status)?.color} text-white border-0 text-[10px] px-1.5 h-4 capitalize whitespace-nowrap`}>
-                                                    {p.status.replace(/_/g, ' ')}
-                                                </Badge>
-                                            </div>
+                    <Link href="/projects" className="text-sm text-primary hover:underline">
+                        View All →
+                    </Link>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {milestones.filter((m: any) => m.status !== 'done').slice(0, 6).map((m: any) => (
+                        <div key={m.id} className="border rounded-xl p-4 bg-muted/20 hover:bg-muted/30 transition-colors">
+                            <div className="flex justify-between items-start mb-2">
+                                <h3 className="font-bold truncate" title={m.title}>{m.title}</h3>
+                                <Badge variant="outline" className="text-[10px] h-4 bg-primary/10 text-primary border-0">
+                                    {m.status.replace(/_/g, ' ')}
+                                </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1">
+                                <span className="font-medium text-foreground">Project:</span> {m.projectName}
+                            </p>
 
-                                            <div className="mt-3 pt-3 border-t">
-                                                <label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground block mb-1">Update Status</label>
-                                                <Select
-                                                    value={p.status}
-                                                    onValueChange={(val) => handleStatusChange(p.id, val)}
-                                                >
-                                                    <SelectTrigger className="h-8 text-xs bg-muted/50 border-0">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {projectStatuses.map(status => (
-                                                            <SelectItem key={status.value} value={status.value} className="text-xs">
-                                                                <div className="flex items-center gap-2">
-                                                                    <div className={`w-2 h-2 rounded-full ${status.color}`} />
-                                                                    {status.label}
-                                                                </div>
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                        </div>
-                                    ))}
+                            {/* Progress Section */}
+                            <div className="space-y-1.5 mb-4">
+                                <div className="flex justify-between text-[10px] font-medium">
+                                    <span className="text-muted-foreground">Progress</span>
+                                    <span>{m.totalTasks > 0 ? Math.round((m.completedTasks / m.totalTasks) * 100) : 0}%</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-primary/10 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-primary transition-all duration-500 ease-in-out"
+                                        style={{ width: `${m.totalTasks > 0 ? (m.completedTasks / m.totalTasks) * 100 : 0}%` }}
+                                    />
+                                </div>
+                                <div className="text-[10px] text-muted-foreground">
+                                    {m.completedTasks} / {m.totalTasks} tasks completed
                                 </div>
                             </div>
-                        ))}
 
-                        {/* Available / Free Members */}
-                        {teamWorkload.filter((u: any) => u.activeProjects.length === 0).length > 0 && (
-                            <div className="mt-6 pt-6 border-t">
-                                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
-                                    <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                                    Available Members ({teamWorkload.filter((u: any) => u.activeProjects.length === 0).length})
-                                </h3>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                                    {teamWorkload.filter((u: any) => u.activeProjects.length === 0).map((u: any) => (
-                                        <div key={u.id} className="flex items-center gap-3 p-3 rounded-lg border bg-green-500/5 hover:bg-green-500/10 transition-colors">
-                                            <div className="w-9 h-9 rounded-full bg-green-500/15 flex items-center justify-center font-bold text-green-600 text-sm shrink-0">
-                                                {u.name.charAt(0)}
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="font-medium text-sm truncate">{u.name}</p>
-                                                <p className="text-[10px] text-muted-foreground capitalize">{u.role}</p>
-                                            </div>
-                                        </div>
-                                    ))}
+                            <div className="flex justify-between items-center mt-auto pt-2 border-t">
+                                <div className="text-xs">
+                                    <span className="text-muted-foreground">Due: </span>
+                                    <span className={`font-medium ${new Date(m.dueDate) < new Date() ? 'text-red-500' : 'text-foreground'}`}>
+                                        {new Date(m.dueDate).toLocaleDateString()}
+                                    </span>
                                 </div>
+                                <Link href={`/projects?id=${m.projectId}`} className="text-[10px] uppercase font-bold text-primary hover:underline">
+                                    Details
+                                </Link>
                             </div>
-                        )}
-                    </div>
-                </Card>
-            )}
+                        </div>
+                    ))}
+                    {milestones.length === 0 && (
+                        <div className="col-span-full py-12 text-center text-muted-foreground">
+                            No upcoming milestones found.
+                        </div>
+                    )}
+                </div>
+            </Card>
+
 
             {/* Pending Access Requests */}
             {pendingAccessProjects.length > 0 && (
