@@ -505,39 +505,57 @@ app.put('/api/users/profile', requireAuth, upload.fields([{ name: 'profilePictur
     const { name, title, department, location, phone, employeeId, managerId } = req.body;
 
     try {
-        let updateQuery = `
-            UPDATE users 
-            SET name = COALESCE($1, name),
-                title = COALESCE($2, title),
-                department = COALESCE($3, department),
-                location = COALESCE($4, location),
-                phone = COALESCE($5, phone),
-                "employeeId" = COALESCE($6, "employeeId"),
-                "managerId" = $7
-        `;
+        const fields = [];
+        const params = [];
+        let idx = 1;
 
-        const params = [name, title, department, location, phone, employeeId, managerId || null];
-        let paramIndex = 8;
-
-        if (req.files['profilePicture']) {
-            updateQuery += `, "profilePicture" = $${paramIndex}`;
-            params.push('/uploads/profiles/' + req.files['profilePicture'][0].filename);
-            paramIndex++;
+        // Text fields - use COALESCE for optional updates
+        const textFields = { name, title, department, location, phone, employeeId };
+        for (const [key, val] of Object.entries(textFields)) {
+            if (val !== undefined) {
+                const dbCol = key === 'employeeId' ? '"employeeId"' : key;
+                fields.push(`${dbCol} = $${idx++}`);
+                params.push(val);
+            }
         }
 
-        if (req.files['coverImage']) {
-            updateQuery += `, "coverImage" = $${paramIndex}`;
-            params.push('/uploads/profiles/' + req.files['coverImage'][0].filename);
-            paramIndex++;
+        if (managerId !== undefined) {
+            fields.push(`"managerId" = $${idx++}`);
+            params.push(managerId || null);
         }
 
-        updateQuery += ` WHERE id = $${paramIndex} RETURNING *`;
+        // Handle profile picture - convert to base64 for persistence on ephemeral filesystems
+        if (req.files && req.files['profilePicture'] && req.files['profilePicture'][0]) {
+            const file = req.files['profilePicture'][0];
+            const fs = require('fs');
+            const fileData = fs.readFileSync(file.path);
+            const base64 = `data:${file.mimetype};base64,${fileData.toString('base64')}`;
+            fields.push(`"profilePicture" = $${idx++}`);
+            params.push(base64);
+            // Clean up temp file
+            fs.unlinkSync(file.path);
+        }
+
+        if (req.files && req.files['coverImage'] && req.files['coverImage'][0]) {
+            const file = req.files['coverImage'][0];
+            const fs = require('fs');
+            const fileData = fs.readFileSync(file.path);
+            const base64 = `data:${file.mimetype};base64,${fileData.toString('base64')}`;
+            fields.push(`"coverImage" = $${idx++}`);
+            params.push(base64);
+            fs.unlinkSync(file.path);
+        }
+
+        if (fields.length === 0) {
+            return res.status(400).json({ error: 'No valid fields provided for update' });
+        }
+
         params.push(userId);
-
+        const updateQuery = `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
         const result = await query(updateQuery, params);
         const user = result.rows[0];
 
-        // Notify if name changed (optional)
+        // Notify if name changed
         if (name && name !== req.session.userName) {
             req.session.userName = name;
         }
@@ -546,6 +564,43 @@ app.put('/api/users/profile', requireAuth, upload.fields([{ name: 'profilePictur
     } catch (error) {
         console.error('Update profile error:', error);
         res.status(500).json({ error: 'Failed to update profile' });
+    }
+});
+
+// Change Password API
+app.put('/api/users/change-password', requireAuth, async (req, res) => {
+    const userId = req.session.userId;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+        return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    try {
+        // Verify current password
+        const userResult = await query('SELECT * FROM users WHERE id = $1', [userId]);
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const user = userResult.rows[0];
+        const validPassword = await bcrypt.compare(currentPassword, user.password);
+        if (!validPassword) {
+            return res.status(401).json({ error: 'Current password is incorrect' });
+        }
+
+        // Hash and update new password
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userId]);
+
+        res.json({ message: 'Password changed successfully' });
+    } catch (error) {
+        console.error('Change password error:', error);
+        res.status(500).json({ error: 'Failed to change password' });
     }
 });
 

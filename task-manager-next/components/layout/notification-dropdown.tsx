@@ -26,7 +26,7 @@ export function NotificationDropdown() {
         if (data.taskId) {
             router.push(`/tasks`);
         } else if (data.projectId) {
-            router.push(`/projects/${data.projectId}`);
+            router.push(`/projects?id=${data.projectId}`);
         }
     };
 

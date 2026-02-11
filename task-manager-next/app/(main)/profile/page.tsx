@@ -13,6 +13,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
 import { Camera, MapPin, Briefcase, Phone, Hash, User as UserIcon } from 'lucide-react';
 import api from '@/lib/api/client';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from '@/components/ui/dialog';
 
 export default function ProfilePage() {
     return (
@@ -28,6 +35,11 @@ function ProfileContent() {
     const queryClient = useQueryClient();
 
     const [isEditing, setIsEditing] = useState(false);
+    const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+    const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    const [passwordError, setPasswordError] = useState('');
+    const [passwordSuccess, setPasswordSuccess] = useState('');
+
     const [formData, setFormData] = useState({
         name: user?.name || '',
         email: user?.email || '',
@@ -65,6 +77,26 @@ function ProfileContent() {
         },
     });
 
+    const changePasswordMutation = useMutation({
+        mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
+            const response = await api.put('/api/users/change-password', data);
+            return response.data;
+        },
+        onSuccess: () => {
+            setPasswordSuccess('Password changed successfully!');
+            setPasswordError('');
+            setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+            setTimeout(() => {
+                setIsPasswordDialogOpen(false);
+                setPasswordSuccess('');
+            }, 1500);
+        },
+        onError: (error: any) => {
+            setPasswordError(error.response?.data?.error || 'Failed to change password');
+            setPasswordSuccess('');
+        },
+    });
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -75,6 +107,23 @@ function ProfileContent() {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         updateProfileMutation.mutate(formData);
+    };
+
+    const handlePasswordChange = () => {
+        setPasswordError('');
+        setPasswordSuccess('');
+        if (passwordData.newPassword !== passwordData.confirmPassword) {
+            setPasswordError('New passwords do not match');
+            return;
+        }
+        if (passwordData.newPassword.length < 6) {
+            setPasswordError('New password must be at least 6 characters');
+            return;
+        }
+        changePasswordMutation.mutate({
+            currentPassword: passwordData.currentPassword,
+            newPassword: passwordData.newPassword,
+        });
     };
 
     return (
@@ -250,12 +299,73 @@ function ProfileContent() {
                     <Card className="p-6 border-destructive/20 bg-destructive/5">
                         <h3 className="font-semibold text-destructive mb-4">Security</h3>
                         <div className="space-y-3">
-                            <Button variant="outline" className="w-full justify-start text-xs h-8">Change Password</Button>
+                            <Button
+                                variant="outline"
+                                className="w-full justify-start text-xs h-8"
+                                onClick={() => {
+                                    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                                    setPasswordError('');
+                                    setPasswordSuccess('');
+                                    setIsPasswordDialogOpen(true);
+                                }}
+                            >
+                                Change Password
+                            </Button>
                             <Button variant="ghost" className="w-full justify-start text-xs text-destructive hover:bg-destructive/10 h-8">Delete Account</Button>
                         </div>
                     </Card>
                 </div>
             </div>
+
+            {/* Password Change Dialog */}
+            <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+                <DialogContent className="sm:max-w-[400px]">
+                    <DialogHeader>
+                        <DialogTitle>Change Password</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        {passwordError && (
+                            <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">{passwordError}</div>
+                        )}
+                        {passwordSuccess && (
+                            <div className="text-sm text-green-600 bg-green-50 dark:bg-green-900/20 p-3 rounded-md">{passwordSuccess}</div>
+                        )}
+                        <div className="grid gap-2">
+                            <Label htmlFor="current-password">Current Password</Label>
+                            <Input
+                                id="current-password"
+                                type="password"
+                                value={passwordData.currentPassword}
+                                onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="new-password">New Password</Label>
+                            <Input
+                                id="new-password"
+                                type="password"
+                                value={passwordData.newPassword}
+                                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="confirm-password">Confirm New Password</Label>
+                            <Input
+                                id="confirm-password"
+                                type="password"
+                                value={passwordData.confirmPassword}
+                                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsPasswordDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handlePasswordChange} disabled={changePasswordMutation.isPending}>
+                            {changePasswordMutation.isPending ? 'Changing...' : 'Change Password'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
