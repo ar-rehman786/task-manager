@@ -551,25 +551,55 @@ app.put('/api/users/profile', requireAuth, upload.fields([{ name: 'profilePictur
 
 app.put('/api/users/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
-    const { role } = req.body;
+    const updates = req.body;
 
     try {
-        if (!['admin', 'member'].includes(role)) {
-            return res.status(400).json({ error: 'Invalid role' });
-        }
-
-        // Prevent self-demotion if desired, but for now let's allow it with caution or just basic update
         // Check if user exists
         const check = await query('SELECT * FROM users WHERE id = $1', [id]);
         if (check.rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        const result = await query(
-            'UPDATE users SET role = $1 WHERE id = $2 RETURNING id, name, email, role, active',
-            [role, id]
-        );
+        // Build dynamic query for partial updates
+        const fields = [];
+        const values = [];
+        let idx = 1;
 
+        const allowedFields = {
+            name: 'name',
+            email: 'email',
+            role: 'role',
+            title: 'title',
+            department: 'department',
+            location: 'location',
+            phone: 'phone',
+            employeeId: '"employeeId"',
+            active: 'active'
+        };
+
+        for (const [key, dbCol] of Object.entries(allowedFields)) {
+            if (updates[key] !== undefined) {
+                // Validate role if provided
+                if (key === 'role' && !['admin', 'member'].includes(updates[key])) {
+                    return res.status(400).json({ error: 'Invalid role' });
+                }
+                fields.push(`${dbCol} = $${idx++}`);
+                values.push(updates[key]);
+            }
+        }
+
+        if (fields.length === 0) {
+            return res.status(400).json({ error: 'No valid fields provided for update' });
+        }
+
+        values.push(id);
+        const updateQuery = `
+            UPDATE users SET ${fields.join(', ')} 
+            WHERE id = $${idx} 
+            RETURNING id, name, email, role, active, title, department, location, phone, "employeeId"
+        `;
+
+        const result = await query(updateQuery, values);
         res.json(result.rows[0]);
     } catch (error) {
         console.error('Update user error:', error);
@@ -1307,33 +1337,74 @@ app.post('/api/projects/:projectId/access', requireAuth, async (req, res) => {
 
 app.put('/api/access/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
-    const { platform, description, isGranted, grantedEmail, notes } = req.body;
-
-    const grantedAt = isGranted ? new Date().toISOString() : null;
+    const updates = req.body;
 
     try {
-        await query(`
-            UPDATE project_access_items 
-            SET platform = $1, description = $2, "isGranted" = $3, "grantedAt" = $4, "grantedEmail" = $5, notes = $6
-            WHERE id = $7
-        `, [platform, description, isGranted ? 1 : 0, grantedAt, grantedEmail || null, notes, id]);
+        // Build dynamic query for partial updates
+        const fields = [];
+        const values = [];
+        let idx = 1;
 
-        const item = await query('SELECT * FROM project_access_items WHERE id = $1', [id]);
+        const allowedFields = {
+            platform: 'platform',
+            description: 'description',
+            isGranted: '"isGranted"',
+            grantedEmail: '"grantedEmail"',
+            notes: 'notes'
+        };
+
+        for (const [key, dbCol] of Object.entries(allowedFields)) {
+            if (updates[key] !== undefined) {
+                if (key === 'isGranted') {
+                    fields.push(`${dbCol} = $${idx++}`);
+                    values.push(updates[key]);
+                } else {
+                    fields.push(`${dbCol} = $${idx++}`);
+                    values.push(updates[key]);
+                }
+            }
+        }
+
+        // Auto-set grantedAt when isGranted changes
+        if (updates.isGranted !== undefined) {
+            fields.push(`"grantedAt" = $${idx++}`);
+            values.push(updates.isGranted ? new Date().toISOString() : null);
+        }
+
+        if (fields.length === 0) {
+            return res.status(400).json({ error: 'No valid fields provided for update' });
+        }
+
+        values.push(id);
+        const updateQuery = `
+            UPDATE project_access_items 
+            SET ${fields.join(', ')}
+            WHERE id = $${idx}
+            RETURNING *
+        `;
+
+        const result = await query(updateQuery, values);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Access item not found' });
+        }
+
+        const accessItem = result.rows[0];
 
         // Log access grant/update
-        if (isGranted) {
-            const accessItem = item.rows[0];
+        if (updates.isGranted) {
             await query(`
                 INSERT INTO project_logs ("projectId", type, message, "createdBy")
                 VALUES ($1, 'access_update', $2, $3)
-            `, [accessItem.projectId, `Access granted for ${accessItem.platform}`, req.session.userId]);
+            `, [accessItem.projectId, `Access updated for ${accessItem.platform}`, req.session.userId]);
         }
 
         // Broadcast data update
         io.emit('dataUpdate', { type: 'projects' });
 
-        res.json(item.rows[0]);
+        res.json(accessItem);
     } catch (error) {
+        console.error('Error updating access item:', error);
         res.status(500).json({ error: 'Error updating access item' });
     }
 });

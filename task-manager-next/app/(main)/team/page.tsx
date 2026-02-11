@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi } from '@/lib/api/users';
 import { User } from '@/lib/types';
@@ -7,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import ProtectedRoute from '@/components/protected-route';
 import { useAuthStore } from '@/lib/store/authStore';
+import { UserEditDialog } from '@/components/team/user-edit-dialog';
 
 export default function TeamPage() {
     return (
@@ -19,11 +21,31 @@ export default function TeamPage() {
 function TeamContent() {
     const queryClient = useQueryClient();
     const currentUser = useAuthStore((state) => state.user);
+    const [editingUser, setEditingUser] = useState<User | null>(null);
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
     const { data: users = [], isLoading } = useQuery({
         queryKey: ['users'],
         queryFn: usersApi.getUsers,
     });
+
+    const updateUserMutation = useMutation({
+        mutationFn: ({ id, data }: { id: number; data: Partial<User> }) => usersApi.updateUser(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['users'] });
+            setIsEditDialogOpen(false);
+            setEditingUser(null);
+        },
+    });
+
+    const handleEditUser = (user: User) => {
+        setEditingUser(user);
+        setIsEditDialogOpen(true);
+    };
+
+    const handleSaveUser = (id: number, data: Partial<User>) => {
+        updateUserMutation.mutate({ id, data });
+    };
 
     if (isLoading) {
         return (
@@ -81,8 +103,8 @@ function TeamContent() {
                                     <td className="py-3 px-4">
                                         <span
                                             className={`px-2 py-1 rounded text-xs font-medium ${user.role === 'admin'
-                                                    ? 'bg-purple-500/20 text-purple-600'
-                                                    : 'bg-blue-500/20 text-blue-600'
+                                                ? 'bg-purple-500/20 text-purple-600'
+                                                : 'bg-blue-500/20 text-blue-600'
                                                 }`}
                                         >
                                             {user.role}
@@ -97,7 +119,7 @@ function TeamContent() {
                                             : 'N/A'}
                                     </td>
                                     <td className="py-3 px-4 text-right">
-                                        <Button variant="ghost" size="sm">
+                                        <Button variant="ghost" size="sm" onClick={() => handleEditUser(user)}>
                                             Edit
                                         </Button>
                                     </td>
@@ -113,6 +135,14 @@ function TeamContent() {
                     <p className="text-muted-foreground">No team members found.</p>
                 </div>
             )}
+
+            <UserEditDialog
+                user={editingUser}
+                open={isEditDialogOpen}
+                onOpenChange={setIsEditDialogOpen}
+                onSave={handleSaveUser}
+                isPending={updateUserMutation.isPending}
+            />
         </div>
     );
 }

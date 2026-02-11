@@ -9,7 +9,6 @@ import {
     Heading1, Heading2, Image as ImageIcon,
     Undo, Redo, Quote
 } from 'lucide-react';
-import api from '@/lib/api/client';
 import { useCallback } from 'react';
 
 interface RichTextEditorProps {
@@ -42,20 +41,18 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
         const file = event.target.files?.[0];
         if (!file) return;
 
-        const formData = new FormData();
-        formData.append('image', file);
-
-        try {
-            const response = await api.post('/api/upload/image', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            });
-
-            if (editor && response.data.url) {
-                editor.chain().focus().setImage({ src: response.data.url }).run();
+        // Convert image to base64 data URI to avoid ephemeral file storage issues
+        const reader = new FileReader();
+        reader.onload = () => {
+            const base64Url = reader.result as string;
+            if (editor && base64Url) {
+                editor.chain().focus().setImage({ src: base64Url }).run();
             }
-        } catch (error) {
-            console.error('Error uploading image:', error);
-        }
+        };
+        reader.readAsDataURL(file);
+
+        // Reset the input so the same file can be selected again
+        event.target.value = '';
     }, [editor]);
 
     if (!editor) {
