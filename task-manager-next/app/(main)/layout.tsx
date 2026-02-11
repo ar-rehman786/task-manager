@@ -1,6 +1,7 @@
 import ProtectedRoute from '@/components/protected-route';
 import Sidebar from '@/components/layout/sidebar';
 import Topbar from '@/components/layout/topbar';
+import { GlobalStickies } from '@/components/ideation/global-stickies';
 
 export default function DashboardLayout({
     children,
@@ -11,11 +12,12 @@ export default function DashboardLayout({
         <ProtectedRoute>
             <div className="flex h-screen overflow-hidden">
                 <Sidebar />
-                <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex-1 flex flex-col overflow-hidden relative">
                     <Topbar />
                     <main className="flex-1 overflow-y-auto bg-background p-6">
                         {children}
                     </main>
+                    <GlobalStickies />
                 </div>
             </div>
         </ProtectedRoute>

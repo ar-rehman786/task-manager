@@ -126,8 +126,7 @@ export function IdeationDialog({ open, onOpenChange, board }: IdeationDialogProp
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="mindmap">Mind Map (Workflow Visualizer)</SelectItem>
-                                <SelectItem value="stickies">Sticky Notes (Brainstorming)</SelectItem>
+                                <SelectItem value="mindmap">Mind Map (Concept Visualizer)</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

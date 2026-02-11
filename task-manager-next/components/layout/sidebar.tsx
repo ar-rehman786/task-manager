@@ -15,7 +15,9 @@ import {
     ChevronLeft,
     ChevronRight,
     Lightbulb,
+    StickyNote,
 } from 'lucide-react';
+import { useStickyStore } from '@/lib/store/stickyStore';
 
 const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -79,6 +81,19 @@ export default function Sidebar() {
                         </Link>
                     );
                 })}
+
+                <div className="pt-4 mt-4 border-t border-border">
+                    <button
+                        onClick={() => useStickyStore.getState().addSticky()}
+                        className={cn(
+                            'flex items-center gap-3 px-3 py-2 rounded-md transition-colors w-full text-left',
+                            'hover:bg-yellow-50 hover:text-yellow-700 text-muted-foreground'
+                        )}
+                    >
+                        <StickyNote size={20} className="text-yellow-500" />
+                        {!collapsed && <span className="font-medium">New Sticky</span>}
+                    </button>
+                </div>
             </nav>
         </aside>
     );
