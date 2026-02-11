@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from '@/components/ui/input';
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function ProjectsPage() {
     return (
@@ -187,11 +188,13 @@ function ProjectDetail({
 }) {
     const queryClient = useQueryClient();
     const [isMilestoneDialogOpen, setIsMilestoneDialogOpen] = useState(false);
+    const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
     const [isAccessDialogOpen, setIsAccessDialogOpen] = useState(false);
     const [isTranscriptionDialogOpen, setIsTranscriptionDialogOpen] = useState(false);
     const [grantingAccessId, setGrantingAccessId] = useState<number | null>(null);
     const [adminEmail, setAdminEmail] = useState("");
     const [adminNotes, setAdminNotes] = useState("");
+    const [accessStatus, setAccessStatus] = useState<number>(0);
 
     // Queries
     const { data: milestones = [] } = useQuery({
@@ -226,6 +229,11 @@ function ProjectDetail({
     // Mutations
     const createMilestoneMutation = useMutation({
         mutationFn: (data: Partial<Milestone>) => projectsApi.createMilestone(project.id, data),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['milestones', project.id] }),
+    });
+
+    const updateMilestoneMutation = useMutation({
+        mutationFn: ({ id, data }: { id: number; data: Partial<Milestone> }) => projectsApi.updateMilestone(id, data),
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['milestones', project.id] }),
     });
 
@@ -268,7 +276,19 @@ function ProjectDetail({
     });
 
     // Handlers
-    const handleAddMilestone = (data: any) => createMilestoneMutation.mutate(data);
+    const handleAddMilestone = (data: any) => {
+        if (data.id) {
+            updateMilestoneMutation.mutate({ id: data.id, data });
+        } else {
+            createMilestoneMutation.mutate(data);
+        }
+    };
+
+    const handleEditMilestone = (milestone: Milestone) => {
+        setEditingMilestone(milestone);
+        setIsMilestoneDialogOpen(true);
+    };
+
     const handleRequestAccess = (data: any) => createAccessMutation.mutate(data);
     const handleAddTranscription = (data: any) => createTranscriptionMutation.mutate(data);
 
@@ -276,7 +296,7 @@ function ProjectDetail({
         updateAccessMutation.mutate({
             id: item.id,
             data: {
-                isGranted: 1,
+                isGranted: accessStatus,
                 grantedEmail: adminEmail,
                 notes: adminNotes ? (item.notes ? item.notes + '\n\nAdmin: ' + adminNotes : adminNotes) : item.notes,
             }
@@ -340,7 +360,14 @@ function ProjectDetail({
                                 <div key={m.id} className="border rounded-lg p-3">
                                     <div className="flex justify-between items-center mb-1">
                                         <p className="font-medium">{m.title}</p>
-                                        <Badge variant="outline">{m.status.replace('_', ' ')}</Badge>
+                                        <div className="flex items-center gap-2">
+                                            {isAdmin && (
+                                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleEditMilestone(m)}>
+                                                    <Edit3 size={12} />
+                                                </Button>
+                                            )}
+                                            <Badge variant="outline">{m.status.replace('_', ' ')}</Badge>
+                                        </div>
                                     </div>
                                     <div className="flex justify-between text-xs text-muted-foreground">
                                         <span>Due: {m.dueDate ? new Date(m.dueDate).toLocaleDateString() : 'No date'}</span>
@@ -372,8 +399,9 @@ function ProjectDetail({
                                 <Popover key={item.id} onOpenChange={(open: boolean) => {
                                     if (open) {
                                         setGrantingAccessId(item.id);
-                                        setAdminEmail("");
+                                        setAdminEmail(item.grantedEmail || "");
                                         setAdminNotes("");
+                                        setAccessStatus(item.isGranted || 0);
                                     }
                                 }}>
                                     <PopoverTrigger asChild>
@@ -385,23 +413,35 @@ function ProjectDetail({
                                                 <p className="font-medium">{item.platform}</p>
                                                 {!item.isGranted && <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-600">Pending</Badge>}
                                                 {item.isGranted === 1 && <Badge variant="secondary" className="bg-green-500/20 text-green-600">Granted</Badge>}
+                                                {item.isGranted === 2 && <Badge variant="secondary" className="bg-red-500/20 text-red-600">Denied</Badge>}
                                             </div>
                                             <p className="text-sm text-muted-foreground mb-1">{item.description}</p>
-                                            {item.grantedEmail && <p className="text-xs text-green-600">Access via: {item.grantedEmail}</p>}
+                                            {item.isGranted === 1 && item.grantedEmail && <p className="text-xs text-green-600">Access via: {item.grantedEmail}</p>}
                                         </div>
                                     </PopoverTrigger>
-                                    {isAdmin && !item.isGranted && (
+                                    {isAdmin && (
                                         <PopoverContent className="w-80">
                                             <div className="grid gap-4">
                                                 <div className="space-y-2">
-                                                    <h4 className="font-medium leading-none">Provide Access</h4>
+                                                    <h4 className="font-medium leading-none">Manage Access</h4>
                                                     <p className="text-sm text-muted-foreground">
-                                                        Enter details to mark this access as provided.
+                                                        Update access details or change status.
                                                     </p>
                                                 </div>
                                                 <div className="grid gap-2">
                                                     <div className="grid grid-cols-3 items-center gap-4">
-                                                        <label htmlFor="email" className="text-xs">Email</label>
+                                                        <label htmlFor="status" className="text-xs">Status</label>
+                                                        <Select value={accessStatus.toString()} onValueChange={(val) => setAccessStatus(parseInt(val))}>
+                                                            <SelectTrigger className="col-span-2 h-8">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="0">Pending</SelectItem>
+                                                                <SelectItem value="1">Granted</SelectItem>
+                                                                <SelectItem value="2">Denied</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
                                                         <Input
                                                             id="email"
                                                             value={adminEmail}
@@ -420,12 +460,12 @@ function ProjectDetail({
                                                     </div>
                                                 </div>
                                                 <Button size="sm" onClick={() => handleGrantAccess(item)}>
-                                                    Mark as Granted
+                                                    Update Status
                                                 </Button>
                                             </div>
                                         </PopoverContent>
                                     )}
-                                    {item.isGranted === 1 && (
+                                    {!isAdmin && item.isGranted === 1 && (
                                         <PopoverContent className="w-80">
                                             <div className="space-y-2">
                                                 <h4 className="font-medium leading-none">Access Granted</h4>
@@ -498,7 +538,7 @@ function ProjectDetail({
                         )}
                     </div>
                 </Card>
-            </div>
+            </div >
 
             <Card className="p-6">
                 <div className="flex justify-between items-center mb-4">
@@ -552,8 +592,12 @@ function ProjectDetail({
 
             <MilestoneDialog
                 open={isMilestoneDialogOpen}
-                onOpenChange={setIsMilestoneDialogOpen}
+                onOpenChange={(open) => {
+                    setIsMilestoneDialogOpen(open);
+                    if (!open) setEditingMilestone(null);
+                }}
                 onSubmit={handleAddMilestone}
+                milestone={editingMilestone}
             />
 
             <AccessRequestDialog
@@ -567,6 +611,6 @@ function ProjectDetail({
                 onOpenChange={setIsTranscriptionDialogOpen}
                 onSubmit={handleAddTranscription}
             />
-        </div>
+        </div >
     );
 }

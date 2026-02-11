@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
     Dialog,
@@ -16,30 +16,41 @@ import { RichTextEditor } from "@/components/rich-text-editor"
 interface MilestoneDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
-    onSubmit: (data: { title: string; dueDate?: string; status: string; details?: string }) => void
+    onSubmit: (data: { id?: number; title: string; dueDate?: string; status: string; details?: string }) => void
+    milestone?: Milestone | null
 }
 
-export function MilestoneDialog({ open, onOpenChange, onSubmit }: MilestoneDialogProps) {
+export function MilestoneDialog({ open, onOpenChange, onSubmit, milestone }: MilestoneDialogProps) {
     const [title, setTitle] = useState("")
     const [dueDate, setDueDate] = useState("")
     const [status, setStatus] = useState("not_started")
     const [details, setDetails] = useState("")
 
+    useEffect(() => {
+        if (milestone) {
+            setTitle(milestone.title || "")
+            setDueDate(milestone.dueDate ? new Date(milestone.dueDate).toISOString().split('T')[0] : "")
+            setStatus(milestone.status || "not_started")
+            setDetails(milestone.details || "")
+        } else {
+            setTitle("")
+            setDueDate("")
+            setStatus("not_started")
+            setDetails("")
+        }
+    }, [milestone, open])
+
     const onSubmitClick = () => {
         if (!title) return;
-        onSubmit({ title, dueDate, status, details });
+        onSubmit({ id: milestone?.id, title, dueDate, status, details });
         onOpenChange(false);
-        setTitle("");
-        setDueDate("");
-        setStatus("not_started");
-        setDetails("");
     }
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>Add Milestone</DialogTitle>
+                    <DialogTitle>{milestone ? 'Edit Milestone' : 'Add Milestone'}</DialogTitle>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
@@ -72,7 +83,7 @@ export function MilestoneDialog({ open, onOpenChange, onSubmit }: MilestoneDialo
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button onClick={onSubmitClick}>Add Milestone</Button>
+                    <Button onClick={onSubmitClick}>{milestone ? 'Save Changes' : 'Add Milestone'}</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

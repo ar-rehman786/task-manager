@@ -255,6 +255,18 @@ async function initializeDatabase() {
       $$;
     `);
 
+    // Update projects status CHECK constraint
+    await client.query(`
+      DO $$
+      BEGIN
+        -- Drop old constraint if exists
+        ALTER TABLE projects DROP CONSTRAINT IF EXISTS projects_status_check;
+        -- Add new one with more statuses
+        ALTER TABLE projects ADD CONSTRAINT projects_status_check CHECK (status IN ('active', 'paused', 'closed', 'waiting_for_client_response', 'on_hold', 'completed'));
+      END
+      $$;
+    `);
+
     // Add profile columns to users (Schema Migration)
     await client.query(`
       DO $$

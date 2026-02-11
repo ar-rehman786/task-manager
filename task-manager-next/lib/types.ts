@@ -65,7 +65,7 @@ export interface Project {
     name: string;
     client?: string;
     description?: string;
-    status: 'active' | 'on_hold' | 'completed';
+    status: 'active' | 'paused' | 'closed' | 'waiting_for_client_response' | 'on_hold' | 'completed';
     startDate?: string;
     endDate?: string;
     budget?: number;
