@@ -211,6 +211,20 @@ async function initializeDatabase() {
       );
     `);
 
+    // Ideation boards table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ideation_boards (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        "projectId" INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+        "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        data JSONB NOT NULL DEFAULT '{}',
+        type TEXT NOT NULL DEFAULT 'mindmap' CHECK(type IN ('mindmap', 'stickies')),
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Indexes
     await client.query('CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks("assignedUserId")');
     await client.query('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)');

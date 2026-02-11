@@ -3,12 +3,29 @@ export interface User {
     name: string;
     email: string;
     role: 'admin' | 'member';
-    position?: string;
+    title?: string;
     department?: string;
+    location?: string;
     phone?: string;
-    avatar?: string;
-    cover?: string;
+    employeeId?: string;
+    profilePicture?: string;
+    coverImage?: string;
+    managerId?: number;
+    managerName?: string;
+    active?: number;
     createdAt?: string;
+}
+
+export interface IdeationBoard {
+    id: number;
+    name: string;
+    projectId?: number;
+    projectName?: string;
+    userId: number;
+    data: any;
+    type: 'mindmap' | 'stickies';
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface Task {

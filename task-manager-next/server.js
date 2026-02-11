@@ -1770,6 +1770,96 @@ app.put('/api/notifications/read', requireAuth, async (req, res) => {
     }
 });
 
+// ============= IDEATION ROUTES =============
+
+app.get('/api/ideation', requireAuth, async (req, res) => {
+    try {
+        const result = await query(`
+            SELECT ib.*, p.name as "projectName"
+            FROM ideation_boards ib
+            LEFT JOIN projects p ON ib."projectId" = p.id
+            WHERE ib."userId" = $1
+            ORDER BY ib."updatedAt" DESC
+        `, [req.session.userId]);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching ideation boards:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.get('/api/ideation/:id', requireAuth, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await query(`
+            SELECT ib.*, p.name as "projectName"
+            FROM ideation_boards ib
+            LEFT JOIN projects p ON ib."projectId" = p.id
+            WHERE ib.id = $1 AND ib."userId" = $2
+        `, [id, req.session.userId]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Board not found' });
+        }
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Error fetching ideation board:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.post('/api/ideation', requireAuth, async (req, res) => {
+    const { name, projectId, data, type } = req.body;
+    try {
+        const result = await query(`
+            INSERT INTO ideation_boards (name, "projectId", "userId", data, type)
+            VALUES ($1, $2, $3, $4, $5) RETURNING *
+        `, [name, projectId || null, req.session.userId, JSON.stringify(data || {}), type || 'mindmap']);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Error creating ideation board:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.put('/api/ideation/:id', requireAuth, async (req, res) => {
+    const { id } = req.params;
+    const { name, projectId, data } = req.body;
+    try {
+        const result = await query(`
+            UPDATE ideation_boards 
+            SET name = COALESCE($1, name),
+                "projectId" = $2,
+                data = COALESCE($3, data),
+                "updatedAt" = CURRENT_TIMESTAMP
+            WHERE id = $4 AND "userId" = $5
+            RETURNING *
+        `, [name, projectId || null, data ? JSON.stringify(data) : null, id, req.session.userId]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Board not found or unauthorized' });
+        }
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Error updating ideation board:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.delete('/api/ideation/:id', requireAuth, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await query('DELETE FROM ideation_boards WHERE id = $1 AND "userId" = $2 RETURNING id', [id, req.session.userId]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Board not found or unauthorized' });
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting ideation board:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 // ============= TRANSCRIPTION ROUTES =============
 
 app.get('/api/projects/:projectId/transcriptions', requireAuth, async (req, res) => {

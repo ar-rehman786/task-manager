@@ -14,12 +14,14 @@ import {
     UserCircle,
     ChevronLeft,
     ChevronRight,
+    Lightbulb,
 } from 'lucide-react';
 
 const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Tasks', href: '/tasks', icon: CheckSquare },
     { name: 'Projects', href: '/projects', icon: FolderKanban },
+    { name: 'Ideation', href: '/ideation', icon: Lightbulb },
     { name: 'Team', href: '/team', icon: Users },
     { name: 'Attendance', href: '/attendance', icon: Clock },
     { name: 'Profile', href: '/profile', icon: UserCircle },
