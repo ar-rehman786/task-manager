@@ -153,17 +153,6 @@ export function GlobalStickies() {
                 ))}
             </AnimatePresence>
 
-            {/* Add sticky button - always visible on bottom-left with jumping animation */}
-            <div className="absolute bottom-8 left-8 pointer-events-auto">
-                <Button
-                    size="icon"
-                    className="h-14 w-14 rounded-full shadow-xl animate-bounce"
-                    onClick={addSticky}
-                    title="New Floating Sticky"
-                >
-                    <Plus size={24} />
-                </Button>
-            </div>
         </div>
     );
 }
