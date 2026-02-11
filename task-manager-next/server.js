@@ -1689,8 +1689,8 @@ app.post('/api/seed-database', async (req, res) => {
             success: true,
             message: 'Database seeded successfully!',
             users: [
-                { email: 'admin@taskmanager.com', password: 'admin123', role: 'admin' },
-                { email: 'member@taskmanager.com', password: 'member123', role: 'member' }
+                { email: 'admin@sloraai.com', password: 'admin123', role: 'admin' },
+                { email: 'member@sloraai.com', password: 'member123', role: 'member' }
             ]
         });
     } catch (error) {
@@ -1840,22 +1840,22 @@ app.get('/api/dashboard/stats', requireAuth, async (req, res) => {
 // Auto-seed function (Postgres)
 async function seedDatabase() {
     try {
-        const adminResult = await query('SELECT * FROM users WHERE email = $1', ['admin@taskmanager.com']);
+        const adminResult = await query('SELECT * FROM users WHERE email = $1', ['admin@sloraai.com']);
         if (!adminResult.rows[0]) {
             console.log('🌱 Seed: Creating Admin...');
             const adminPassword = await bcrypt.hash('admin123', 10);
             const adminUserResult = await query(`
                 INSERT INTO users (email, password, name, role, active)
                 VALUES ($1, $2, $3, $4, 1) RETURNING *
-            `, ['admin@taskmanager.com', adminPassword, 'Admin User', 'admin']);
+            `, ['admin@sloraai.com', adminPassword, 'Admin User', 'admin']);
             const adminUser = adminUserResult.rows[0];
-
+            // ...
             console.log('🌱 Seed: Creating Member...');
             const memberPassword = await bcrypt.hash('member123', 10);
             await query(`
                 INSERT INTO users (email, password, name, role, active)
                 VALUES ($1, $2, $3, $4, 1)
-            `, ['member@taskmanager.com', memberPassword, 'Team Member', 'member']);
+            `, ['member@sloraai.com', memberPassword, 'Team Member', 'member']);
 
             // Default board
             await query(`
@@ -1868,7 +1868,7 @@ async function seedDatabase() {
         } else {
             // Check if active is 0, if so, reactivate
             if (adminResult.rows[0].active === 0) {
-                await query('UPDATE users SET active = 1 WHERE email = $1', ['admin@taskmanager.com']);
+                await query('UPDATE users SET active = 1 WHERE email = $1', ['admin@sloraai.com']);
             }
         }
     } catch (error) {

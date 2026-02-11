@@ -43,7 +43,7 @@ export default function LoginPage() {
             <Card className="w-full max-w-md">
                 <CardHeader className="text-center">
                     <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
-                        Task Manager
+                        SloraAI Workspace
                     </CardTitle>
                     <CardDescription>Sign in to your account</CardDescription>
                 </CardHeader>
@@ -62,7 +62,7 @@ export default function LoginPage() {
                             <Input
                                 id="email"
                                 type="email"
-                                placeholder="admin@taskmanager.com"
+                                placeholder="admin@sloraai.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
@@ -89,7 +89,7 @@ export default function LoginPage() {
 
                         <div className="text-center text-sm text-muted-foreground mt-4">
                             <p>Demo Credentials:</p>
-                            <p>admin@taskmanager.com / admin123</p>
+                            <p>admin@sloraai.com / admin123</p>
                         </div>
                     </form>
                 </CardContent>

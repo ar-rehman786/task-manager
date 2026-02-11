@@ -22,7 +22,7 @@ async function verify() {
     // 2. Authentication
     console.log('\n2️⃣  Authentication');
     const loginRes = await client.post('/api/auth/login', {
-        email: 'admin@taskmanager.com',
+        email: 'admin@sloraai.com',
         password: 'admin123'
     });
     console.log(`- POST /api/auth/login: ${loginRes.status}`);
@@ -38,7 +38,7 @@ async function verify() {
     console.log('\n3️⃣  User Profile');
     const meRes = await client.get('/api/auth/me');
     console.log(`- GET /api/auth/me: ${meRes.status}`);
-    if (meRes.status === 200 && meRes.data.email === 'admin@taskmanager.com') {
+    if (meRes.status === 200 && meRes.data.email === 'admin@sloraai.com') {
         console.log('  ✅ Profile verified');
         results.profile = true;
     } else {

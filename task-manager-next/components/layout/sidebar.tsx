@@ -45,7 +45,7 @@ export default function Sidebar() {
             <div className="p-4 border-b border-border flex items-center justify-between">
                 {!collapsed && (
                     <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
-                        TaskManager
+                        SloraAI Workspace
                     </h1>
                 )}
                 <button

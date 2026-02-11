@@ -7,8 +7,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Task Manager - Professional Project Management",
-  description: "Modern task management application with attendance tracking",
+  title: "SloraAI Workspace - Professional Project Management",
+  description: "Modern workspace with attendance tracking",
   icons: {
     icon: [
       { url: '/favicon.svg', type: 'image/svg+xml' },
@@ -28,7 +28,7 @@ export default function RootLayout({
           attribute="class"
           defaultTheme="light"
           enableSystem={false}
-          storageKey="task-manager-theme"
+          storageKey="slora-ai-theme"
         >
           <Providers>{children}</Providers>
         </ThemeProvider>
