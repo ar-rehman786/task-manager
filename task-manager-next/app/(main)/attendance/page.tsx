@@ -29,10 +29,13 @@ export default function AttendancePage() {
 function AttendanceContent() {
     const queryClient = useQueryClient();
     const user = useAuthStore((state) => state.user);
-    const [currentTime, setCurrentTime] = useState(new Date());
+    const [currentTime, setCurrentTime] = useState<Date | null>(null);
+    const [mounted, setMounted] = useState(false);
 
     // Update clock every second
     useEffect(() => {
+        setMounted(true);
+        setCurrentTime(new Date());
         const interval = setInterval(() => {
             setCurrentTime(new Date());
         }, 1000);
@@ -121,7 +124,23 @@ function AttendanceContent() {
         return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
     };
 
-    if (isLoading) {
+    const currentShiftDuration = useMemo(() => {
+        return formatDuration(
+            history
+                .filter((r) => {
+                    const getShiftDate = (d: string) => {
+                        const date = new Date(d);
+                        // 12:00 PM boundary for graveyard shift
+                        if (date.getHours() < 12) date.setDate(date.getDate() - 1);
+                        return date.toDateString();
+                    };
+                    return getShiftDate(r.clockInTime) === getShiftDate(new Date().toISOString());
+                })
+                .reduce((sum, r) => sum + (r.workDuration || 0), 0)
+        );
+    }, [history]);
+
+    if (isLoading || !mounted || !currentTime) {
         return (
             <div className="flex items-center justify-center h-screen">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -206,19 +225,7 @@ function AttendanceContent() {
                     <div className="text-center">
                         <div className="text-sm text-muted-foreground">Current Shift Duration</div>
                         <div className="text-xl font-semibold">
-                            {useMemo(() => formatDuration(
-                                history
-                                    .filter((r) => {
-                                        const getShiftDate = (d: string) => {
-                                            const date = new Date(d);
-                                            // 12:00 PM boundary for graveyard shift
-                                            if (date.getHours() < 12) date.setDate(date.getDate() - 1);
-                                            return date.toDateString();
-                                        };
-                                        return getShiftDate(r.clockInTime) === getShiftDate(new Date().toISOString());
-                                    })
-                                    .reduce((sum, r) => sum + (r.workDuration || 0), 0)
-                            ), [history])}
+                            {currentShiftDuration}
                         </div>
                     </div>
                 </div>
