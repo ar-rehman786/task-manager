@@ -1,6 +1,7 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,7 +11,6 @@ import { tasksApi } from '@/lib/api/tasks';
 import { projectsApi } from '@/lib/api/projects';
 import { usersApi } from '@/lib/api/users';
 import api from '@/lib/api/client';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { attendanceApi } from '@/lib/api/attendance';
 import Link from 'next/link';
@@ -96,30 +96,34 @@ function DashboardContent() {
 
     // Calculate stats
     const isAdmin = user?.role === 'admin';
-    const myTasks = tasks.filter((t: any) => t.assignedUserId === user?.id);
-    const todoTasks = myTasks.filter((t: any) => t.status === 'todo' || t.status === 'in_progress');
-    const activeProjects = projects.filter((p: any) => p.status === 'active');
+
+    const myTasks = useMemo(() => tasks.filter((t: any) => t.assignedUserId === user?.id), [tasks, user?.id]);
+
+    const todoTasks = useMemo(() => myTasks.filter((t: any) => t.status === 'todo' || t.status === 'in_progress'), [myTasks]);
+
+    const activeProjects = useMemo(() => projects.filter((p: any) => p.status === 'active'), [projects]);
+
     const hoursToday = attendanceStatus?.workDuration
         ? Math.floor(attendanceStatus.workDuration / 60)
         : 0;
 
-    const teamWorkload = users.map((u: any) => ({
+    const teamWorkload = useMemo(() => users.map((u: any) => ({
         ...u,
         activeProjects: projects.filter((p: any) => p.assignedUserId === u.id && p.status === 'active')
-    }));
+    })), [users, projects]);
 
-    const pendingAccessProjects = projects.filter((p: any) => {
+    const pendingAccessProjects = useMemo(() => projects.filter((p: any) => {
         const pendingCount = Number(p.pendingAccessCount || 0);
         const hasPending = pendingCount > 0;
         if (!hasPending) return false;
         if (user?.role === 'admin') return true;
         return p.assignedUserId === user?.id || p.managerId === user?.id;
-    });
+    }), [projects, user?.role, user?.id]);
 
     // Recent activity
-    const recentTasks = tasks
+    const recentTasks = useMemo(() => [...tasks]
         .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-        .slice(0, 5);
+        .slice(0, 5), [tasks]);
 
     const projectStatuses = [
         { value: 'active', label: 'Active', color: 'bg-green-500' },

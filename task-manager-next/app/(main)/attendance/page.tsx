@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -92,7 +92,7 @@ function AttendanceContent() {
 
     const calculateDuration = (start: string) => {
         const startTime = new Date(start);
-        const diff = currentTime.getTime() - startTime.getTime();
+        const diff = Math.max(0, currentTime.getTime() - startTime.getTime());
         const hours = Math.floor(diff / 1000 / 60 / 60);
         const minutes = Math.floor((diff / 1000 / 60) % 60);
         const seconds = Math.floor((diff / 1000) % 60);
@@ -191,7 +191,7 @@ function AttendanceContent() {
                     <div className="text-center">
                         <div className="text-sm text-muted-foreground">Current Shift Duration</div>
                         <div className="text-xl font-semibold">
-                            {formatDuration(
+                            {useMemo(() => formatDuration(
                                 history
                                     .filter((r) => {
                                         const getShiftDate = (d: string) => {
@@ -203,7 +203,7 @@ function AttendanceContent() {
                                         return getShiftDate(r.clockInTime) === getShiftDate(new Date().toISOString());
                                     })
                                     .reduce((sum, r) => sum + (r.workDuration || 0), 0)
-                            )}
+                            ), [history])}
                         </div>
                     </div>
                 </div>

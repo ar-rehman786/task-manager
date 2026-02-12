@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tasksApi } from '@/lib/api/tasks';
 import { usersApi } from '@/lib/api/users';
@@ -30,6 +30,19 @@ function TasksContent() {
     const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
     const [pendingStatusUpdate, setPendingStatusUpdate] = useState<{ id: number; status: string } | null>(null);
     const userRole = useAuthStore((state) => state.user?.role);
+
+    const TaskDescription = ({ description }: { description: string }) => {
+        const maxLength = 200;
+        const needsTruncation = description.length > maxLength;
+        const displayContent = needsTruncation ? description.substring(0, maxLength) + '...' : description;
+
+        return (
+            <div
+                className="text-sm text-muted-foreground mb-2 line-clamp-2 prose prose-sm dark:prose-invert max-w-none"
+                dangerouslySetInnerHTML={{ __html: displayContent }}
+            />
+        );
+    };
 
     // Fetch tasks, boards, and users
     const { data: tasks = [], isLoading: tasksLoading } = useQuery({
@@ -102,12 +115,12 @@ function TasksContent() {
     });
 
     // Filter tasks
-    const filteredTasks = tasks.filter((task) => {
+    const filteredTasks = useMemo(() => tasks.filter((task) => {
         const currentBoard = boards.find((b) => b.id === currentBoardId);
         if (!currentBoard) return false;
 
         //  Board filtering
-        if (currentBoard.type === 'MEM BER_BOARD' && task.assignedUserId !== currentBoard.ownerUserId) {
+        if (currentBoard.type === 'MEMBER_BOARD' && task.assignedUserId !== currentBoard.ownerUserId) {
             return false;
         }
 
@@ -123,20 +136,20 @@ function TasksContent() {
         }
 
         return true;
-    });
+    }), [tasks, boards, currentBoardId, filters]);
 
     // Group tasks by status
-    const columns = [
+    const columns = useMemo(() => [
         { id: 'todo', title: 'To Do', color: '#6366f1' },
         { id: 'in_progress', title: 'In Progress', color: '#f59e0b' },
         { id: 'blocked', title: 'Blocked', color: '#ef4444' },
         { id: 'done', title: 'Done', color: '#10b981' },
-    ];
+    ], []);
 
-    const tasksByStatus = columns.reduce((acc, col) => {
+    const tasksByStatus = useMemo(() => columns.reduce((acc, col) => {
         acc[col.id] = filteredTasks.filter((t) => t.status === col.id);
         return acc;
-    }, {} as Record<string, Task[]>);
+    }, {} as Record<string, Task[]>), [columns, filteredTasks]);
 
     // Drag and drop handlers
     const handleDragStart = (taskId: number) => {
@@ -306,12 +319,7 @@ function TasksContent() {
                                         </span>
                                     </div>
 
-                                    {task.description && (
-                                        <div
-                                            className="text-sm text-muted-foreground mb-2 line-clamp-2 prose prose-sm dark:prose-invert max-w-none"
-                                            dangerouslySetInnerHTML={{ __html: task.description.substring(0, 200) }}
-                                        />
-                                    )}
+                                    {task.description && <TaskDescription description={task.description} />}
 
                                     <div className="space-y-1 mb-2">
                                         {task.projectName && (

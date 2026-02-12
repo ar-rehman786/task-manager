@@ -16,6 +16,7 @@ import ReactFlow, {
     Panel,
     Handle,
     Position,
+    BackgroundVariant,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
@@ -71,7 +72,7 @@ import { ideationApi } from '@/lib/api/ideation';
 import Link from 'next/link';
 
 // Custom Node Component
-const WorkflowNode = ({ data, selected, id }: any) => {
+const WorkflowNode = React.memo(({ data, selected, id }: any) => {
     const [isEditing, setIsEditing] = useState(false);
     const [label, setLabel] = useState(data.label);
     const [description, setDescription] = useState(data.description);
@@ -161,7 +162,9 @@ const WorkflowNode = ({ data, selected, id }: any) => {
             <Handle type="source" position={Position.Right} className="w-3 h-3 !bg-primary border-2 border-background" />
         </div>
     );
-};
+});
+
+WorkflowNode.displayName = 'WorkflowNode';
 
 const nodeTypes = {
     workflow: WorkflowNode,
@@ -209,22 +212,26 @@ export function MindMap({ id, initialData, name }: MindMapProps) {
     const [nodes, setNodes] = useState<Node[]>([]);
     const [edges, setEdges] = useState<Edge[]>([]);
 
+    const handleNodeDataChange = useCallback((nodeId: string, newData: any) => {
+        setNodes((nds) => nds.map((node) => {
+            if (node.id === nodeId) return { ...node, data: { ...node.data, ...newData } };
+            return node;
+        }));
+    }, []);
+
+    const handleNodeDelete = useCallback((nodeId: string) => {
+        setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+        setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
+    }, []);
+
     useEffect(() => {
         if (initialData?.nodes) {
             setNodes(initialData.nodes.map((n: any) => ({
                 ...n,
                 data: {
                     ...n.data,
-                    onChange: (nodeId: string, newData: any) => {
-                        setNodes((nds) => nds.map((node) => {
-                            if (node.id === nodeId) return { ...node, data: { ...node.data, ...newData } };
-                            return node;
-                        }));
-                    },
-                    onDelete: (nodeId: string) => {
-                        setNodes((nds) => nds.filter((n) => n.id !== nodeId));
-                        setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
-                    }
+                    onChange: handleNodeDataChange,
+                    onDelete: handleNodeDelete
                 }
             })));
         } else {
@@ -235,7 +242,7 @@ export function MindMap({ id, initialData, name }: MindMapProps) {
         } else {
             setEdges([]);
         }
-    }, [initialData?.nodes, initialData?.edges]);
+    }, [initialData?.nodes, initialData?.edges, handleNodeDataChange, handleNodeDelete]);
 
     const onNodesChange = useCallback(
         (changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)),
@@ -247,7 +254,7 @@ export function MindMap({ id, initialData, name }: MindMapProps) {
     );
     const onConnect = useCallback(
         (params: Connection) => setEdges((eds) => addEdge({ ...params, animated: true }, eds)),
-        [setEdges]
+        []
     );
 
     const updateMutation = useMutation({
@@ -273,16 +280,8 @@ export function MindMap({ id, initialData, name }: MindMapProps) {
             position: { x: 500, y: 200 },
             data: {
                 ...template,
-                onChange: (nodeId: string, newData: any) => {
-                    setNodes((nds) => nds.map((node) => {
-                        if (node.id === nodeId) return { ...node, data: { ...node.data, ...newData } };
-                        return node;
-                    }));
-                },
-                onDelete: (nodeId: string) => {
-                    setNodes((nds) => nds.filter((n) => n.id !== nodeId));
-                    setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
-                }
+                onChange: handleNodeDataChange,
+                onDelete: handleNodeDelete
             },
         };
         setNodes((nds) => nds.concat(newNode));
@@ -301,7 +300,7 @@ export function MindMap({ id, initialData, name }: MindMapProps) {
                 snapToGrid
                 snapGrid={[15, 15]}
             >
-                <Background color="#cbd5e1" gap={20} variant="dots" />
+                <Background color="#cbd5e1" gap={20} variant={BackgroundVariant.Dots} />
                 <Controls />
                 <MiniMap className="!bg-background/80 !backdrop-blur" />
 

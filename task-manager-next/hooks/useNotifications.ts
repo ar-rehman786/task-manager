@@ -28,10 +28,10 @@ export function useNotifications() {
     }, [setNotifications]);
 
     const playNotificationSound = useCallback(() => {
-        // Simple "ding" sound in base64 to avoid network issues
-        const sound = "data:audio/mp3;base64,//uQxAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//uQxAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
+        // Valid short "ding" sound
+        const sound = "data:audio/mp3;base64,SUQzBAAAAAABAFRYWFhYAAAASAAAbWFya2VyX25vdGlmaWNhdGlvbi5tcDMAbWFya2VyX25vdGlmaWNhdGlvbi5tcDMAXy9uYXR1cmFsX25vdGlmaWNhdGlvbl9hcnBlZ2dpby5tcDMAX//uQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABYaW5nAAAADAAAAAUAACH4AAMHCgsPEBMVGBocHx8iJSYpLC8yNTY5Oz9BQ0VIS09SVRZcXF5hZGZpanBycnZ3eXt/gYOGiImLkZOVmZueoaOmqKmrrbGztbe5u7/BwsXGyc3R09XY293f4OLm5+nr7fHz9fj7/wAAAAxMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZAAAC8V9PjmgAAIk9y7fMAAAUu3v+WvXAAAk7Xidp2uAAP/86i817z6Lz/vO97zXvea94A//S8///oWmvOfS80173vPeea97//6WmvOfS80173vPeea97///8A/+l///S8///oWmvOfS80173vPeea97//6WmvOfS80173vPeea97///8A/+l///S8///oWmvOfS80173vPeea97//6WmvOfS80173vPeea97///8A/+l///S8///oWmvOfS80173vPeea97//6WmvOfS80173vPeea97///8A/+l///S8///oWmvOfS80173vPeea97//6WmvOfS80173vPeea97///8A/+l///S8///oWmvOfS80173vPeea97//6WmvOfS80173vPeea97///8A/+l///S8///oWmvOfS80173vPeea97//6WmvOfS80173vPeea97///8A/+l///S8///oWmvOfS80173vPeea97//6WmvOfS80173vPeea97///8A/+l///S8///oWmvOfS80173vPeea97//6WmvOfS80173vPeea97///8A/+l///S8///oWmvOfS80173vPeea97//6WmvOfS80173vPeea97///8A/+l///S8///oWmvOfS80173vPeea97//6WmvOfS80173vPeea97///8A/+l///S8///oWmvOfS80173vPeea97//6WmvOfS80173vPeea97///8A/+l///S8///oWmvOfS80173vPeea97//6WmvOfS80173vPeea97///8A/+l///S8///oWmvOfS80173vPeea97//6WmvOfS80173vPeea97///8A/+l///S8///oWmvOfS80173vPeea97//6WmvOfS80173vPeea97///8A/+l///S8///oWmvgAA=";
         const audio = new Audio(sound);
-        audio.play().catch((err) => console.log('Error playing notification sound:', err));
+        audio.play().catch((err) => console.log('🔔 Error playing notification sound:', err));
     }, []);
 
     useEffect(() => {
@@ -46,11 +46,11 @@ export function useNotifications() {
         socket.emit('join', user.id);
 
         const handleNotification = (notification: any) => {
-            console.log('New notification received:', notification);
+            console.log('🔔 Notification received via socket:', notification);
 
             // Format notification for store
             const newNotif: Notification = {
-                id: Date.now(), // Fallback ID if not provided
+                id: notification.id || Date.now() + Math.random(),
                 userId: user.id,
                 message: notification.message,
                 type: notification.type || 'info',
@@ -62,21 +62,21 @@ export function useNotifications() {
             addNotification(newNotif);
             playNotificationSound();
 
+            console.log('🚀 Showing toast for:', notification.message);
             // Slack-like popup
             toast(notification.message, {
-                description: 'New Notification',
+                description: 'New Workspace Notification',
                 action: {
                     label: 'View',
                     onClick: () => {
-                        // Handle redirection logic if needed
-                        console.log('Toast clicked', notification.data);
+                        console.log('Toast action clicked', notification.data);
                     },
                 },
             });
         };
 
         const handleDataUpdate = (data: any) => {
-            console.log('Data update received:', data);
+            console.log('🔄 Data update signal received:', data);
             if (data.type) {
                 // Invalidate the specific query type (tasks, projects, etc.)
                 queryClient.invalidateQueries({ queryKey: [data.type] });
@@ -91,12 +91,24 @@ export function useNotifications() {
         socket.on('notification', handleNotification);
         socket.on('dataUpdate', handleDataUpdate);
 
+        socket.on('connect', () => {
+            console.log('✅ Socket connected, joining room:', user.id);
+            socket.emit('join', user.id);
+        });
+
+        if (socket.connected) {
+            console.log('✅ Socket already connected, joining room:', user.id);
+            socket.emit('join', user.id);
+        }
+
         // Fetch initial notifications
         fetchNotifications();
 
         return () => {
+            console.log('🔌 Cleaning up socket listeners');
             socket.off('notification', handleNotification);
             socket.off('dataUpdate', handleDataUpdate);
+            socket.off('connect');
         };
     }, [user, addNotification, playNotificationSound, fetchNotifications, queryClient]);
 }

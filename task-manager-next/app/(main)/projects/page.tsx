@@ -199,6 +199,40 @@ function ProjectDetail({
     const [adminNotes, setAdminNotes] = useState("");
     const [accessStatus, setAccessStatus] = useState<number>(0);
 
+    const MilestoneDetails = ({ details }: { details: string }) => {
+        const [isExpanded, setIsExpanded] = useState(false);
+        const maxLength = 500;
+        const needsTruncation = details.length > maxLength;
+
+        if (!needsTruncation) {
+            return (
+                <div
+                    className="text-xs text-muted-foreground mt-2 prose prose-xs dark:prose-invert max-w-none break-words overflow-hidden"
+                    dangerouslySetInnerHTML={{ __html: details }}
+                />
+            );
+        }
+
+        const displayContent = isExpanded ? details : details.substring(0, maxLength) + '...';
+
+        return (
+            <div className="mt-2">
+                <div
+                    className="text-xs text-muted-foreground prose prose-xs dark:prose-invert max-w-none break-words overflow-hidden"
+                    dangerouslySetInnerHTML={{ __html: displayContent }}
+                />
+                <Button
+                    variant="link"
+                    size="sm"
+                    className="h-auto p-0 text-[10px] mt-1"
+                    onClick={() => setIsExpanded(!isExpanded)}
+                >
+                    {isExpanded ? 'Show less' : 'Show more'}
+                </Button>
+            </div>
+        );
+    };
+
     // Queries
     const { data: milestones = [] } = useQuery({
         queryKey: ['milestones', project.id],
@@ -401,12 +435,7 @@ function ProjectDetail({
                                     <div className="flex justify-between text-xs text-muted-foreground">
                                         <span>Due: {m.dueDate ? new Date(m.dueDate).toLocaleDateString() : 'No date'}</span>
                                     </div>
-                                    {m.details && (
-                                        <div
-                                            className="text-xs text-muted-foreground mt-2 prose prose-xs dark:prose-invert max-w-none break-words overflow-hidden"
-                                            dangerouslySetInnerHTML={{ __html: m.details }}
-                                        />
-                                    )}
+                                    {m.details && <MilestoneDetails details={m.details} />}
 
                                     {/* Milestone Tasks */}
                                     <div className="mt-3 space-y-2">

@@ -229,10 +229,17 @@ async function initializeDatabase() {
     await client.query('CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks("assignedUserId")');
     await client.query('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_tasks_milestone ON tasks("milestoneId")');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks("projectId")');
     await client.query('CREATE INDEX IF NOT EXISTS idx_milestones_project ON milestones("projectId")');
     await client.query('CREATE INDEX IF NOT EXISTS idx_boards_owner ON boards("ownerUserId")');
     await client.query('CREATE INDEX IF NOT EXISTS idx_attendance_user ON attendance("userId")');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_attendance_clockin ON attendance("clockInTime")');
     await client.query('CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications("userId")');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications("isRead")');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_project_logs_project ON project_logs("projectId")');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_project_access_project ON project_access_items("projectId")');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_ideation_project ON ideation_boards("projectId")');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_ideation_user ON ideation_boards("userId")');
 
     // Schema Updates (Safe to run multiple times)
     // Add projectId and milestoneId to tasks

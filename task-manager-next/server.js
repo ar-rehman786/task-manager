@@ -1241,6 +1241,11 @@ app.post('/api/projects/:projectId/milestones', requireAuth, async (req, res) =>
     const { projectId } = req.params;
     const { title, dueDate, status, details } = req.body;
 
+    // Size limit check for details (max 500KB)
+    if (details && details.length > 500000) {
+        return res.status(400).json({ error: 'Milestone details are too large (max 500KB)' });
+    }
+
     try {
         const maxOrderResult = await query('SELECT MAX("orderIndex") as max FROM milestones WHERE "projectId" = $1', [projectId]);
         const orderIndex = (maxOrderResult.rows[0].max || -1) + 1;
@@ -1297,6 +1302,11 @@ app.post('/api/projects/:projectId/milestones', requireAuth, async (req, res) =>
 app.put('/api/milestones/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { title, dueDate, status, details } = req.body;
+
+    // Size limit check for details (max 500KB)
+    if (details && details.length > 500000) {
+        return res.status(400).json({ error: 'Milestone details are too large (max 500KB)' });
+    }
 
     try {
         await query(`

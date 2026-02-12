@@ -84,27 +84,42 @@ export function StickyNotes({ id, initialData, name }: StickyNotesProps) {
                     </div>
                 )}
                 {notes.map((note) => (
-                    <Card
+                    <StickyNoteItem
                         key={note.id}
-                        className={`w-48 h-48 p-4 shadow-md border-none relative group transition-transform hover:rotate-1 ${note.color} flex flex-col`}
-                    >
-                        <textarea
-                            className="w-full h-full bg-transparent border-none resize-none focus:ring-0 text-sm font-medium leading-relaxed placeholder:text-black/20"
-                            placeholder="Type your idea here..."
-                            value={note.text}
-                            onChange={(e) => updateNote(note.id, e.target.value)}
-                        />
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
-                            onClick={() => deleteNote(note.id)}
-                        >
-                            <Trash2 size={12} />
-                        </Button>
-                    </Card>
+                        note={note}
+                        onUpdate={updateNote}
+                        onDelete={deleteNote}
+                    />
                 ))}
             </div>
         </div>
+    );
+}
+
+function StickyNoteItem({ note, onUpdate, onDelete }: { note: StickyNote, onUpdate: (id: string, text: string) => void, onDelete: (id: string) => void }) {
+    const [localText, setLocalText] = useState(note.text);
+
+    return (
+        <Card
+            className={`w-48 h-48 p-4 shadow-md border-none relative group transition-transform hover:rotate-1 ${note.color} flex flex-col`}
+        >
+            <textarea
+                className="w-full h-full bg-transparent border-none resize-none focus:ring-0 text-sm font-medium leading-relaxed placeholder:text-black/20"
+                placeholder="Type your idea here..."
+                value={localText}
+                onChange={(e) => {
+                    setLocalText(e.target.value);
+                    onUpdate(note.id, e.target.value);
+                }}
+            />
+            <Button
+                variant="ghost"
+                size="icon"
+                className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
+                onClick={() => onDelete(note.id)}
+            >
+                <Trash2 size={12} />
+            </Button>
+        </Card>
     );
 }
