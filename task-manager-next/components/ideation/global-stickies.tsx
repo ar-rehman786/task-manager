@@ -48,7 +48,9 @@ export function GlobalStickies() {
                 }
             });
 
-            // Set background color of the new window
+            // Set background color and height of the new window
+            pipWindow.document.documentElement.style.height = '100%';
+            pipWindow.document.body.style.height = '100%';
             pipWindow.document.body.style.backgroundColor = sticky.color;
             pipWindow.document.body.style.margin = '0';
             pipWindow.document.body.style.overflow = 'hidden';
@@ -56,6 +58,7 @@ export function GlobalStickies() {
             // Create a root for the PiP window
             const container = pipWindow.document.createElement('div');
             container.className = 'p-4 h-full flex flex-col font-sans';
+            container.style.boxSizing = 'border-box';
             pipWindow.document.body.appendChild(container);
 
             // Render content (we use an iframe or just manual DOM for simplicity in this draft)

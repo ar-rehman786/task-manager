@@ -18,11 +18,11 @@ const next = require('next');
 
 console.log('🔹 SERVER.JS: Next.js module loaded');
 
-const dev = process.env.NODE_ENV !== 'production';
+const dev = false; // Forced false to bypass Turbopack issues in dev mode
 let nextApp;
 try {
     console.log('🔹 SERVER.JS: Initializing Next.js app...');
-    nextApp = next({ dev, dir: '.' });
+    nextApp = next({ dev, dir: '.', turbo: false });
     console.log('🔹 SERVER.JS: Next.js app initialized');
 } catch (err) {
     console.error('❌ SERVER.JS: Failed to initialize Next.js app:', err);
@@ -463,13 +463,16 @@ app.get('/api/setup-super-user', async (req, res) => {
 app.get('/api/users', requireAuth, async (req, res) => {
     try {
         const result = await query(`
-            SELECT id, name, email, role, active, "createdAt", title, department, location, phone, "employeeId", "profilePicture", "coverImage", "managerId"
-            FROM users 
-            WHERE active = 1 
-            ORDER BY name ASC
+            SELECT u.id, u.name, u.email, u.role, u.active, u."createdAt", u.title, u.department, u.location, u.phone, u."employeeId", u."profilePicture", u."coverImage", u."managerId",
+                   (CASE WHEN a.id IS NOT NULL THEN true ELSE false END) as "isWorking"
+            FROM users u
+            LEFT JOIN attendance a ON u.id = a."userId" AND a.status = 'active'
+            WHERE u.active = 1 
+            ORDER BY u.name ASC
         `);
         res.json(result.rows);
     } catch (error) {
+        console.error('Fetch users error:', error);
         res.status(500).json({ error: 'Server error' });
     }
 });
@@ -704,16 +707,40 @@ app.get('/api/boards', requireAuth, async (req, res) => {
     try {
         let result;
         if (req.session.userRole === 'admin') {
-            // Admin sees all active member boards
+            // Admin sees all active member boards AND workspace boards (ownerUserId is NULL)
+            // Dynamically generate names for member boards based on current user names
             result = await query(`
-                SELECT b.* 
+                SELECT 
+                    b.id, 
+                    b.workspace, 
+                    CASE 
+                        WHEN b.type = 'ALL_TASKS' THEN 'All Tasks'
+                        WHEN b.type = 'MEMBER_BOARD' THEN u.name || '''s Board'
+                        ELSE b.name 
+                    END as name,
+                    b.type, 
+                    b."ownerUserId", 
+                    b."createdAt"
                 FROM boards b
-                JOIN users u ON b."ownerUserId" = u.id
+                LEFT JOIN users u ON b."ownerUserId" = u.id
                 WHERE b.workspace = $1 
-                AND u.role = 'member'
-                AND u.active = 1
-                ORDER BY b.name
+                AND (b."ownerUserId" IS NULL OR u.active = 1)
+                ORDER BY 
+                    CASE WHEN b.type = 'ALL_TASKS' THEN 0 ELSE 1 END,
+                    name
             `, ['tasks']);
+
+            // Deduplicate "All Tasks" boards in the response
+            const seenAllTasks = new Set();
+            const uniqueBoards = result.rows.filter(board => {
+                if (board.type === 'ALL_TASKS') {
+                    if (seenAllTasks.has('ALL_TASKS')) return false;
+                    seenAllTasks.add('ALL_TASKS');
+                    return true;
+                }
+                return true;
+            });
+            res.json(uniqueBoards);
         } else {
             // Members only see their own board renamed to "My Tasks"
             result = await query(`
@@ -725,8 +752,8 @@ app.get('/api/boards', requireAuth, async (req, res) => {
                 AND u.active = 1
                 LIMIT 1
             `, ['tasks', req.session.userId]);
+            res.json(result.rows);
         }
-        res.json(result.rows);
     } catch (error) {
         console.error('Fetch boards error:', error);
         res.status(500).json({ error: 'Server error' });
@@ -778,7 +805,7 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
             description || null,
             status || 'todo',
             priority || 'medium',
-            dueDate || null,
+            (dueDate === "" || !dueDate) ? null : dueDate,
             assignedUserId || null,
             req.session.userId,
             labels || null,
@@ -864,7 +891,21 @@ app.put('/api/tasks/:id', requireAuth, async (req, res) => {
                 "assignedUserId" = $6, labels = $7, "projectId" = $8, "milestoneId" = $9,
                 "loomVideo" = $10, "workflowLink" = $11, "workflowStatus" = $12, "updatedAt" = CURRENT_TIMESTAMP
             WHERE id = $13
-        `, [title, description, status, priority, dueDate, assignedUserId, labels, projectId, milestoneId, loomVideo, workflowLink, workflowStatus, id]);
+        `, [
+            title,
+            description,
+            status,
+            priority,
+            (dueDate === "" || !dueDate) ? null : dueDate,
+            assignedUserId,
+            labels,
+            projectId,
+            milestoneId,
+            loomVideo,
+            workflowLink,
+            workflowStatus,
+            id
+        ]);
 
         const taskResult = await query(`
             SELECT t.*, u.name as "assignedUserName", c.name as "createdByName", p.name as "projectName", m.title as "milestoneTitle"
@@ -2013,8 +2054,32 @@ async function seedDatabase() {
                 await query('UPDATE users SET active = 1 WHERE email = $1', ['admin@sloraai.com']);
             }
         }
+        await ensureBoards();
     } catch (error) {
         console.error('Auto-seed failed:', error);
+    }
+}
+
+async function ensureBoards() {
+    try {
+        console.log('🔄 Ensuring all active users have task boards...');
+        const users = await query('SELECT id, name FROM users WHERE active = 1');
+        for (const user of users.rows) {
+            const boardResult = await query(
+                'SELECT 1 FROM boards WHERE "ownerUserId" = $1 AND workspace = $2',
+                [user.id, 'tasks']
+            );
+            if (!boardResult.rows[0]) {
+                console.log(`🌱 Creating missing board for user: ${user.name}`);
+                await query(
+                    'INSERT INTO boards (workspace, name, type, "ownerUserId") VALUES ($1, $2, $3, $4)',
+                    ['tasks', `${user.name}'s Board`, 'MEMBER_BOARD', user.id]
+                );
+            }
+        }
+        console.log('✅ Boards ensured.');
+    } catch (error) {
+        console.error('Error ensuring boards:', error);
     }
 }
 

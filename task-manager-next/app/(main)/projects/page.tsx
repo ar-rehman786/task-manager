@@ -19,6 +19,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Edit3 } from 'lucide-react';
+import React from 'react';
+
+const safeFormatDate = (dateStr: string | undefined | null) => {
+    if (!dateStr) return 'No Date';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    return date.toLocaleDateString();
+};
 
 export default function ProjectsPage() {
     return (
@@ -199,39 +207,6 @@ function ProjectDetail({
     const [adminNotes, setAdminNotes] = useState("");
     const [accessStatus, setAccessStatus] = useState<number>(0);
 
-    const MilestoneDetails = ({ details }: { details: string }) => {
-        const [isExpanded, setIsExpanded] = useState(false);
-        const maxLength = 500;
-        const needsTruncation = details.length > maxLength;
-
-        if (!needsTruncation) {
-            return (
-                <div
-                    className="text-xs text-muted-foreground mt-2 prose prose-xs dark:prose-invert max-w-none break-words overflow-hidden"
-                    dangerouslySetInnerHTML={{ __html: details }}
-                />
-            );
-        }
-
-        const displayContent = isExpanded ? details : details.substring(0, maxLength) + '...';
-
-        return (
-            <div className="mt-2">
-                <div
-                    className="text-xs text-muted-foreground prose prose-xs dark:prose-invert max-w-none break-words overflow-hidden"
-                    dangerouslySetInnerHTML={{ __html: displayContent }}
-                />
-                <Button
-                    variant="link"
-                    size="sm"
-                    className="h-auto p-0 text-[10px] mt-1"
-                    onClick={() => setIsExpanded(!isExpanded)}
-                >
-                    {isExpanded ? 'Show less' : 'Show more'}
-                </Button>
-            </div>
-        );
-    };
 
     // Queries
     const { data: milestones = [] } = useQuery({
@@ -402,8 +377,8 @@ function ProjectDetail({
                 )}
 
                 <div className="flex gap-4 text-sm text-muted-foreground">
-                    <span>Start: {new Date(project.startDate || '').toLocaleDateString()}</span>
-                    <span>Target End: {new Date(project.endDate || '').toLocaleDateString()}</span>
+                    <span>Start: {safeFormatDate(project.startDate)}</span>
+                    <span>Target End: {safeFormatDate(project.endDate)}</span>
                 </div>
             </Card>
 
@@ -435,7 +410,9 @@ function ProjectDetail({
                                     <div className="flex justify-between text-xs text-muted-foreground">
                                         <span>Due: {m.dueDate ? new Date(m.dueDate).toLocaleDateString() : 'No date'}</span>
                                     </div>
-                                    {m.details && <MilestoneDetails details={m.details} />}
+                                    {m.details && (
+                                        <MilestoneDetails details={m.details} />
+                                    )}
 
                                     {/* Milestone Tasks */}
                                     <div className="mt-3 space-y-2">
@@ -705,3 +682,43 @@ function ProjectDetail({
         </div >
     );
 }
+
+const MilestoneDetails = React.memo(({ details }: { details: string }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    // Increased threshold for rendering full content, but we'll use CSS to hide it
+    const isAstronomical = details.length > 2000000; // 2MB+
+
+    return (
+        <div className="mt-2 text-[10px] relative">
+            <div
+                className={`text-xs text-muted-foreground prose prose-xs dark:prose-invert max-w-none break-words overflow-hidden transition-all duration-300 ${!isExpanded ? 'max-h-[150px] relative' : 'max-h-none'
+                    }`}
+                dangerouslySetInnerHTML={{
+                    __html: isAstronomical && !isExpanded
+                        ? details.substring(0, 5000) + "... (Astronomical content truncated for safety)"
+                        : details
+                }}
+            />
+            {!isExpanded && !isAstronomical && (
+                <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-background/90 to-transparent pointer-events-none" />
+            )}
+            {(details.length > 500 || isAstronomical) && (
+                <Button
+                    variant="link"
+                    size="sm"
+                    className="h-auto p-0 text-[10px] mt-1 relative z-10"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsExpanded(!isExpanded);
+                    }}
+                >
+                    {isExpanded ? 'Show less' : 'Show more'}
+                </Button>
+            )}
+        </div>
+    );
+}, (prevProps, nextProps) => {
+    return prevProps.details === nextProps.details;
+});
+
+MilestoneDetails.displayName = 'MilestoneDetails';

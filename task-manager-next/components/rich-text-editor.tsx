@@ -4,11 +4,11 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
 import { Button } from './ui/button';
-import { Textarea } from './ui/textarea';
+import { Badge } from './ui/badge';
 import {
     Bold, Italic, List, ListOrdered,
     Heading1, Heading2, Image as ImageIcon,
-    Undo, Redo, Quote, AlertTriangle, FileText, Settings2
+    Undo, Redo, Quote, AlertTriangle
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -21,9 +21,9 @@ interface RichTextEditorProps {
 const SAFE_LIMIT = 200000; // 200k characters safety threshold
 
 export function RichTextEditor({ content, onChange, placeholder }: RichTextEditorProps) {
-    const [isLargeContent, setIsLargeContent] = useState(content.length > SAFE_LIMIT);
-    const [showWarning, setShowWarning] = useState(content.length > SAFE_LIMIT);
-    const [editMode, setEditMode] = useState<'rich' | 'plain'>(content.length > SAFE_LIMIT ? 'plain' : 'rich');
+    const [isLargeContent] = useState(content.length > SAFE_LIMIT);
+    const [isEditing, setIsEditing] = useState(!isLargeContent);
+    const [isLoadingEditor, setIsLoadingEditor] = useState(false);
 
     const editor = useEditor({
         extensions: [
@@ -33,31 +33,36 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
                 allowBase64: true,
             }),
         ],
-        content: content,
+        content: isEditing ? content : '',
         onUpdate: ({ editor }) => {
-            if (editMode === 'rich') {
-                onChange(editor.getHTML());
-            }
+            onChange(editor.getHTML());
         },
-        editorProps: {
-            attributes: {
-                class: 'prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[150px] p-4 border rounded-md',
-            },
-        },
-    }, [editMode === 'rich' && !showWarning]); // Only initialize if we're in rich mode and warning is cleared
+    });
 
-    // Keep editor content in sync only if not in plain mode
+    // Handle switching to edit mode for large content
+    const handleStartEditing = () => {
+        setIsLoadingEditor(true);
+        // Delay slightly to give UI feedback and avoid blocking the thread immediately
+        setTimeout(() => {
+            setIsEditing(true);
+            setIsLoadingEditor(false);
+            if (editor) {
+                editor.commands.setContent(content);
+            }
+        }, 100);
+    };
+
+    // Keep editor content in sync when content changes from outside (and we are editing)
     useEffect(() => {
-        if (editor && content !== editor.getHTML() && editMode === 'rich') {
+        if (editor && isEditing && editor.getHTML() !== content) {
             editor.commands.setContent(content);
         }
-    }, [content, editor, editMode]);
+    }, [isEditing, editor, content]);
 
     const addImage = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file || !editor) return;
 
-        // Convert image to base64 data URI to avoid ephemeral file storage issues
         const reader = new FileReader();
         reader.onload = () => {
             const base64Url = reader.result as string;
@@ -66,194 +71,161 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
             }
         };
         reader.readAsDataURL(file);
-
-        // Reset the input so the same file can be selected again
         event.target.value = '';
     };
 
-    if (showWarning) {
+    if (!isEditing) {
         return (
-            <div className="p-6 border-2 border-dashed border-yellow-500/50 rounded-lg bg-yellow-500/5 space-y-4">
-                <div className="flex items-center gap-3 text-yellow-600 dark:text-yellow-500">
-                    <AlertTriangle className="w-6 h-6" />
-                    <h3 className="font-semibold text-lg">Large Content Detected</h3>
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                    This description is very large ({Math.round(content.length / 1024)} KB) and might contain many large images.
-                    Loading the rich text editor automatically may cause your browser to become unresponsive.
-                </p>
-                <div className="flex flex-wrap gap-3 pt-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => {
-                            setEditMode('plain');
-                            setShowWarning(false);
-                        }}
-                    >
-                        <FileText className="w-4 h-4" />
-                        Edit as Plain Text (Safe)
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="gap-2 text-yellow-600 dark:text-yellow-500 hover:text-yellow-700 hover:bg-yellow-500/10"
-                        onClick={() => {
-                            setEditMode('rich');
-                            setShowWarning(false);
-                        }}
-                    >
-                        <Settings2 className="w-4 h-4" />
-                        Load Rich Editor Anyway
-                    </Button>
-                </div>
-            </div>
-        );
-    }
-
-    if (editMode === 'plain') {
-        return (
-            <div className="space-y-2">
+            <div className="space-y-4">
                 <div className="flex justify-between items-center px-1">
-                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Plain Text Editor (HTML Mode)</span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Milestone Description Preview</span>
+                        {isLargeContent && (
+                            <Badge variant="outline" className="text-[9px] h-4 bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+                                Safety Mode Active
+                            </Badge>
+                        )}
+                    </div>
                     <Button
                         variant="link"
                         size="sm"
-                        className="h-auto p-0 text-[10px]"
-                        onClick={() => setEditMode('rich')}
+                        className="h-auto p-0 text-xs font-bold text-primary"
+                        onClick={handleStartEditing}
+                        disabled={isLoadingEditor}
                     >
-                        Switch to Rich Editor
+                        {isLoadingEditor ? 'Initialising Editor...' : 'Click to Edit Description'}
                     </Button>
                 </div>
-                <Textarea
-                    value={content}
-                    onChange={(e) => onChange(e.target.value)}
-                    placeholder={placeholder}
-                    className="min-h-[300px] font-mono text-xs p-4 bg-muted/20"
-                />
-                <p className="text-[10px] text-muted-foreground italic">
-                    Note: In plain text mode, you are editing the raw HTML.
-                </p>
-            </div>
-        );
-    }
 
-    if (!editor) {
-        return (
-            <div className="min-h-[150px] flex items-center justify-center border rounded-md bg-muted/10">
-                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary"></div>
+                <div
+                    className="min-h-[400px] max-h-[600px] overflow-y-auto p-6 border rounded-lg bg-muted/5 prose prose-sm dark:prose-invert max-w-none break-words"
+                    dangerouslySetInnerHTML={{ __html: content || `<p class="text-muted-foreground italic">${placeholder || 'No description provided.'}</p>` }}
+                />
+
+                <p className="text-[10px] text-muted-foreground italic text-center py-2 border-t">
+                    Showing instant visualization for large data. Click the button above to start editing.
+                </p>
             </div>
         );
     }
 
     return (
         <div className="space-y-2">
-            <div className="flex flex-wrap gap-1 p-1 bg-muted rounded-t-md border border-b-0 items-center">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => editor.chain().focus().toggleBold().run()}
-                    className={editor.isActive('bold') ? 'bg-accent' : ''}
-                >
-                    <Bold className="w-4 h-4" />
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => editor.chain().focus().toggleItalic().run()}
-                    className={editor.isActive('italic') ? 'bg-accent' : ''}
-                >
-                    <Italic className="w-4 h-4" />
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-                    className={editor.isActive('heading', { level: 1 }) ? 'bg-accent' : ''}
-                >
-                    <Heading1 className="w-4 h-4" />
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-                    className={editor.isActive('heading', { level: 2 }) ? 'bg-accent' : ''}
-                >
-                    <Heading2 className="w-4 h-4" />
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => editor.chain().focus().toggleBulletList().run()}
-                    className={editor.isActive('bulletList') ? 'bg-accent' : ''}
-                >
-                    <List className="w-4 h-4" />
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => editor.chain().focus().toggleOrderedList().run()}
-                    className={editor.isActive('orderedList') ? 'bg-accent' : ''}
-                >
-                    <ListOrdered className="w-4 h-4" />
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => editor.chain().focus().toggleBlockquote().run()}
-                    className={editor.isActive('blockquote') ? 'bg-accent' : ''}
-                >
-                    <Quote className="w-4 h-4" />
-                </Button>
+            <div className="flex justify-between items-center px-1">
+                <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Rich Text Editor</span>
+                    {isLargeContent && (
+                        <Badge variant="outline" className="text-[9px] h-4 bg-orange-500/10 text-orange-600 border-orange-500/20">
+                            Large Document
+                        </Badge>
+                    )}
+                </div>
+            </div>
 
-                <div className="w-[1px] h-6 bg-border mx-1 my-auto" />
+            <div className="border rounded-md focus-within:ring-1 focus-within:ring-ring transition-all overflow-hidden">
+                <div className="flex flex-wrap gap-1 p-1 bg-muted/50 border-b items-center">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`h-8 w-8 p-0 ${editor?.isActive('bold') ? 'bg-accent' : ''}`}
+                        onClick={() => editor?.chain().focus().toggleBold().run()}
+                        title="Bold"
+                    >
+                        <Bold className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`h-8 w-8 p-0 ${editor?.isActive('italic') ? 'bg-accent' : ''}`}
+                        onClick={() => editor?.chain().focus().toggleItalic().run()}
+                        title="Italic"
+                    >
+                        <Italic className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`h-8 w-8 p-0 ${editor?.isActive('heading', { level: 1 }) ? 'bg-accent' : ''}`}
+                        onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+                        title="H1"
+                    >
+                        <Heading1 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`h-8 w-8 p-0 ${editor?.isActive('heading', { level: 2 }) ? 'bg-accent' : ''}`}
+                        onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+                        title="H2"
+                    >
+                        <Heading2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`h-8 w-8 p-0 ${editor?.isActive('bulletList') ? 'bg-accent' : ''}`}
+                        onClick={() => editor?.chain().focus().toggleBulletList().run()}
+                        title="Bullet List"
+                    >
+                        <List className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`h-8 w-8 p-0 ${editor?.isActive('orderedList') ? 'bg-accent' : ''}`}
+                        onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+                        title="Ordered List"
+                    >
+                        <ListOrdered className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`h-8 w-8 p-0 ${editor?.isActive('blockquote') ? 'bg-accent' : ''}`}
+                        onClick={() => editor?.chain().focus().toggleBlockquote().run()}
+                        title="Quote"
+                    >
+                        <Quote className="h-4 w-4" />
+                    </Button>
 
-                <div className="relative">
-                    <Button variant="ghost" size="sm" asChild>
-                        <label className="cursor-pointer">
-                            <ImageIcon className="w-4 h-4" />
-                            <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={addImage}
-                            />
+                    <div className="w-[1px] h-4 bg-border mx-1" />
+
+                    <Button variant="ghost" size="sm" asChild className="h-8 w-8 p-0">
+                        <label className="cursor-pointer flex items-center justify-center">
+                            <ImageIcon className="h-4 w-4" />
+                            <input type="file" accept="image/*" className="hidden" onChange={addImage} />
                         </label>
                     </Button>
+
+                    <div className="flex-grow" />
+
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => editor?.chain().focus().undo().run()}
+                        title="Undo"
+                    >
+                        <Undo className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => editor?.chain().focus().redo().run()}
+                        title="Redo"
+                    >
+                        <Redo className="h-4 w-4" />
+                    </Button>
                 </div>
-
-                <div className="flex-grow" />
-
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                        setEditMode('plain');
-                    }}
-                    title="Switch to Plain Text"
-                >
-                    <FileText className="w-4 h-4" />
-                </Button>
-
-                <div className="w-[1px] h-6 bg-border mx-1 my-auto" />
-
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => editor.chain().focus().undo().run()}
-                >
-                    <Undo className="w-4 h-4" />
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => editor.chain().focus().redo().run()}
-                >
-                    <Redo className="w-4 h-4" />
-                </Button>
+                <EditorContent
+                    editor={editor}
+                    className="prose prose-sm dark:prose-invert max-w-none p-4 min-h-[400px] max-h-[600px] overflow-y-auto focus:outline-none"
+                />
             </div>
-            <EditorContent editor={editor} />
+            <p className="text-[10px] text-muted-foreground italic">
+                Tip: Changes are instantly previewed as you type. Images are stored in the description.
+            </p>
         </div>
     );
 }

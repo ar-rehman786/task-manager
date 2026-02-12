@@ -90,8 +90,23 @@ function AttendanceContent() {
 
     const isClockedIn = activeSession && activeSession.status === 'active';
 
+    const safeFormatTime = (dateStr: string | undefined | null) => {
+        if (!dateStr) return '--:--';
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return 'Invalid Time';
+        return date.toLocaleTimeString();
+    };
+
+    const safeFormatDate = (dateStr: string | undefined | null) => {
+        if (!dateStr) return 'No Date';
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return 'Invalid Date';
+        return date.toLocaleDateString();
+    };
+
     const calculateDuration = (start: string) => {
         const startTime = new Date(start);
+        if (isNaN(startTime.getTime())) return '00:00:00';
         const diff = Math.max(0, currentTime.getTime() - startTime.getTime());
         const hours = Math.floor(diff / 1000 / 60 / 60);
         const minutes = Math.floor((diff / 1000 / 60) % 60);
@@ -143,7 +158,7 @@ function AttendanceContent() {
                                 {calculateDuration(activeSession.clockInTime)}
                             </div>
                             <div className="text-sm text-muted-foreground mt-1">
-                                Started at {new Date(activeSession.clockInTime).toLocaleTimeString()}
+                                Started at {safeFormatTime(activeSession.clockInTime)}
                             </div>
                             <div className="text-xs text-muted-foreground">
                                 Shift: 7 PM - 4 AM
@@ -184,7 +199,7 @@ function AttendanceContent() {
                         <div className="text-sm text-muted-foreground">Clock In</div>
                         <div className="text-xl font-semibold">
                             {activeSession
-                                ? new Date(activeSession.clockInTime).toLocaleTimeString()
+                                ? safeFormatTime(activeSession.clockInTime)
                                 : '--:--'}
                         </div>
                     </div>
@@ -227,14 +242,14 @@ function AttendanceContent() {
                             {history.map((record) => (
                                 <tr key={record.id} className="border-b hover:bg-muted/50">
                                     <td className="py-3 px-4">
-                                        {new Date(record.clockInTime).toLocaleDateString()}
+                                        {safeFormatDate(record.clockInTime)}
                                     </td>
                                     <td className="py-3 px-4">
-                                        {new Date(record.clockInTime).toLocaleTimeString()}
+                                        {safeFormatTime(record.clockInTime)}
                                     </td>
                                     <td className="py-3 px-4">
                                         {record.clockOutTime
-                                            ? new Date(record.clockOutTime).toLocaleTimeString()
+                                            ? safeFormatTime(record.clockOutTime)
                                             : '--:--'}
                                     </td>
                                     <td className="py-3 px-4 font-semibold">
@@ -277,14 +292,14 @@ function AttendanceContent() {
                                             <div className="text-xs text-muted-foreground">{record.userEmail}</div>
                                         </td>
                                         <td className="py-3 px-4">
-                                            {new Date(record.clockInTime).toLocaleDateString()}
+                                            {safeFormatDate(record.clockInTime)}
                                         </td>
                                         <td className="py-3 px-4">
-                                            {new Date(record.clockInTime).toLocaleTimeString()}
+                                            {safeFormatTime(record.clockInTime)}
                                         </td>
                                         <td className="py-3 px-4">
                                             {record.clockOutTime
-                                                ? new Date(record.clockOutTime).toLocaleTimeString()
+                                                ? safeFormatTime(record.clockOutTime)
                                                 : 'Active'}
                                         </td>
                                         <td className="py-3 px-4">

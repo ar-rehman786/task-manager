@@ -13,6 +13,7 @@ export interface User {
     managerId?: number;
     managerName?: string;
     active?: number;
+    isWorking?: boolean;
     createdAt?: string;
 }
 

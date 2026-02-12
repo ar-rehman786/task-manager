@@ -11,6 +11,8 @@ import { useAuthStore } from '@/lib/store/authStore';
 import { Button } from '@/components/ui/button';
 import ProtectedRoute from '@/components/protected-route';
 import api from '@/lib/api/client';
+import { Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function TasksPage() {
     return (
@@ -114,10 +116,36 @@ function TasksContent() {
         },
     });
 
+    const deleteTaskMutation = useMutation({
+        mutationFn: (id: number) => tasksApi.deleteTask(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            toast.success('Task deleted successfully');
+        },
+        onError: () => {
+            toast.error('Failed to delete task');
+        }
+    });
+
+    const handleDeleteTask = (e: React.MouseEvent, id: number) => {
+        e.stopPropagation();
+        if (window.confirm('Are you sure you want to delete this task?')) {
+            deleteTaskMutation.mutate(id);
+        }
+    };
+
     // Filter tasks
     const filteredTasks = useMemo(() => tasks.filter((task) => {
         const currentBoard = boards.find((b) => b.id === currentBoardId);
-        if (!currentBoard) return false;
+
+        // Fallback: If no board is selected or found, show all tasks (useful for admins or initial state)
+        if (!currentBoard) {
+            // Basic filtering still applies
+            if (filters.assignee !== 'all' && task.assignedUserId?.toString() !== filters.assignee) return false;
+            if (filters.status !== 'all' && task.status !== filters.status) return false;
+            if (filters.priority !== 'all' && task.priority !== filters.priority) return false;
+            return true;
+        }
 
         //  Board filtering
         if (currentBoard.type === 'MEMBER_BOARD' && task.assignedUserId !== currentBoard.ownerUserId) {
@@ -220,17 +248,35 @@ function TasksContent() {
                 <Button onClick={() => setShowTaskModal(true)}>+ Quick Add Task</Button>
             </div>
 
+            {/* Working Now Summary */}
+            <div className="flex flex-wrap gap-2 items-center p-3 bg-muted/20 border rounded-lg">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-2">Working Now:</span>
+                {users.filter(u => u.isWorking).length > 0 ? (
+                    users.filter(u => u.isWorking).map(u => (
+                        <div key={u.id} className="flex items-center gap-1.5 px-2.5 py-1 bg-green-500/10 text-green-700 dark:text-green-400 rounded-full border border-green-200/50 text-[10px] font-bold animate-in fade-in zoom-in duration-300">
+                            <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                            </span>
+                            {u.name}
+                        </div>
+                    ))
+                ) : (
+                    <span className="text-[10px] text-muted-foreground italic">No team members currently clocked in.</span>
+                )}
+            </div>
+
             {/* Filters */}
             <div className="flex gap-4">
                 <select
-                    className="px-4 py-2 border rounded-lg bg-background"
+                    className="px-4 py-2 border rounded-lg bg-background font-medium text-sm"
                     value={filters.assignee}
                     onChange={(e) => setFilters({ ...filters, assignee: e.target.value })}
                 >
-                    <option value="all">All Members</option>
+                    <option value="all">👥 All Members</option>
                     {users.map((u) => (
                         <option key={u.id} value={u.id}>
-                            {u.name}
+                            {u.isWorking ? '🟢 ' : '⚪ '}{u.name}
                         </option>
                     ))}
                 </select>
@@ -260,11 +306,20 @@ function TasksContent() {
             </div>
 
             {/* Board Tabs */}
-            <div className="flex gap-2 border-b">
-                {boards.map((board) => (
+            <div className="flex gap-2 border-b overflow-x-auto">
+                <button
+                    className={`px-4 py-2 font-medium transition-colors whitespace-nowrap ${currentBoardId === null
+                        ? 'border-b-2 border-primary text-primary'
+                        : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                    onClick={() => setCurrentBoardId(null)}
+                >
+                    All Tasks
+                </button>
+                {boards.filter(b => b.type !== 'ALL_TASKS').map((board) => (
                     <button
                         key={board.id}
-                        className={`px-4 py-2 font-medium transition-colors ${currentBoardId === board.id
+                        className={`px-4 py-2 font-medium transition-colors whitespace-nowrap ${currentBoardId === board.id
                             ? 'border-b-2 border-primary text-primary'
                             : 'text-muted-foreground hover:text-foreground'
                             }`}
@@ -305,8 +360,15 @@ function TasksContent() {
                                     }}
                                     className="bg-background p-4 rounded-lg shadow-sm border cursor-pointer hover:shadow-md transition-shadow relative group"
                                 >
-                                    <div className="flex justify-between items-start mb-2">
+                                    <div className="flex justify-between items-start mb-2 pr-6">
                                         <h4 className="font-medium group-hover:text-primary transition-colors">{task.title}</h4>
+                                        <button
+                                            onClick={(e) => handleDeleteTask(e, task.id)}
+                                            className="absolute top-4 right-4 p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-md opacity-0 group-hover:opacity-100 transition-all z-10"
+                                            title="Delete Task"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
                                         <span
                                             className={`text-xs px-2 py-1 rounded ${task.priority === 'high'
                                                 ? 'bg-red-500/20 text-red-600'
@@ -335,11 +397,19 @@ function TasksContent() {
                                     </div>
 
                                     <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                        <span>
-                                            👤 {users.find((u) => u.id === task.assignedUserId)?.name || 'Unassigned'}
-                                        </span>
+                                        <div className="flex items-center gap-1.5 overflow-hidden">
+                                            <span className="truncate">👤 {users.find((u) => u.id === task.assignedUserId)?.name || 'Unassigned'}</span>
+                                            {task.assignedUserId && users.find(u => u.id === task.assignedUserId)?.isWorking && (
+                                                <span className="flex h-1.5 w-1.5 rounded-full bg-green-500 flex-shrink-0" title="Currently Working" />
+                                            )}
+                                        </div>
                                         {task.dueDate && (
-                                            <span>📅 {new Date(task.dueDate).toLocaleDateString()}</span>
+                                            <span suppressHydrationWarning>
+                                                📅 {(() => {
+                                                    const d = new Date(task.dueDate);
+                                                    return isNaN(d.getTime()) ? 'Invalid Date' : d.toLocaleDateString();
+                                                })()}
+                                            </span>
                                         )}
                                     </div>
                                 </div>

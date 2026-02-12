@@ -230,6 +230,175 @@ function DashboardContent() {
                 </Link>
             </div>
 
+            {/* Team Availability */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Available Members */}
+                <Card className="p-6 border-l-4 border-l-green-500">
+                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <span>🟢</span> Available Team Members
+                    </h2>
+                    <div className="space-y-3">
+                        {teamWorkload.filter((u: any) => u.activeProjects.length === 0).length > 0 ? (
+                            teamWorkload.filter((u: any) => u.activeProjects.length === 0).map((u: any) => (
+                                <div key={u.id} className="flex items-center justify-between p-3 bg-green-50/10 rounded-lg border border-green-100/20">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-700 dark:text-green-300 font-bold text-xs">
+                                            {u.profilePicture ? (
+                                                <img src={u.profilePicture} alt={u.name} className="w-full h-full rounded-full object-cover" />
+                                            ) : (
+                                                u.name.charAt(0)
+                                            )}
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-sm">{u.name}</p>
+                                            <p className="text-xs text-muted-foreground">{u.role}</p>
+                                        </div>
+                                    </div>
+                                    <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+                                        Free
+                                    </Badge>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="text-muted-foreground text-sm italic">Everyone is currently busy!</p>
+                        )}
+                    </div>
+                </Card>
+
+                {/* Busy Members */}
+                <Card className="p-6 border-l-4 border-l-orange-500">
+                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <span>🔴</span> Busy Team Members
+                    </h2>
+                    <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                        {teamWorkload.filter((u: any) => u.activeProjects.length > 0).length > 0 ? (
+                            teamWorkload.filter((u: any) => u.activeProjects.length > 0).map((u: any) => (
+                                <div key={u.id} className="p-3 bg-orange-50/5 rounded-lg border border-orange-100/20">
+                                    <div className="flex items-center justify-between mb-3 border-b border-orange-100/20 pb-2">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-700 dark:text-orange-300 font-bold text-xs">
+                                                {u.profilePicture ? (
+                                                    <img src={u.profilePicture} alt={u.name} className="w-full h-full rounded-full object-cover" />
+                                                ) : (
+                                                    u.name.charAt(0)
+                                                )}
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-sm">{u.name}</p>
+                                                <p className="text-[10px] text-muted-foreground uppercase tracking-tight">
+                                                    {u.activeProjects.length} Active Project{u.activeProjects.length !== 1 ? 's' : ''}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3 ml-2">
+                                        {u.activeProjects.map((p: any) => (
+                                            <div key={p.id} className="flex flex-col gap-2 p-2 bg-muted/20 rounded-md">
+                                                <div className="flex justify-between items-center">
+                                                    <Link href={`/projects?id=${p.id}`} className="text-xs font-semibold text-primary hover:underline truncate flex-1">
+                                                        {p.name}
+                                                    </Link>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">Status:</span>
+                                                    <Select
+                                                        defaultValue={p.status}
+                                                        onValueChange={(value) => handleStatusChange(p.id, value)}
+                                                    >
+                                                        <SelectTrigger className="h-7 text-[10px] bg-background">
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {projectStatuses.map((status) => (
+                                                                <SelectItem key={status.value} value={status.value} className="text-[10px]">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className={`w-1.5 h-1.5 rounded-full ${status.color}`} />
+                                                                        {status.label}
+                                                                    </div>
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="text-muted-foreground text-sm italic">No one is currently working on active projects.</p>
+                        )}
+                    </div>
+                </Card>
+            </div>
+
+            {/* Pending Access Requests */}
+            {pendingAccessProjects.length > 0 && (
+                <Card className="p-6 border-red-200 bg-red-50/10">
+                    <h2 className="text-xl font-semibold mb-4 text-red-700">⚠️ Pending Access Requests</h2>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {pendingAccessProjects.map((p: any) => {
+                            const pendingCount = Number(p.pendingAccessCount || 0);
+                            return (
+                                <Link key={p.id} href={`/projects?id=${p.id}`} className="block">
+                                    <div className="border border-red-200 rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+                                        <h3 className="font-semibold">{p.name}</h3>
+                                        <p className="text-sm text-red-600 mb-2">{pendingCount} request{pendingCount > 1 ? 's' : ''} pending</p>
+                                        <div className="text-xs text-primary font-medium flex items-center justify-end">
+                                            View Details →
+                                        </div>
+                                    </div>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </Card>
+            )}
+
+            {/* Recent Activity */}
+            <Card className="p-6">
+                <h2 className="text-xl font-semibold mb-4">Recent Tasks</h2>
+                <div className="space-y-3">
+                    {recentTasks.length > 0 ? (
+                        recentTasks.map((task: any) => (
+                            <Link key={task.id} href="/tasks" className="block group">
+                                <div
+                                    className="flex items-center justify-between p-3 bg-muted/50 rounded-lg group-hover:bg-muted transition-colors cursor-pointer"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div
+                                            className={`w-2 h-2 rounded-full ${task.status === 'done'
+                                                ? 'bg-green-500'
+                                                : task.status === 'in_progress'
+                                                    ? 'bg-yellow-500'
+                                                    : task.status === 'blocked'
+                                                        ? 'bg-red-500'
+                                                        : 'bg-gray-500'
+                                                }`}
+                                        />
+                                        <div>
+                                            <p className="font-medium">{task.title}</p>
+                                            <p className="text-xs text-muted-foreground group-hover:text-primary transition-colors">
+                                                {task.status?.replace('_', ' ')} • {task.priority} priority
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {task.dueDate && (
+                                        <span className="text-xs text-muted-foreground" suppressHydrationWarning>
+                                            {new Date(task.dueDate).toLocaleDateString()}
+                                        </span>
+                                    )}
+                                </div>
+                            </Link>
+                        ))
+                    ) : (
+                        <p className="text-center text-muted-foreground py-8">
+                            No tasks yet. Create your first task to get started!
+                        </p>
+                    )}
+                </div>
+            </Card>
+
             {/* Upcoming Milestones */}
             <Card className="p-6">
                 <div className="flex justify-between items-center mb-6">
@@ -287,149 +456,6 @@ function DashboardContent() {
                         <div className="col-span-full py-12 text-center text-muted-foreground">
                             No upcoming milestones found.
                         </div>
-                    )}
-                </div>
-            </Card>
-
-
-            {/* Pending Access Requests */}
-            {pendingAccessProjects.length > 0 && (
-                <Card className="p-6 border-red-200 bg-red-50/10">
-                    <h2 className="text-xl font-semibold mb-4 text-red-700">⚠️ Pending Access Requests</h2>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        {pendingAccessProjects.map((p: any) => {
-                            const pendingCount = Number(p.pendingAccessCount || 0);
-                            return (
-                                <Link key={p.id} href={`/projects?id=${p.id}`} className="block">
-                                    <div className="border border-red-200 rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                                        <h3 className="font-semibold">{p.name}</h3>
-                                        <p className="text-sm text-red-600 mb-2">{pendingCount} request{pendingCount > 1 ? 's' : ''} pending</p>
-                                        <div className="text-xs text-primary font-medium flex items-center justify-end">
-                                            View Details →
-                                        </div>
-                                    </div>
-                                </Link>
-                            );
-                        })}
-                    </div>
-                </Card>
-            )}
-
-            {/* Team Availability */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Available Members */}
-                <Card className="p-6 border-l-4 border-l-green-500">
-                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                        <span>🟢</span> Available Team Members
-                    </h2>
-                    <div className="space-y-3">
-                        {teamWorkload.filter((u: any) => u.activeProjects.length === 0).length > 0 ? (
-                            teamWorkload.filter((u: any) => u.activeProjects.length === 0).map((u: any) => (
-                                <div key={u.id} className="flex items-center justify-between p-3 bg-green-50/10 rounded-lg border border-green-100/20">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-700 dark:text-green-300 font-bold text-xs">
-                                            {u.profilePicture ? (
-                                                <img src={u.profilePicture} alt={u.name} className="w-full h-full rounded-full object-cover" />
-                                            ) : (
-                                                u.name.charAt(0)
-                                            )}
-                                        </div>
-                                        <div>
-                                            <p className="font-medium text-sm">{u.name}</p>
-                                            <p className="text-xs text-muted-foreground">{u.role}</p>
-                                        </div>
-                                    </div>
-                                    <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                                        Free
-                                    </Badge>
-                                </div>
-                            ))
-                        ) : (
-                            <p className="text-muted-foreground text-sm italic">Everyone is currently busy!</p>
-                        )}
-                    </div>
-                </Card>
-
-                {/* Busy Members */}
-                <Card className="p-6 border-l-4 border-l-orange-500">
-                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                        <span>🔴</span> Busy Team Members
-                    </h2>
-                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                        {teamWorkload.filter((u: any) => u.activeProjects.length > 0).length > 0 ? (
-                            teamWorkload.filter((u: any) => u.activeProjects.length > 0).map((u: any) => (
-                                <div key={u.id} className="p-3 bg-orange-50/5 rounded-lg border border-orange-100/20">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-700 dark:text-orange-300 font-bold text-xs">
-                                                {u.profilePicture ? (
-                                                    <img src={u.profilePicture} alt={u.name} className="w-full h-full rounded-full object-cover" />
-                                                ) : (
-                                                    u.name.charAt(0)
-                                                )}
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-sm">{u.name}</p>
-                                                <p className="text-xs text-muted-foreground">{u.activeProjects.length} Active Project{u.activeProjects.length !== 1 ? 's' : ''}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1 ml-11">
-                                        {u.activeProjects.map((p: any) => (
-                                            <Link key={p.id} href={`/projects?id=${p.id}`} className="block text-xs text-primary hover:underline truncate">
-                                                • {p.name}
-                                            </Link>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            <p className="text-muted-foreground text-sm italic">No one is currently working on active projects.</p>
-                        )}
-                    </div>
-                </Card>
-            </div>
-
-            {/* Recent Activity */}
-            <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4">Recent Tasks</h2>
-                <div className="space-y-3">
-                    {recentTasks.length > 0 ? (
-                        recentTasks.map((task: any) => (
-                            <Link key={task.id} href="/tasks" className="block group">
-                                <div
-                                    className="flex items-center justify-between p-3 bg-muted/50 rounded-lg group-hover:bg-muted transition-colors cursor-pointer"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div
-                                            className={`w-2 h-2 rounded-full ${task.status === 'done'
-                                                ? 'bg-green-500'
-                                                : task.status === 'in_progress'
-                                                    ? 'bg-yellow-500'
-                                                    : task.status === 'blocked'
-                                                        ? 'bg-red-500'
-                                                        : 'bg-gray-500'
-                                                }`}
-                                        />
-                                        <div>
-                                            <p className="font-medium">{task.title}</p>
-                                            <p className="text-xs text-muted-foreground group-hover:text-primary transition-colors">
-                                                {task.status?.replace('_', ' ')} • {task.priority} priority
-                                            </p>
-                                        </div>
-                                    </div>
-                                    {task.dueDate && (
-                                        <span className="text-xs text-muted-foreground" suppressHydrationWarning>
-                                            {new Date(task.dueDate).toLocaleDateString()}
-                                        </span>
-                                    )}
-                                </div>
-                            </Link>
-                        ))
-                    ) : (
-                        <p className="text-center text-muted-foreground py-8">
-                            No tasks yet. Create your first task to get started!
-                        </p>
                     )}
                 </div>
             </Card>

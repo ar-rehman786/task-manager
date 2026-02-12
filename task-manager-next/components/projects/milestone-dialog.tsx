@@ -53,7 +53,7 @@ export function MilestoneDialog({ open, onOpenChange, onSubmit, milestone }: Mil
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{milestone ? 'Edit Milestone' : 'Add Milestone'}</DialogTitle>
                 </DialogHeader>
@@ -81,7 +81,7 @@ export function MilestoneDialog({ open, onOpenChange, onSubmit, milestone }: Mil
                     </div>
                     <div className="grid gap-2">
                         <label htmlFor="details" className="text-sm font-medium">Details (Support formatting & images)</label>
-                        <div className="max-h-[250px] overflow-y-auto pr-2 border rounded-md">
+                        <div className="max-h-[600px] overflow-y-auto pr-2 border rounded-md">
                             <RichTextEditor
                                 content={details}
                                 onChange={setDetails}
