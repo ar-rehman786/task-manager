@@ -33,6 +33,10 @@ export function MilestoneDialog({ open, onOpenChange, onSubmit, milestone }: Mil
             setDueDate(milestone.dueDate ? new Date(milestone.dueDate).toISOString().split('T')[0] : "")
             setStatus(milestone.status || "not_started")
             setDetails(milestone.details || "")
+
+            if (milestone.details && milestone.details.length > 200000) {
+                console.warn(`[SAFETY] Milestone "${milestone.title}" has abnormally large details (${milestone.details.length} chars). Rich editor safety triggered.`);
+            }
         } else {
             setTitle("")
             setDueDate("")

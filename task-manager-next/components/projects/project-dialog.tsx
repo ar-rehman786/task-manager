@@ -66,6 +66,10 @@ export function ProjectDialog({
                 setDescription(project.description || '');
                 setManagerId(project.managerId?.toString() || '');
                 setAssignedUserId(project.assignedUserId?.toString() || '');
+
+                if (project.description && project.description.length > 200000) {
+                    console.warn(`[SAFETY] Project "${project.name}" has abnormally large description (${project.description.length} chars). Rich editor safety triggered.`);
+                }
             } else {
                 // Reset for new project
                 setName('');
