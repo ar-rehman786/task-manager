@@ -1,37 +1,87 @@
-const { Pool } = require('pg');
+// MOCK DATABASE IMPLEMENTATION
+// Used when real database is unavailable to allow frontend development
 
-// Debug connection (Safe logging)
-const dbUrl = process.env.DATABASE_URL;
-if (!dbUrl) {
-  console.error('❌ CRITICAL: DATABASE_URL is undefined or empty!');
+const isMock = !process.env.DATABASE_URL || process.env.DATABASE_URL.includes('dummy');
+
+let pool;
+let query;
+let initializeDatabase;
+
+if (isMock) {
+  console.log('⚠️ RUNNING IN MOCK DATABASE MODE');
+  
+  pool = {
+    on: () => {},
+    connect: () => Promise.resolve({
+      query: () => Promise.resolve({ rows: [] }),
+      release: () => {}
+    }),
+    query: (text, params) => {
+      console.log(`[MOCK DB] Query: ${text.substring(0, 50)}...`);
+      return Promise.resolve({ rows: [] });
+    }
+  };
+
+  query = (text, params) => {
+    // Return mock admin user for user queries
+    if (text.includes('FROM users') && (text.includes('WHERE email') || text.includes('WHERE id'))) {
+        return Promise.resolve({
+            rows: [{
+                id: 1,
+                name: 'Demo Admin',
+                email: 'admin@sloraai.com',
+                password: '$2a$10$MockPasswordHashForAdmin123', // Mock hash
+                role: 'admin',
+                active: 1
+            }]
+        });
+    }
+    console.log(`[MOCK DB] Query: ${text.substring(0, 50)}...`);
+    return Promise.resolve({ rows: [] });
+  };
+
+  initializeDatabase = async () => {
+    console.log('✅ Mock Database "initialized"');
+  };
+
 } else {
-  console.log(`ℹ️ DATABASE_URL detected. Length: ${dbUrl.length}`);
-  console.log(`ℹ️ Starts with: ${dbUrl.substring(0, 15)}...`);
-}
+  // REAL DATABASE IMPLEMENTATION
+  const { Pool } = require('pg');
+  
+  // Debug connection (Safe logging)
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    console.error('❌ CRITICAL: DATABASE_URL is undefined or empty!');
+  } else {
+    console.log(`ℹ️ DATABASE_URL detected. Length: ${dbUrl.length}`);
+    console.log(`ℹ️ Starts with: ${dbUrl.substring(0, 15)}...`);
+  }
 
-// Create a new pool using the connection string (from environment variable)
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  },
-  connectionTimeoutMillis: 5000 // 5 seconds timeout
-});
+  // Create a new pool using the connection string (from environment variable)
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false
+    },
+    connectionTimeoutMillis: 5000 // 5 seconds timeout
+  });
 
-pool.on('error', (err, client) => {
-  console.error('❌ Unexpected error on idle client', err);
-  process.exit(-1);
-});
+  pool.on('error', (err, client) => {
+    console.error('❌ Unexpected error on idle client', err);
+    process.exit(-1);
+  });
 
-// Initialize database schema
-async function initializeDatabase() {
-  const client = await pool.connect();
-  try {
-    console.log('🔄 Initializing database schema...');
+  query = (text, params) => pool.query(text, params);
 
-    await client.query('BEGIN');
+  // Initialize database schema
+  initializeDatabase = async () => {
+    const client = await pool.connect();
+    try {
+      console.log('🔄 Initializing database schema...');
 
-    // Users table
+      await client.query('BEGIN');
+
+     // Users table
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -306,19 +356,17 @@ async function initializeDatabase() {
       $$;
     `);
 
-    await client.query('COMMIT');
-    console.log('✅ Database initialized successfully');
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('❌ Database initialization failed:', error);
-    throw error;
-  } finally {
-    client.release();
-  }
+      await client.query('COMMIT');
+      console.log('✅ Database initialized successfully');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ Database initialization failed:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  };
 }
-
-// Helper query function
-const query = (text, params) => pool.query(text, params);
 
 module.exports = {
   query,
