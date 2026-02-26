@@ -18,7 +18,7 @@ const next = require("next");
 
 console.log("🔹 SERVER.JS: Next.js module loaded");
 
-const dev = false; // Forced false to bypass Turbopack issues in dev mode
+const dev = true; // Enabled for real frontend development (HMR)
 let nextApp;
 try {
   console.log("🔹 SERVER.JS: Initializing Next.js app...");
