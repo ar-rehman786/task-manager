@@ -2315,13 +2315,15 @@ app.get("/api/attendance/totals", requireAdmin, async (req, res) => {
     const result = await query(`
       WITH AdjustedAttendance AS (
           SELECT 
-              "workDuration",
+              CASE 
+                WHEN status = 'active' THEN EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - "clockInTime")) / 60
+                ELSE "workDuration" 
+              END as duration,
               (CASE 
                   WHEN EXTRACT(HOUR FROM "clockInTime") >= 12 THEN CAST("clockInTime" AS DATE)
                   ELSE CAST("clockInTime" - INTERVAL '1 day' AS DATE)
               END) as shift_date
           FROM attendance
-          WHERE status = 'completed'
       ),
       CurrentShift AS (
           SELECT CASE 
@@ -2330,9 +2332,9 @@ app.get("/api/attendance/totals", requireAdmin, async (req, res) => {
           END as today_date
       )
       SELECT 
-          COALESCE(SUM(CASE WHEN shift_date = (SELECT today_date FROM CurrentShift) THEN "workDuration" ELSE 0 END) / 60.0, 0) as today,
-          COALESCE(SUM(CASE WHEN shift_date >= date_trunc('week', (SELECT today_date FROM CurrentShift)) THEN "workDuration" ELSE 0 END) / 60.0, 0) as week,
-          COALESCE(SUM(CASE WHEN shift_date >= date_trunc('month', (SELECT today_date FROM CurrentShift)) THEN "workDuration" ELSE 0 END) / 60.0, 0) as month
+          COALESCE(SUM(CASE WHEN shift_date = (SELECT today_date FROM CurrentShift) THEN duration ELSE 0 END) / 60.0, 0) as today,
+          COALESCE(SUM(CASE WHEN shift_date >= date_trunc('week', (SELECT today_date FROM CurrentShift)) THEN duration ELSE 0 END) / 60.0, 0) as week,
+          COALESCE(SUM(CASE WHEN shift_date >= date_trunc('month', (SELECT today_date FROM CurrentShift)) THEN duration ELSE 0 END) / 60.0, 0) as month
       FROM AdjustedAttendance
     `);
     res.json(result.rows[0]);
@@ -2349,13 +2351,16 @@ app.get("/api/attendance/employee-totals", requireAdmin, async (req, res) => {
           SELECT 
               a.*,
               u.name as "userName",
+              CASE 
+                WHEN a.status = 'active' THEN EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - a."clockInTime")) / 60
+                ELSE a."workDuration" 
+              END as duration,
               (CASE 
                   WHEN EXTRACT(HOUR FROM a."clockInTime") >= 12 THEN CAST(a."clockInTime" AS DATE)
                   ELSE CAST(a."clockInTime" - INTERVAL '1 day' AS DATE)
               END) as shift_date
           FROM attendance a
           JOIN users u ON a."userId" = u.id
-          WHERE a.status = 'completed'
       ),
       CurrentShift AS (
           SELECT CASE 
@@ -2365,8 +2370,8 @@ app.get("/api/attendance/employee-totals", requireAdmin, async (req, res) => {
       )
       SELECT 
           "userName",
-          COALESCE(SUM(CASE WHEN shift_date >= date_trunc('month', (SELECT today_date FROM CurrentShift)) THEN "workDuration" ELSE 0 END) / 60.0, 0) as "monthHours",
-          COALESCE(SUM(CASE WHEN shift_date >= date_trunc('week', (SELECT today_date FROM CurrentShift)) THEN "workDuration" ELSE 0 END) / 60.0, 0) as "weekHours"
+          COALESCE(SUM(CASE WHEN shift_date >= date_trunc('month', (SELECT today_date FROM CurrentShift)) THEN duration ELSE 0 END) / 60.0, 0) as "monthHours",
+          COALESCE(SUM(CASE WHEN shift_date >= date_trunc('week', (SELECT today_date FROM CurrentShift)) THEN duration ELSE 0 END) / 60.0, 0) as "weekHours"
       FROM AdjustedAttendance
       GROUP BY "userName"
       ORDER BY "monthHours" DESC
@@ -2385,13 +2390,16 @@ app.get("/api/attendance/client-totals", requireAdmin, async (req, res) => {
           SELECT 
               a.*,
               c.name as "clientName",
+              CASE 
+                WHEN a.status = 'active' THEN EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - a."clockInTime")) / 60
+                ELSE a."workDuration" 
+              END as duration,
               (CASE 
                   WHEN EXTRACT(HOUR FROM a."clockInTime") >= 12 THEN CAST(a."clockInTime" AS DATE)
                   ELSE CAST(a."clockInTime" - INTERVAL '1 day' AS DATE)
               END) as shift_date
           FROM attendance a
           JOIN clients c ON a."clientId" = c.id
-          WHERE a.status = 'completed'
       ),
       CurrentShift AS (
           SELECT CASE 
@@ -2401,8 +2409,8 @@ app.get("/api/attendance/client-totals", requireAdmin, async (req, res) => {
       )
       SELECT 
           "clientName",
-          COALESCE(SUM(CASE WHEN shift_date >= date_trunc('month', (SELECT today_date FROM CurrentShift)) THEN "workDuration" ELSE 0 END) / 60.0, 0) as "monthHours",
-          COALESCE(SUM(CASE WHEN shift_date >= date_trunc('week', (SELECT today_date FROM CurrentShift)) THEN "workDuration" ELSE 0 END) / 60.0, 0) as "weekHours"
+          COALESCE(SUM(CASE WHEN shift_date >= date_trunc('month', (SELECT today_date FROM CurrentShift)) THEN duration ELSE 0 END) / 60.0, 0) as "monthHours",
+          COALESCE(SUM(CASE WHEN shift_date >= date_trunc('week', (SELECT today_date FROM CurrentShift)) THEN duration ELSE 0 END) / 60.0, 0) as "weekHours"
       FROM AdjustedAttendance
       GROUP BY "clientName"
       ORDER BY "monthHours" DESC
@@ -2431,9 +2439,10 @@ app.get("/api/attendance/admin/history", requireAdmin, async (req, res) => {
       // Super Admin sees all
       result = await query(
         `
-                SELECT a.*, u.name as "userName", u.email as "userEmail"
+                SELECT a.*, u.name as "userName", u.email as "userEmail", c.name as "clientName"
                 FROM attendance a
                 JOIN users u ON a."userId" = u.id
+                LEFT JOIN clients c ON a."clientId" = c.id
                 ORDER BY a."clockInTime" DESC
                 LIMIT $1
             `,
@@ -2443,9 +2452,10 @@ app.get("/api/attendance/admin/history", requireAdmin, async (req, res) => {
       // Regular Admin sees members only
       result = await query(
         `
-                SELECT a.*, u.name as "userName", u.email as "userEmail"
+                SELECT a.*, u.name as "userName", u.email as "userEmail", c.name as "clientName"
                 FROM attendance a
                 JOIN users u ON a."userId" = u.id
+                LEFT JOIN clients c ON a."clientId" = c.id
                 WHERE u.role = 'member'
                 ORDER BY a."clockInTime" DESC
                 LIMIT $1
