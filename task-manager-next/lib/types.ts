@@ -14,6 +14,9 @@ export interface User {
     managerName?: string;
     active?: number;
     isWorking?: boolean;
+    isBusy?: boolean;
+    isAvailable?: boolean;
+    activeTaskCount?: number;
     createdAt?: string;
 }
 
@@ -66,7 +69,7 @@ export interface Project {
     name: string;
     client?: string;
     description?: string;
-    status: 'active' | 'paused' | 'closed' | 'waiting_for_client_response' | 'on_hold' | 'completed';
+    status: 'active' | 'paused' | 'closed' | 'waiting_for_client_response' | 'on_hold' | 'completed' | 'archived';
     startDate?: string;
     endDate?: string;
     budget?: number;
@@ -141,6 +144,16 @@ export interface Notification {
     read: boolean;
     relatedTaskId?: number;
     data?: any;
+    createdAt: string;
+}
+
+export interface ChatMessage {
+    id: number;
+    userId: number;
+    userName: string;
+    profilePicture?: string;
+    content: string;
+    readBy: number[];
     createdAt: string;
 }
 

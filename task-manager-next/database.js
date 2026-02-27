@@ -112,6 +112,13 @@ if (isMock) {
       WITH (OIDS=FALSE);
 
       CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
+
+      -- Clients table for attendance tracking
+      CREATE TABLE IF NOT EXISTS clients (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     // Boards table
@@ -160,7 +167,7 @@ if (isMock) {
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         client TEXT,
-        status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'on_hold', 'completed')),
+        status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'on_hold', 'completed', 'archived')),
         "startDate" DATE,
         "endDate" DATE,
         description TEXT,
@@ -227,6 +234,7 @@ if (isMock) {
       CREATE TABLE IF NOT EXISTS attendance (
         id SERIAL PRIMARY KEY,
         "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        "clientId" INTEGER REFERENCES clients(id) ON DELETE SET NULL,
         "clockInTime" TIMESTAMP NOT NULL,
         "clockOutTime" TIMESTAMP,
         "workDuration" INTEGER,
@@ -275,6 +283,17 @@ if (isMock) {
       );
     `);
 
+    // Team chat messages table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id SERIAL PRIMARY KEY,
+        "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        "readBy" JSONB NOT NULL DEFAULT '[]',
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Indexes
     await client.query('CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks("assignedUserId")');
     await client.query('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)');
@@ -290,6 +309,8 @@ if (isMock) {
     await client.query('CREATE INDEX IF NOT EXISTS idx_project_access_project ON project_access_items("projectId")');
     await client.query('CREATE INDEX IF NOT EXISTS idx_ideation_project ON ideation_boards("projectId")');
     await client.query('CREATE INDEX IF NOT EXISTS idx_ideation_user ON ideation_boards("userId")');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_chat_messages_created ON chat_messages("createdAt")');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_chat_messages_user ON chat_messages("userId")');
 
     // Schema Updates (Safe to run multiple times)
     // Add projectId and milestoneId to tasks
@@ -333,7 +354,7 @@ if (isMock) {
         -- Drop old constraint if exists
         ALTER TABLE projects DROP CONSTRAINT IF EXISTS projects_status_check;
         -- Add new one with more statuses
-        ALTER TABLE projects ADD CONSTRAINT projects_status_check CHECK (status IN ('active', 'paused', 'closed', 'waiting_for_client_response', 'on_hold', 'completed'));
+        ALTER TABLE projects ADD CONSTRAINT projects_status_check CHECK (status IN ('active', 'paused', 'closed', 'waiting_for_client_response', 'on_hold', 'completed', 'archived'));
       END
       $$;
     `);
@@ -351,6 +372,16 @@ if (isMock) {
           ALTER TABLE users ADD COLUMN "profilePicture" TEXT;
           ALTER TABLE users ADD COLUMN "coverImage" TEXT;
           ALTER TABLE users ADD COLUMN "managerId" INTEGER REFERENCES users(id) ON DELETE SET NULL;
+        END IF;
+
+        -- Ensure attendance table has clientId (migration)
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='attendance' AND column_name='clientId') THEN
+          ALTER TABLE attendance ADD COLUMN "clientId" INTEGER REFERENCES clients(id) ON DELETE SET NULL;
+        END IF;
+
+        -- Seed initial clients if empty
+        IF (SELECT count(*) FROM clients) = 0 THEN
+          INSERT INTO clients (name) VALUES ('Internal Work'), ('Client Alpha'), ('Project X'), ('Global Solutions');
         END IF;
       END
       $$;

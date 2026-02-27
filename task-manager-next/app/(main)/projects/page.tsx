@@ -18,7 +18,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Edit3 } from 'lucide-react';
+import { Edit3, Calendar, User2, Building, FolderKanban, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import React from 'react';
 
 const safeFormatDate = (dateStr: string | undefined | null) => {
@@ -42,6 +43,7 @@ function ProjectsContent() {
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingProject, setEditingProject] = useState<Project | null>(null);
+    const [isArchiveExpanded, setIsArchiveExpanded] = useState(false);
 
     const { data: projects = [], isLoading } = useQuery({
         queryKey: ['projects'],
@@ -67,6 +69,15 @@ function ProjectsContent() {
                 // Re-fetching list handles the list view.
                 setSelectedProject(null); // Go back to list to see changes
             }
+        },
+    });
+
+    const archiveMutation = useMutation({
+        mutationFn: projectsApi.deleteProject, // This is now an archive operation on the backend
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['projects'] });
+            setSelectedProject(null);
+            toast.success('Project archived successfully');
         },
     });
 
@@ -104,68 +115,160 @@ function ProjectsContent() {
                     onBack={() => setSelectedProject(null)}
                     onEdit={() => handleEditProject(selectedProject)}
                     isAdmin={user?.role === 'admin'}
+                    onArchive={() => archiveMutation.mutate(selectedProject.id)}
                 />
             ) : (
-                <div className="p-6 space-y-6">
+                <div className="p-4 space-y-4">
                     <div className="flex justify-between items-center">
-                        <h1 className="text-3xl font-bold">Projects</h1>
+                        <h1 className="text-xl font-bold">Projects</h1>
                         {user?.role === 'admin' && (
                             <Button onClick={handleCreateProject}>+ New Project</Button>
                         )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {projects.map((project) => (
-                            <Card
-                                key={project.id}
-                                className="p-6 cursor-pointer hover:shadow-lg transition-shadow"
-                                onClick={() => setSelectedProject(project)}
-                            >
-                                <div className="flex justify-between items-start mb-4">
-                                    <h3 className="text-xl font-semibold">{project.name}</h3>
-                                    <Badge variant={project.status === 'active' ? 'default' : 'secondary'}>
-                                        {project.status?.replace('_', ' ')}
-                                    </Badge>
-                                </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {projects.filter(p => p.status !== 'archived').map((project) => {
+                            const statusConfig: Record<string, { color: string; dot: string; bg: string }> = {
+                                active: { color: 'text-emerald-600', dot: 'bg-emerald-500', bg: 'bg-emerald-500' },
+                                paused: { color: 'text-amber-600', dot: 'bg-amber-500', bg: 'bg-amber-500' },
+                                on_hold: { color: 'text-amber-600', dot: 'bg-amber-500', bg: 'bg-amber-500' },
+                                completed: { color: 'text-blue-600', dot: 'bg-blue-500', bg: 'bg-blue-500' },
+                                waiting_for_client_response: { color: 'text-purple-600', dot: 'bg-purple-500', bg: 'bg-purple-500' },
+                                closed: { color: 'text-slate-500', dot: 'bg-slate-400', bg: 'bg-slate-400' },
+                            };
+                            const sc = statusConfig[project.status || ''] || { color: 'text-primary', dot: 'bg-primary', bg: 'bg-primary' };
+                            const initials = project.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
+                            const pendingCount = Number(project.pendingAccessCount || 0);
 
-                                {project.client && (
-                                    <p className="text-sm text-muted-foreground mb-2">Client: {project.client}</p>
-                                )}
+                            return (
+                                <div
+                                    key={project.id}
+                                    onClick={() => setSelectedProject(project)}
+                                    className="group relative bg-card border border-border rounded-xl overflow-hidden cursor-pointer hover:shadow-lg hover:shadow-black/5 hover:-translate-y-0.5 transition-all duration-200"
+                                >
+                                    {/* Colored top accent bar */}
+                                    <div className={`h-1 w-full ${sc.bg}`} />
 
-                                {project.description && (
-                                    <div
-                                        className="text-sm text-muted-foreground mb-4 line-clamp-2 prose prose-sm dark:prose-invert max-w-none"
-                                        dangerouslySetInnerHTML={{ __html: project.description.substring(0, 200) }}
-                                    />
-                                )}
-
-                                <div className="space-y-1 mb-4">
-                                    {project.managerName && (
-                                        <p className="text-xs text-muted-foreground">Manager: <span className="font-medium text-foreground">{project.managerName}</span></p>
-                                    )}
-                                    {project.assignedUserName && (
-                                        <p className="text-xs text-muted-foreground">Assigned: <span className="font-medium text-foreground">{project.assignedUserName}</span></p>
-                                    )}
-                                </div>
-
-                                {(() => {
-                                    const pendingCount = Number(project.pendingAccessCount || 0);
-                                    return pendingCount > 0 && (
-                                        <div className="mb-4">
-                                            <Badge variant="destructive" className="w-full justify-center py-1">
-                                                {pendingCount} Pending Access Request{pendingCount > 1 ? 's' : ''}
-                                            </Badge>
+                                    <div className="p-5">
+                                        {/* Header row */}
+                                        <div className="flex items-start gap-3 mb-3">
+                                            {/* Project avatar */}
+                                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold text-white flex-shrink-0 ${sc.bg}`}>
+                                                {initials}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="font-semibold text-foreground text-[15px] leading-snug truncate group-hover:text-primary transition-colors">{project.name}</h3>
+                                                {project.client && (
+                                                    <div className="flex items-center gap-1 mt-0.5">
+                                                        <Building className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                                                        <span className="text-xs text-muted-foreground truncate">{project.client}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {/* Status badge */}
+                                            <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border flex-shrink-0 ${sc.color} border-current/20 bg-current/5`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
+                                                {(project.status || 'active').replace(/_/g, ' ')}
+                                            </span>
                                         </div>
-                                    );
-                                })()}
 
-                                <div className="flex justify-between text-xs text-muted-foreground">
-                                    <span suppressHydrationWarning>Start: {project.startDate ? new Date(project.startDate).toLocaleDateString() : 'N/A'}</span>
-                                    <span suppressHydrationWarning>End: {project.endDate ? new Date(project.endDate).toLocaleDateString() : 'N/A'}</span>
+                                        {/* Description */}
+                                        {project.description && (
+                                            <div
+                                                className="text-xs text-muted-foreground line-clamp-2 mb-3 prose prose-xs dark:prose-invert max-w-none leading-relaxed"
+                                                dangerouslySetInnerHTML={{ __html: project.description.replace(/<[^>]*>/g, ' ').slice(0, 120) }}
+                                            />
+                                        )}
+
+                                        {/* Team row */}
+                                        {(project.managerName || project.assignedUserName) && (
+                                            <div className="flex items-center gap-3 mb-3 py-2.5 px-3 bg-muted/40 rounded-lg">
+                                                {project.managerName && (
+                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                        <div className="w-5 h-5 rounded-full bg-violet-500 flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0">
+                                                            {project.managerName.charAt(0)}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="text-[9px] text-muted-foreground leading-none">Manager</p>
+                                                            <p className="text-[11px] font-medium text-foreground truncate">{project.managerName}</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {project.managerName && project.assignedUserName && (
+                                                    <div className="w-px h-6 bg-border flex-shrink-0" />
+                                                )}
+                                                {project.assignedUserName && (
+                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                        <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0">
+                                                            {project.assignedUserName.charAt(0)}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="text-[9px] text-muted-foreground leading-none">Assigned</p>
+                                                            <p className="text-[11px] font-medium text-foreground truncate">{project.assignedUserName}</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Pending access warning */}
+                                        {pendingCount > 0 && (
+                                            <div className="flex items-center gap-1.5 text-amber-600 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg px-2.5 py-1.5 mb-3">
+                                                <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                                                <span className="text-[11px] font-medium">{pendingCount} pending access request{pendingCount > 1 ? 's' : ''}</span>
+                                            </div>
+                                        )}
+
+                                        {/* Date footer */}
+                                        <div className="flex items-center justify-between pt-3 border-t border-border">
+                                            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                                                <Calendar className="w-3 h-3" />
+                                                <span suppressHydrationWarning>{project.startDate ? new Date(project.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : 'No start'}</span>
+                                            </div>
+                                            <span className="text-[10px] text-muted-foreground">→</span>
+                                            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                                                <Calendar className="w-3 h-3" />
+                                                <span suppressHydrationWarning>{project.endDate ? new Date(project.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : 'No end'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                            </Card>
-                        ))}
+                            );
+                        })}
                     </div>
+
+                    {projects.some(p => p.status === 'archived') && (
+                        <div className="pt-8 border-t">
+                            <Button
+                                variant="ghost"
+                                className="w-full flex justify-between items-center text-muted-foreground hover:text-foreground hover:bg-muted/30"
+                                onClick={() => setIsArchiveExpanded(!isArchiveExpanded)}
+                            >
+                                <span className="font-semibold">Archived Projects ({projects.filter(p => p.status === 'archived').length})</span>
+                                <span>{isArchiveExpanded ? 'Hide' : 'Show'}</span>
+                            </Button>
+
+                            {isArchiveExpanded && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
+                                    {projects.filter(p => p.status === 'archived').map((project) => (
+                                        <Card
+                                            key={project.id}
+                                            className="p-6 cursor-pointer hover:shadow-lg transition-shadow opacity-70 grayscale-[0.5]"
+                                            onClick={() => setSelectedProject(project)}
+                                        >
+                                            <div className="flex justify-between items-start mb-4">
+                                                <h3 className="text-xl font-semibold">{project.name}</h3>
+                                                <Badge variant="outline" className="uppercase text-[10px]">Archived</Badge>
+                                            </div>
+                                            <div className="flex justify-between text-xs text-muted-foreground mt-auto pt-4 border-t">
+                                                <span>Client: {project.client || 'N/A'}</span>
+                                            </div>
+                                        </Card>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {projects.length === 0 && (
                         <div className="text-center py-12">
@@ -190,11 +293,13 @@ function ProjectDetail({
     onBack,
     onEdit,
     isAdmin,
+    onArchive,
 }: {
     project: Project;
     onBack: () => void;
     onEdit: () => void;
     isAdmin: boolean;
+    onArchive: () => void;
 }) {
     const queryClient = useQueryClient();
     const [isMilestoneDialogOpen, setIsMilestoneDialogOpen] = useState(false);
@@ -355,7 +460,22 @@ function ProjectDetail({
                 <Button variant="secondary" onClick={onBack}>
                     ← Back to Projects
                 </Button>
-                {isAdmin && <Button onClick={onEdit}>Edit Project</Button>}
+                <div className="flex gap-2">
+                    {isAdmin && project.status !== 'archived' && (
+                        <Button
+                            variant="destructive"
+                            className="bg-red-600 hover:bg-red-700"
+                            onClick={() => {
+                                if (confirm('Are you sure you want to archive this project? It will be moved to the archive section.')) {
+                                    onArchive();
+                                }
+                            }}
+                        >
+                            Archive Project
+                        </Button>
+                    )}
+                    {isAdmin && <Button onClick={onEdit}>Edit Project</Button>}
+                </div>
             </div>
 
             <Card className="p-6">
@@ -644,12 +764,12 @@ function ProjectDetail({
                         <p className="text-muted-foreground text-sm">No activity logs yet.</p>
                     ) : (
                         logs.map((log: ProjectLog) => (
-                            <div key={log.id} className="flex gap-3 text-sm">
-                                <div className="text-muted-foreground whitespace-nowrap w-32" suppressHydrationWarning>
+                            <div key={log.id} className="flex gap-4 py-2 text-sm border-b last:border-0 border-muted/30">
+                                <div className="text-muted-foreground whitespace-nowrap min-w-[180px] flex-none italic" suppressHydrationWarning>
                                     {new Date(log.createdAt).toLocaleString()}
                                 </div>
-                                <div>
-                                    <span className="font-medium text-foreground">{log.userName || 'System'}: </span>
+                                <div className="flex-1">
+                                    <span className="font-bold text-foreground">{log.userName || 'System'}: </span>
                                     <span className="text-muted-foreground">{log.message}</span>
                                 </div>
                             </div>

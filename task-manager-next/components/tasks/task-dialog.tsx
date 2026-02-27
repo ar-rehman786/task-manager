@@ -22,9 +22,10 @@ interface TaskDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onSubmit: (data: Partial<Task>) => void;
+    userRole?: string;
 }
 
-export function TaskDialog({ task, open, onOpenChange, onSubmit }: TaskDialogProps) {
+export function TaskDialog({ task, open, onOpenChange, onSubmit, userRole }: TaskDialogProps) {
     const [formData, setFormData] = useState<Partial<Task>>({
         title: '',
         description: '',
@@ -79,11 +80,15 @@ export function TaskDialog({ task, open, onOpenChange, onSubmit }: TaskDialogPro
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
-                    <DialogTitle>{task ? 'Edit Task' : 'Add New Task'}</DialogTitle>
+            <DialogContent className="max-w-[min(900px,calc(100vw-40px))] max-h-[calc(100vh-32px)] w-full flex flex-col p-0 overflow-hidden border-none shadow-2xl">
+                <DialogHeader className="p-4 lg:p-6 pb-2 border-b flex-none bg-background z-20">
+                    <DialogTitle className="text-xl lg:text-2xl font-bold truncate pr-8">{task ? 'Edit Task' : 'Add New Task'}</DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4 py-4">
+                <form 
+                    onSubmit={handleSubmit} 
+                    className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-6 custom-scrollbar break-words"
+                    style={{ wordBreak: 'break-word' }}
+                >
                     <div className="space-y-2">
                         <Label htmlFor="title">Title</Label>
                         <Input
@@ -102,7 +107,7 @@ export function TaskDialog({ task, open, onOpenChange, onSubmit }: TaskDialogPro
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="status">Status</Label>
                             <select
@@ -154,13 +159,14 @@ export function TaskDialog({ task, open, onOpenChange, onSubmit }: TaskDialogPro
                             <Input
                                 id="dueDate"
                                 type="date"
+                                className="w-full"
                                 value={formData.dueDate}
                                 onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
                             />
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="projectId">Project</Label>
                             <select
@@ -196,15 +202,48 @@ export function TaskDialog({ task, open, onOpenChange, onSubmit }: TaskDialogPro
                         </div>
                     </div>
 
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                            Cancel
-                        </Button>
-                        <Button type="submit">
-                            {task ? 'Update Task' : 'Create Task'}
-                        </Button>
-                    </DialogFooter>
+                    {formData.status === 'done' && (
+                        <div className="space-y-4 pt-6 last:pb-0 border-t border-dashed">
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="workflowLink">Workflow Link <span className="text-muted-foreground text-xs">(Optional)</span></Label>
+                                    <Input
+                                        id="workflowLink"
+                                        placeholder="https://workflow.com/..."
+                                        value={formData.workflowLink || ''}
+                                        onChange={(e) => setFormData({ ...formData, workflowLink: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="workflowStatus">Workflow Status <span className="text-muted-foreground text-xs">(Optional)</span></Label>
+                                    <Input
+                                        id="workflowStatus"
+                                        placeholder="Brief summary of work done"
+                                        value={formData.workflowStatus || ''}
+                                        onChange={(e) => setFormData({ ...formData, workflowStatus: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="loomVideo">Loom Video (Optional)</Label>
+                                <Input
+                                    id="loomVideo"
+                                    placeholder="https://loom.com/..."
+                                    value={formData.loomVideo || ''}
+                                    onChange={(e) => setFormData({ ...formData, loomVideo: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                    )}
                 </form>
+                <DialogFooter className="p-4 lg:p-6 pt-2 border-t bg-muted/20 flex-none z-10">
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                        Cancel
+                    </Button>
+                    <Button type="submit" onClick={() => (document.querySelector('form') as HTMLFormElement)?.requestSubmit()}>
+                        {task ? 'Update Task' : 'Create Task'}
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

@@ -34,6 +34,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
             }),
         ],
         content: isEditing ? content : '',
+        immediatelyRender: false,
         onUpdate: ({ editor }) => {
             onChange(editor.getHTML());
         },
@@ -98,7 +99,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
                 </div>
 
                 <div
-                    className="min-h-[400px] max-h-[600px] overflow-y-auto p-6 border rounded-lg bg-muted/5 prose prose-sm dark:prose-invert max-w-none break-words"
+                    className="min-h-[150px] overflow-y-auto p-6 border rounded-lg bg-muted/5 prose prose-sm dark:prose-invert max-w-none break-words"
                     dangerouslySetInnerHTML={{ __html: content || `<p class="text-muted-foreground italic">${placeholder || 'No description provided.'}</p>` }}
                 />
 
@@ -220,7 +221,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
                 </div>
                 <EditorContent
                     editor={editor}
-                    className="prose prose-sm dark:prose-invert max-w-none p-4 min-h-[400px] max-h-[600px] overflow-y-auto focus:outline-none"
+                    className="prose prose-sm dark:prose-invert max-w-none p-4 min-h-[150px] overflow-y-auto focus:outline-none [&_.ProseMirror]:min-h-[120px] [&_.ProseMirror]:outline-none [&_.ProseMirror]:whitespace-pre-wrap [&_.ProseMirror_p]:my-1"
                 />
             </div>
             <p className="text-[10px] text-muted-foreground italic">

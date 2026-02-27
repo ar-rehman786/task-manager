@@ -17,6 +17,7 @@ import {
     Lightbulb,
     StickyNote,
     Building2,
+    MessageSquare,
 } from 'lucide-react';
 import { useStickyStore } from '@/lib/store/stickyStore';
 
@@ -25,6 +26,7 @@ const navigation = [
     { name: 'Tasks', href: '/tasks', icon: CheckSquare },
     { name: 'Projects', href: '/projects', icon: FolderKanban },
     { name: 'Ideation', href: '/ideation', icon: Lightbulb },
+    { name: 'Chat', href: '/chat', icon: MessageSquare },
     { name: 'Organization', href: '/organization', icon: Building2 },
     { name: 'Team', href: '/team', icon: Users },
     { name: 'Attendance', href: '/attendance', icon: Clock },
@@ -40,28 +42,27 @@ export default function Sidebar() {
         <aside
             className={cn(
                 'bg-card border-r border-border transition-all duration-300 flex flex-col',
-                collapsed ? 'w-16' : 'w-64'
+                collapsed ? 'w-[60px]' : 'w-[228px]'
             )}
         >
             {/* Header */}
-            <div className="p-4 border-b border-border flex items-center justify-between">
+            <div className="px-3 py-3 border-b border-border flex items-center justify-between min-h-[48px]">
                 {!collapsed && (
-                    <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+                    <h1 className="text-[14px] font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent truncate leading-tight">
                         SloraAI Workspace
                     </h1>
                 )}
                 <button
                     onClick={() => setCollapsed(!collapsed)}
-                    className="p-2 hover:bg-accent rounded-md transition-colors"
+                    className="p-1.5 hover:bg-accent rounded-md transition-colors flex-shrink-0 ml-auto"
                 >
-                    {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+                    {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
                 </button>
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 p-4 space-y-1">
+            <nav className="flex-1 px-2.5 py-2.5 space-y-0.5 overflow-y-auto">
                 {navigation.map((item) => {
-                    // Only show team for admins
                     if (item.name === 'Team' && user?.role !== 'admin') return null;
 
                     const isActive = pathname === item.href;
@@ -72,27 +73,27 @@ export default function Sidebar() {
                             key={item.name}
                             href={item.href}
                             className={cn(
-                                'flex items-center gap-3 px-3 py-2 rounded-md transition-colors',
+                                'flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-[13px]',
                                 isActive
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'hover:bg-accent hover:text-accent-foreground'
+                                    ? 'bg-primary text-primary-foreground font-semibold'
+                                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                             )}
                         >
-                            <Icon size={20} />
-                            {!collapsed && <span className="font-medium">{item.name}</span>}
+                            <Icon size={17} className="flex-shrink-0" />
+                            {!collapsed && <span className="font-medium truncate">{item.name}</span>}
                         </Link>
                     );
                 })}
 
-                <div className="pt-4 mt-4 border-t border-border">
+                <div className="pt-2 mt-2 border-t border-border">
                     <button
                         onClick={() => useStickyStore.getState().addSticky()}
                         className={cn(
-                            'flex items-center gap-3 px-3 py-2 rounded-md transition-colors w-full text-left',
+                            'flex items-center gap-3 px-3 py-2 rounded-md transition-colors w-full text-left text-[13px]',
                             'hover:bg-yellow-50 hover:text-yellow-700 text-muted-foreground'
                         )}
                     >
-                        <StickyNote size={20} className="text-yellow-500" />
+                        <StickyNote size={17} className="text-yellow-500 flex-shrink-0" />
                         {!collapsed && <span className="font-medium">New Sticky</span>}
                     </button>
                 </div>

@@ -92,15 +92,26 @@ function TasksContent() {
             // Return a context object with the snapshotted value
             return { previousTasks };
         },
+        onSuccess: (updatedTask) => {
+            // Directly update the cache with the strictly saved version from server
+            queryClient.setQueryData(['tasks'], (old: Task[] | undefined) => {
+                if (!old) return [updatedTask];
+                return old.map((t) => (t.id === updatedTask.id ? updatedTask : t));
+            });
+            toast.success('Task saved successfully');
+        },
         onError: (err, variables, context) => {
             // Roll back to previous state on error
             if (context?.previousTasks) {
                 queryClient.setQueryData(['tasks'], context.previousTasks);
             }
+            toast.error('Failed to save task. Please try again.');
         },
         onSettled: () => {
             // Always refetch to ensure consistency
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            // Refetch users so availability (isBusy/isAvailable) updates live
+            queryClient.invalidateQueries({ queryKey: ['users'] });
             setShowTaskModal(false);
             setSelectedTask(null);
             setShowCompletionModal(false);
@@ -188,23 +199,25 @@ function TasksContent() {
         e.preventDefault();
     };
 
-    const handleDrop = (status: string) => {
-        if (!draggedTaskId) return;
-
-        const task = tasks.find((t) => t.id === draggedTaskId);
+    const handleStatusUpdate = (taskId: number, newStatus: string) => {
+        const task = tasks.find((t) => t.id === taskId);
         if (!task) return;
 
         // Validation for members moving to 'done'
-        if (status === 'done' && task.status !== 'done' && userRole === 'member') {
-            setPendingStatusUpdate({ id: draggedTaskId, status });
+        if (newStatus === 'done' && task.status !== 'done' && userRole === 'member') {
+            setPendingStatusUpdate({ id: taskId, status: newStatus });
             setShowCompletionModal(true);
         } else {
             updateTaskMutation.mutate({
-                id: draggedTaskId,
-                data: { ...task, status: status as any },
+                id: taskId,
+                data: { ...task, status: newStatus as any },
             });
         }
+    };
 
+    const handleDrop = (status: string) => {
+        if (!draggedTaskId) return;
+        handleStatusUpdate(draggedTaskId, status);
         setDraggedTaskId(null);
     };
 
@@ -241,182 +254,253 @@ function TasksContent() {
     }
 
     return (
-        <div className="p-6 space-y-6">
-            {/*  Header */}
-            <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold">Tasks</h1>
-                <Button onClick={() => setShowTaskModal(true)}>+ Quick Add Task</Button>
-            </div>
+        <div className="h-full flex flex-col space-y-4 p-4 lg:p-6 overflow-hidden">
+            {/* Header, Filters, Boards - Fixed Section */}
+            <div className="flex-none space-y-4">
+                {/*  Header */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <h1 className="text-2xl lg:text-3xl font-bold">Tasks</h1>
+                    <Button onClick={() => setShowTaskModal(true)} className="w-full sm:w-auto">+ Quick Add Task</Button>
+                </div>
 
-            {/* Working Now Summary */}
-            <div className="flex flex-wrap gap-2 items-center p-3 bg-muted/20 border rounded-lg">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-2">Working Now:</span>
-                {users.filter(u => u.isWorking).length > 0 ? (
-                    users.filter(u => u.isWorking).map(u => (
-                        <div key={u.id} className="flex items-center gap-1.5 px-2.5 py-1 bg-green-500/10 text-green-700 dark:text-green-400 rounded-full border border-green-200/50 text-[10px] font-bold animate-in fade-in zoom-in duration-300">
-                            <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                            </span>
-                            {u.name}
-                        </div>
-                    ))
-                ) : (
-                    <span className="text-[10px] text-muted-foreground italic">No team members currently clocked in.</span>
-                )}
-            </div>
+                {/* Team Availability */}
+                <div className="flex flex-wrap gap-3 items-start p-3 bg-muted/20 border rounded-lg">
+                    {/* Available Members */}
+                    <div className="flex flex-wrap gap-1.5 items-center">
+                        <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider">✅ Available:</span>
+                        {users.filter(u => u.isAvailable).length > 0 ? (
+                            users.filter(u => u.isAvailable).map(u => (
+                                <div key={u.id} className="flex items-center gap-1.5 px-2.5 py-1 bg-green-500/10 text-green-700 dark:text-green-400 rounded-full border border-green-200/50 text-[10px] font-bold">
+                                    <span className="relative flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                    </span>
+                                    {u.name}
+                                </div>
+                            ))
+                        ) : (
+                            <span className="text-[10px] text-muted-foreground italic">None</span>
+                        )}
+                    </div>
 
-            {/* Filters */}
-            <div className="flex gap-4">
-                <select
-                    className="px-4 py-2 border rounded-lg bg-background font-medium text-sm"
-                    value={filters.assignee}
-                    onChange={(e) => setFilters({ ...filters, assignee: e.target.value })}
-                >
-                    <option value="all">👥 All Members</option>
-                    {users.map((u) => (
-                        <option key={u.id} value={u.id}>
-                            {u.isWorking ? '🟢 ' : '⚪ '}{u.name}
-                        </option>
-                    ))}
-                </select>
+                    <div className="w-px h-4 bg-border self-center" />
 
-                <select
-                    className="px-4 py-2 border rounded-lg bg-background"
-                    value={filters.status}
-                    onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                >
-                    <option value="all">All Statuses</option>
-                    <option value="todo">To Do</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="blocked">Blocked</option>
-                    <option value="done">Done</option>
-                </select>
+                    {/* Busy Members */}
+                    <div className="flex flex-wrap gap-1.5 items-center">
+                        <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">🔴 Busy:</span>
+                        {users.filter(u => u.isBusy).length > 0 ? (
+                            users.filter(u => u.isBusy).map(u => (
+                                <div key={u.id} className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-full border border-amber-200/50 text-[10px] font-bold" title={`${u.activeTaskCount} active task${u.activeTaskCount !== 1 ? 's' : ''}`}>
+                                    <span className="relative flex h-2 w-2">
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                                    </span>
+                                    {u.name}
+                                    <span className="bg-amber-500/20 rounded-full px-1 text-[9px]">{u.activeTaskCount}</span>
+                                </div>
+                            ))
+                        ) : (
+                            <span className="text-[10px] text-muted-foreground italic">None</span>
+                        )}
+                    </div>
+                </div>
 
-                <select
-                    className="px-4 py-2 border rounded-lg bg-background"
-                    value={filters.priority}
-                    onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
-                >
-                    <option value="all">All Priorities</option>
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                </select>
-            </div>
+                {/* Filters */}
+                <div className="flex flex-wrap gap-3">
+                    <select
+                        className="px-4 py-2 border rounded-lg bg-background font-medium text-sm flex-1 sm:flex-none"
+                        value={filters.assignee}
+                        onChange={(e) => setFilters({ ...filters, assignee: e.target.value })}
+                    >
+                        <option value="all">👥 All Members</option>
+                        {users.map((u) => (
+                            <option key={u.id} value={u.id}>
+                                {u.isAvailable ? '🟢 ' : '🔴 '}{u.name}{u.isBusy ? ` (${u.activeTaskCount} tasks)` : ''}
+                            </option>
+                        ))}
+                    </select>
 
-            {/* Board Tabs */}
-            <div className="flex gap-2 border-b overflow-x-auto">
-                <button
-                    className={`px-4 py-2 font-medium transition-colors whitespace-nowrap ${currentBoardId === null
-                        ? 'border-b-2 border-primary text-primary'
-                        : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                    onClick={() => setCurrentBoardId(null)}
-                >
-                    All Tasks
-                </button>
-                {boards.filter(b => b.type !== 'ALL_TASKS').map((board) => (
+                    <select
+                        className="px-4 py-2 border rounded-lg bg-background flex-1 sm:flex-none"
+                        value={filters.status}
+                        onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                    >
+                        <option value="all">All Statuses</option>
+                        <option value="todo">To Do</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="blocked">Blocked</option>
+                        <option value="done">Done</option>
+                    </select>
+
+                    <select
+                        className="px-4 py-2 border rounded-lg bg-background flex-1 sm:flex-none min-w-[120px]"
+                        value={filters.priority}
+                        onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
+                    >
+                        <option value="all">All Priorities</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                </div>
+
+                {/* Board Tabs */}
+                <div className="flex gap-2 border-b overflow-x-auto pb-px">
                     <button
-                        key={board.id}
-                        className={`px-4 py-2 font-medium transition-colors whitespace-nowrap ${currentBoardId === board.id
+                        className={`px-4 py-2 font-medium transition-colors whitespace-nowrap text-sm ${currentBoardId === null
                             ? 'border-b-2 border-primary text-primary'
                             : 'text-muted-foreground hover:text-foreground'
                             }`}
-                        onClick={() => setCurrentBoardId(board.id)}
+                        onClick={() => setCurrentBoardId(null)}
                     >
-                        {board.name}
+                        All Tasks
                     </button>
-                ))}
+                    {boards.filter(b => b.type !== 'ALL_TASKS').map((board) => (
+                        <button
+                            key={board.id}
+                            className={`px-4 py-2 font-medium transition-colors whitespace-nowrap text-sm ${currentBoardId === board.id
+                                ? 'border-b-2 border-primary text-primary'
+                                : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                            onClick={() => setCurrentBoardId(board.id)}
+                        >
+                            {board.name}
+                        </button>
+                    ))}
+                </div>
             </div>
 
-            {/* Kanban Board */}
-            <div className="grid grid-cols-4 gap-4">
-                {columns.map((col) => (
-                    <div
-                        key={col.id}
-                        className="bg-muted/30 rounded-lg p-4 min-h-[600px]"
-                        onDragOver={handleDragOver}
-                        onDrop={() => handleDrop(col.id)}
-                    >
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-semibold" style={{ color: col.color }}>
-                                {col.title}
-                            </h3>
-                            <span className="bg-background rounded-full px-2 py-1 text-xs font-medium">
-                                {tasksByStatus[col.id]?.length || 0}
-                            </span>
-                        </div>
+            {/* Kanban Board - Scrollable columns Section */}
+            <div className="flex-1 min-h-0">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 h-full overflow-y-auto lg:overflow-hidden">
+                    {columns.map((col) => (
+                        <div
+                            key={col.id}
+                            className="bg-muted/30 rounded-lg flex flex-col h-full min-h-[300px] lg:min-h-0"
+                            onDragOver={handleDragOver}
+                            onDrop={() => handleDrop(col.id)}
+                        >
+                            <div className="flex justify-between items-center p-4 pb-2 flex-none">
+                                <h3 className="font-semibold text-sm" style={{ color: col.color }}>
+                                    {col.title}
+                                </h3>
+                                <span className="bg-background rounded-full px-2 py-0.5 text-[10px] font-bold">
+                                    {tasksByStatus[col.id]?.length || 0}
+                                </span>
+                            </div>
 
-                        <div className="space-y-3">
-                            {tasksByStatus[col.id]?.map((task) => (
-                                <div
-                                    key={task.id}
-                                    draggable
-                                    onDragStart={() => handleDragStart(task.id)}
-                                    onClick={() => {
-                                        setSelectedTask(task);
-                                        setShowTaskModal(true);
-                                    }}
-                                    className="bg-background p-4 rounded-lg shadow-sm border cursor-pointer hover:shadow-md transition-shadow relative group"
-                                >
-                                    <div className="flex justify-between items-start mb-2 pr-6">
-                                        <h4 className="font-medium group-hover:text-primary transition-colors">{task.title}</h4>
-                                        <button
-                                            onClick={(e) => handleDeleteTask(e, task.id)}
-                                            className="absolute top-4 right-4 p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-md opacity-0 group-hover:opacity-100 transition-all z-10"
-                                            title="Delete Task"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                        <span
-                                            className={`text-xs px-2 py-1 rounded ${task.priority === 'high'
-                                                ? 'bg-red-500/20 text-red-600'
-                                                : task.priority === 'medium'
-                                                    ? 'bg-yellow-500/20 text-yellow-600'
-                                                    : 'bg-green-500/20 text-green-600'
-                                                }`}
-                                        >
-                                            {task.priority}
-                                        </span>
-                                    </div>
-
-                                    {task.description && <TaskDescription description={task.description} />}
-
-                                    <div className="space-y-1 mb-2">
-                                        {task.projectName && (
-                                            <div className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded inline-block">
-                                                📁 {task.projectName}
+                            <div className="flex-1 overflow-y-auto p-4 pt-1 space-y-3 custom-scrollbar">
+                                {tasksByStatus[col.id]?.map((task) => (
+                                    <div
+                                        key={task.id}
+                                        draggable
+                                        onDragStart={() => handleDragStart(task.id)}
+                                        onClick={() => {
+                                            setSelectedTask(task);
+                                            setShowTaskModal(true);
+                                        }}
+                                        className={`relative bg-card rounded-xl shadow-sm border border-border cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 group overflow-hidden
+                                            ${task.priority === 'high' ? 'border-l-4 border-l-red-500' : task.priority === 'medium' ? 'border-l-4 border-l-amber-500' : 'border-l-4 border-l-emerald-500'}
+                                        `}
+                                    >
+                                        <div className="p-3.5">
+                                            {/* Top row: title + badges */}
+                                            <div className="flex items-start justify-between gap-2 mb-2">
+                                                <h4 className="font-semibold text-[13px] group-hover:text-primary transition-colors leading-snug flex-1 min-w-0 line-clamp-2">{task.title}</h4>
+                                                <div className="flex items-center gap-1 flex-shrink-0">
+                                                    {task.dueDate && task.status !== 'done' && (() => {
+                                                        const d = new Date(task.dueDate);
+                                                        const today = new Date(); today.setHours(0,0,0,0);
+                                                        return d < today;
+                                                    })() && (
+                                                        <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-red-500 text-white animate-pulse">OD</span>
+                                                    )}
+                                                    <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
+                                                        task.priority === 'high' ? 'bg-red-500/15 text-red-600' :
+                                                        task.priority === 'medium' ? 'bg-amber-500/15 text-amber-600' :
+                                                        'bg-emerald-500/15 text-emerald-600'}`}>
+                                                        {task.priority}
+                                                    </span>
+                                                    <button
+                                                        onClick={(e) => handleDeleteTask(e, task.id)}
+                                                        className="p-1 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded opacity-0 group-hover:opacity-100 transition-all"
+                                                        title="Delete"
+                                                    >
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </button>
+                                                </div>
                                             </div>
-                                        )}
-                                        {task.milestoneTitle && (
-                                            <div className="text-[10px] text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded block">
-                                                🎯 {task.milestoneTitle}
-                                            </div>
-                                        )}
-                                    </div>
 
-                                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                        <div className="flex items-center gap-1.5 overflow-hidden">
-                                            <span className="truncate">👤 {users.find((u) => u.id === task.assignedUserId)?.name || 'Unassigned'}</span>
-                                            {task.assignedUserId && users.find(u => u.id === task.assignedUserId)?.isWorking && (
-                                                <span className="flex h-1.5 w-1.5 rounded-full bg-green-500 flex-shrink-0" title="Currently Working" />
+                                            {/* Description snippet */}
+                                            {task.description && <TaskDescription description={task.description} />}
+
+                                            {/* Project / Milestone chips */}
+                                            {(task.projectName || task.milestoneTitle) && (
+                                                <div className="flex flex-wrap gap-1 mb-2.5">
+                                                    {task.projectName && (
+                                                        <span className="inline-flex items-center gap-0.5 text-[10px] font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                                            <span>📁</span> {task.projectName}
+                                                        </span>
+                                                    )}
+                                                    {task.milestoneTitle && (
+                                                        <span className="inline-flex items-center gap-0.5 text-[10px] font-medium bg-orange-500/10 text-orange-600 px-2 py-0.5 rounded-full">
+                                                            <span>🎯</span> {task.milestoneTitle}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Footer: assignee + status + date */}
+                                            <div className="flex items-center justify-between pt-2.5 border-t border-border/60">
+                                                {/* Assignee */}
+                                                <div className="flex items-center gap-1.5">
+                                                    {(() => {
+                                                        const u = users.find(u => u.id === task.assignedUserId);
+                                                        if (!u) return <span className="text-[10px] text-muted-foreground">Unassigned</span>;
+                                                        return (
+                                                            <div className="flex items-center gap-1">
+                                                                <div className="relative">
+                                                                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-[9px] font-bold text-white">
+                                                                        {u.name.charAt(0)}
+                                                                    </div>
+                                                                    <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-card ${u.isBusy ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                                                                </div>
+                                                                <span className="text-[10px] font-medium text-foreground truncate max-w-[70px]">{u.name.split(' ')[0]}</span>
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </div>
+
+                                                {/* Status select */}
+                                                <select
+                                                    value={task.status}
+                                                    onChange={(e) => { e.stopPropagation(); handleStatusUpdate(task.id, e.target.value); }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="text-[9px] font-bold uppercase bg-muted/60 border border-border rounded-full px-2 py-1 cursor-pointer hover:bg-muted focus:ring-1 focus:ring-primary outline-none transition-colors"
+                                                >
+                                                    {columns.map(col => (
+                                                        <option key={col.id} value={col.id}>{col.title}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            {/* Due date row */}
+                                            {task.dueDate && (
+                                                <div className="flex items-center gap-1 mt-2" suppressHydrationWarning>
+                                                    <span className="text-[10px]">📅</span>
+                                                    <span className={`text-[10px] font-medium ${
+                                                        (() => { const d = new Date(task.dueDate); const t = new Date(); t.setHours(0,0,0,0); return d < t && task.status !== 'done'; })()
+                                                        ? 'text-red-500' : 'text-muted-foreground'}`}>
+                                                        {(() => { const d = new Date(task.dueDate); return isNaN(d.getTime()) ? 'Invalid' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }); })()}
+                                                    </span>
+                                                </div>
                                             )}
                                         </div>
-                                        {task.dueDate && (
-                                            <span suppressHydrationWarning>
-                                                📅 {(() => {
-                                                    const d = new Date(task.dueDate);
-                                                    return isNaN(d.getTime()) ? 'Invalid Date' : d.toLocaleDateString();
-                                                })()}
-                                            </span>
-                                        )}
                                     </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    ))}
+                </div>
             </div>
 
             <TaskDialog
@@ -427,12 +511,14 @@ function TasksContent() {
                 }}
                 task={selectedTask}
                 onSubmit={handleTaskSubmit}
+                userRole={userRole}
             />
 
             <TaskCompletionModal
                 open={showCompletionModal}
                 onOpenChange={setShowCompletionModal}
                 onConfirm={handleCompletionConfirm}
+                isSubmitting={updateTaskMutation.isPending}
             />
         </div>
     );

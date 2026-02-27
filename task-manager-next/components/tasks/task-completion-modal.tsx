@@ -17,9 +17,10 @@ interface TaskCompletionModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onConfirm: (data: { workflowLink: string; workflowStatus: string; loomVideo?: string }) => void;
+    isSubmitting?: boolean;
 }
 
-export function TaskCompletionModal({ open, onOpenChange, onConfirm }: TaskCompletionModalProps) {
+export function TaskCompletionModal({ open, onOpenChange, onConfirm, isSubmitting }: TaskCompletionModalProps) {
     const [formData, setFormData] = useState({
         workflowLink: '',
         workflowStatus: '',
@@ -37,28 +38,26 @@ export function TaskCompletionModal({ open, onOpenChange, onConfirm }: TaskCompl
                 <DialogHeader>
                     <DialogTitle>Complete Task</DialogTitle>
                     <DialogDescription>
-                        Please provide the details below to complete this task.
+                        All fields are optional — fill in what's available.
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4 py-4">
                     <div className="space-y-2">
-                        <Label htmlFor="workflowLink">Workflow Link *</Label>
+                        <Label htmlFor="workflowLink">Workflow Link <span className="text-muted-foreground text-xs">(Optional)</span></Label>
                         <Input
                             id="workflowLink"
                             placeholder="https://..."
                             value={formData.workflowLink}
                             onChange={(e) => setFormData({ ...formData, workflowLink: e.target.value })}
-                            required
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="workflowStatus">Workflow Status *</Label>
+                        <Label htmlFor="workflowStatus">Workflow Status <span className="text-muted-foreground text-xs">(Optional)</span></Label>
                         <Input
                             id="workflowStatus"
                             placeholder="e.g. Completed, Pending Review"
                             value={formData.workflowStatus}
                             onChange={(e) => setFormData({ ...formData, workflowStatus: e.target.value })}
-                            required
                         />
                     </div>
                     <div className="space-y-2">
@@ -71,10 +70,12 @@ export function TaskCompletionModal({ open, onOpenChange, onConfirm }: TaskCompl
                         />
                     </div>
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                             Cancel
                         </Button>
-                        <Button type="submit">Complete Task</Button>
+                        <Button type="submit" disabled={isSubmitting}>
+                            {isSubmitting ? 'Saving...' : 'Complete Task'}
+                        </Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
