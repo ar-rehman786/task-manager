@@ -32,7 +32,13 @@ const handle = nextApp.getRequestHandler();
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  },
+  transports: ['websocket', 'polling']
+});
 const PORT = process.env.PORT || 3000;
 
 // Configure Multer for file uploads
@@ -102,6 +108,13 @@ io.on("connection", (socket) => {
   socket.on("join", (userId) => {
     socket.join(`user:${userId}`);
     console.log(`Socket ${socket.id} joined user:${userId}`);
+  });
+
+  // Chat room
+  socket.on("chat:join", (userId) => {
+    socket.join('chat:global');
+    socket.data.userId = userId;
+    console.log(`Socket ${socket.id} joined chat:global (user ${userId})`);
   });
 
   socket.on("disconnect", () => {
@@ -2075,6 +2088,80 @@ app.post("/api/attendance/clock-out", requireAuth, async (req, res) => {
     res.json(sessionResult.rows[0]);
   } catch (error) {
     res.status(500).json({ error: "Clock out error" });
+  }
+});
+
+// ============= CHAT ROUTES =============
+
+// GET paginated messages
+app.get('/api/chat/messages', requireAuth, async (req, res) => {
+  try {
+    const { limit = 50, before } = req.query;
+    const params = [parseInt(limit)];
+    let whereClause = '';
+    if (before) {
+      params.push(parseInt(before));
+      whereClause = `WHERE m.id < $${params.length}`;
+    }
+    const result = await query(`
+      SELECT m.*, u.name AS "userName"
+      FROM chat_messages m
+      JOIN users u ON u.id = m."userId"
+      ${whereClause}
+      ORDER BY m."createdAt" DESC
+      LIMIT $1
+    `, params);
+    res.json(result.rows.reverse());
+  } catch (err) {
+    console.error('Chat GET error:', err);
+    res.status(500).json({ error: 'Failed to fetch messages' });
+  }
+});
+
+// POST send a message
+app.post('/api/chat/messages', requireAuth, async (req, res) => {
+  try {
+    const { content } = req.body;
+    if (!content || !content.trim()) return res.status(400).json({ error: 'Content required' });
+    const userId = req.session.userId;
+    const result = await query(`
+      INSERT INTO chat_messages ("userId", content, "readBy")
+      VALUES ($1, $2, $3)
+      RETURNING *
+    `, [userId, content.trim(), JSON.stringify([userId])]);
+    const msg = result.rows[0];
+    // Attach sender name
+    const userResult = await query('SELECT name FROM users WHERE id = $1', [userId]);
+    msg.userName = userResult.rows[0]?.name || 'Unknown';
+    // Broadcast to all chat members
+    io.to('chat:global').emit('chat:message', msg);
+    res.json(msg);
+  } catch (err) {
+    console.error('Chat POST error:', err);
+    res.status(500).json({ error: 'Failed to send message' });
+  }
+});
+
+// POST mark messages as read
+app.post('/api/chat/messages/read', requireAuth, async (req, res) => {
+  try {
+    const { upToId } = req.body;
+    const userId = req.session.userId;
+    // Update readBy for all messages up to upToId where user hasn't read yet
+    await query(`
+      UPDATE chat_messages
+      SET "readBy" = CASE
+        WHEN NOT ("readBy" @> $1::jsonb) THEN "readBy" || $1::jsonb
+        ELSE "readBy"
+      END
+      WHERE id <= $2
+    `, [JSON.stringify([userId]), upToId]);
+    // Notify others
+    io.to('chat:global').emit('chat:read', { userId, upToId });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Chat read error:', err);
+    res.status(500).json({ error: 'Failed to mark read' });
   }
 });
 
