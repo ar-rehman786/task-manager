@@ -94,7 +94,7 @@ function AdminAttendanceContent() {
 
     const formatHours = (hours: any) => {
         const h = parseFloat(hours || 0);
-        return h.toFixed(2);
+        return Math.floor(h).toString();
     };
 
     const formatDuration = (minutes: number) => {
@@ -141,7 +141,7 @@ function AdminAttendanceContent() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium text-muted-foreground">Total Hours Today</p>
-                            <h3 className="text-3xl font-bold mt-1">{totals?.today || '0.00'}h</h3>
+                            <h3 className="text-3xl font-bold mt-1">{formatHours(totals?.today)}h</h3>
                         </div>
                         <div className="bg-blue-100 p-3 rounded-full text-blue-600">
                             <Clock className="h-6 w-6" />
@@ -152,7 +152,7 @@ function AdminAttendanceContent() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium text-muted-foreground">This Week</p>
-                            <h3 className="text-3xl font-bold mt-1">{totals?.week || '0.00'}h</h3>
+                            <h3 className="text-3xl font-bold mt-1">{formatHours(totals?.week)}h</h3>
                         </div>
                         <div className="bg-green-100 p-3 rounded-full text-green-600">
                             <TrendingUp className="h-6 w-6" />
@@ -163,7 +163,7 @@ function AdminAttendanceContent() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium text-muted-foreground">This Month</p>
-                            <h3 className="text-3xl font-bold mt-1">{totals?.month || '0.00'}h</h3>
+                            <h3 className="text-3xl font-bold mt-1">{formatHours(totals?.month)}h</h3>
                         </div>
                         <div className="bg-purple-100 p-3 rounded-full text-purple-600">
                             <Calendar className="h-6 w-6" />
