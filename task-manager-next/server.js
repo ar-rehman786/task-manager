@@ -2015,7 +2015,8 @@ app.get("/api/attendance/status", requireAuth, async (req, res) => {
 
 app.post("/api/attendance/clock-in", requireAuth, async (req, res) => {
   const userId = req.session.userId;
-  const { notes } = req.body;
+  const { notes, projectId, clientId } = req.body;
+  const targetId = projectId || clientId;
 
   try {
     const activeSessionResult = await query(
@@ -2028,10 +2029,10 @@ app.post("/api/attendance/clock-in", requireAuth, async (req, res) => {
 
     const result = await query(
       `
-            INSERT INTO attendance ("userId", "clockInTime", status, notes)
-            VALUES ($1, $2, 'active', $3) RETURNING *
+            INSERT INTO attendance ("userId", "clockInTime", status, notes, "clientId")
+            VALUES ($1, $2, 'active', $3, $4) RETURNING *
         `,
-      [userId, new Date().toISOString(), notes],
+      [userId, new Date().toISOString(), notes, targetId],
     );
 
     // Notify admin
@@ -2385,11 +2386,12 @@ app.get("/api/attendance/employee-totals", requireAdmin, async (req, res) => {
 
 app.get("/api/attendance/client-totals", requireAdmin, async (req, res) => {
   try {
+    // Note: We use the existing clientId column to store projectIds
     const result = await query(`
       WITH AdjustedAttendance AS (
           SELECT 
               a.*,
-              c.name as "clientName",
+              p.name as "clientName",
               CASE 
                 WHEN a.status = 'active' THEN EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - a."clockInTime")) / 60
                 ELSE a."workDuration" 
@@ -2399,7 +2401,7 @@ app.get("/api/attendance/client-totals", requireAdmin, async (req, res) => {
                   ELSE CAST(a."clockInTime" - INTERVAL '1 day' AS DATE)
               END) as shift_date
           FROM attendance a
-          JOIN clients c ON a."clientId" = c.id
+          JOIN projects p ON a."clientId" = p.id
       ),
       CurrentShift AS (
           SELECT CASE 
@@ -2439,10 +2441,10 @@ app.get("/api/attendance/admin/history", requireAdmin, async (req, res) => {
       // Super Admin sees all
       result = await query(
         `
-                SELECT a.*, u.name as "userName", u.email as "userEmail", c.name as "clientName"
+                SELECT a.*, u.name as "userName", u.email as "userEmail", p.name as "clientName"
                 FROM attendance a
                 JOIN users u ON a."userId" = u.id
-                LEFT JOIN clients c ON a."clientId" = c.id
+                LEFT JOIN projects p ON a."clientId" = p.id
                 ORDER BY a."clockInTime" DESC
                 LIMIT $1
             `,
@@ -2452,10 +2454,10 @@ app.get("/api/attendance/admin/history", requireAdmin, async (req, res) => {
       // Regular Admin sees members only
       result = await query(
         `
-                SELECT a.*, u.name as "userName", u.email as "userEmail", c.name as "clientName"
+                SELECT a.*, u.name as "userName", u.email as "userEmail", p.name as "clientName"
                 FROM attendance a
                 JOIN users u ON a."userId" = u.id
-                LEFT JOIN clients c ON a."clientId" = c.id
+                LEFT JOIN projects p ON a."clientId" = p.id
                 WHERE u.role = 'member'
                 ORDER BY a."clockInTime" DESC
                 LIMIT $1
