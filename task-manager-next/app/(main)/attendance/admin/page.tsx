@@ -37,10 +37,9 @@ export default function AdminAttendancePage() {
 }
 
 function AdminAttendanceContent() {
-    const queryClient = useQueryClient();
     const [search, setSearch] = useState('');
     const [filterUserId, setFilterUserId] = useState('all');
-    const [filterClientId, setFilterClientId] = useState('all');
+    const [filterProjectId, setFilterProjectId] = useState('all');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [showAllHistory, setShowAllHistory] = useState(false);
@@ -56,18 +55,18 @@ function AdminAttendanceContent() {
         queryFn: () => attendanceApi.getEmployeeTotals(),
     });
 
-    const { data: clientTotals = [] } = useQuery({
-        queryKey: ['admin-client-totals'],
-        queryFn: () => attendanceApi.getClientTotals(),
+    const { data: projectTotals = [] } = useQuery({
+        queryKey: ['admin-project-totals'],
+        queryFn: () => attendanceApi.getClientTotals(), // This route is serving project totals
     });
 
     const { data: history = [] } = useQuery({
-        queryKey: ['admin-attendance-history', showAllHistory, filterUserId, filterClientId, startDate, endDate, search],
+        queryKey: ['admin-attendance-history', showAllHistory, filterUserId, filterProjectId, startDate, endDate, search],
         queryFn: async () => {
             const params = new URLSearchParams();
             if (showAllHistory) params.append('all', 'true');
             if (filterUserId !== 'all') params.append('userId', filterUserId);
-            if (filterClientId !== 'all') params.append('clientId', filterClientId);
+            if (filterProjectId !== 'all') params.append('clientId', filterProjectId); // Sending as clientId to maintain schema compliance for now
             if (startDate) params.append('startDate', startDate);
             if (endDate) params.append('endDate', endDate);
             if (search) params.append('search', search);
@@ -85,10 +84,10 @@ function AdminAttendanceContent() {
         },
     });
 
-    const { data: clients = [] } = useQuery({
-        queryKey: ['clients'],
+    const { data: projects = [] } = useQuery({
+        queryKey: ['projects'],
         queryFn: async () => {
-            const response = await api.get<any[]>('/api/clients');
+            const response = await api.get<any[]>('/api/projects');
             return response.data;
         },
     });
@@ -202,11 +201,11 @@ function AdminAttendanceContent() {
 
                     <Card className="p-4">
                         <h3 className="font-bold flex items-center gap-2 mb-4">
-                            <Briefcase className="h-4 w-4" /> Client Totals
+                            <Briefcase className="h-4 w-4" /> Project Totals
                         </h3>
                         <div className="space-y-4 text-sm">
-                            {clientTotals.length === 0 && <p className="text-xs text-muted-foreground">No data this month.</p>}
-                            {clientTotals.map((c: any) => (
+                            {projectTotals.length === 0 && <p className="text-xs text-muted-foreground">No data this month.</p>}
+                            {projectTotals.map((c: any) => (
                                 <div key={c.clientName} className="flex flex-col border-b border-muted/50 pb-2 last:border-0">
                                     <span className="font-semibold">{c.clientName}</span>
                                     <div className="flex justify-between mt-1 text-xs">
@@ -239,15 +238,15 @@ function AdminAttendanceContent() {
                                 </Select>
                             </div>
                             <div className="space-y-1">
-                                <Label className="text-xs">Client</Label>
-                                <Select value={filterClientId} onValueChange={setFilterClientId}>
+                                <Label className="text-xs">Project</Label>
+                                <Select value={filterProjectId} onValueChange={setFilterProjectId}>
                                     <SelectTrigger size="sm">
-                                        <SelectValue placeholder="All Clients" />
+                                        <SelectValue placeholder="All Projects" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">All Clients</SelectItem>
-                                        {clients.map((c: any) => (
-                                            <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                                        <SelectItem value="all">All Projects</SelectItem>
+                                        {projects.map((p: any) => (
+                                            <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -274,7 +273,7 @@ function AdminAttendanceContent() {
                         <div className="mt-4 relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input 
-                                placeholder="Search by name or client..." 
+                                placeholder="Search by name or project..." 
                                 className="pl-10"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
@@ -289,7 +288,7 @@ function AdminAttendanceContent() {
                                 <thead className="bg-muted/50 border-b">
                                     <tr>
                                         <th className="text-left py-3 px-4">Employee</th>
-                                        <th className="text-left py-3 px-4">Client</th>
+                                        <th className="text-left py-3 px-4">Project</th>
                                         <th className="text-left py-3 px-4">Clock In</th>
                                         <th className="text-left py-3 px-4">Clock Out</th>
                                         <th className="text-left py-3 px-4">Duration</th>
