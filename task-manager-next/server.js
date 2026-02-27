@@ -18,7 +18,7 @@ const next = require("next");
 
 console.log("🔹 SERVER.JS: Next.js module loaded");
 
-const dev = false; 
+const dev = true; 
 let nextApp;
 try {
   console.log("🔹 SERVER.JS: Initializing Next.js app...");
@@ -1025,7 +1025,8 @@ app.put("/api/tasks/:id", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Task not found" });
     }
 
-    // --- Member Completion Rule Validation ---
+    // --- Member Completion Rule Validation (Disabled as requested) ---
+    /*
     if (
       status === "done" &&
       oldTask.status !== "done" &&
@@ -1039,6 +1040,7 @@ app.put("/api/tasks/:id", requireAuth, async (req, res) => {
         });
       }
     }
+    */
 
     // Perform Update
     await query(
@@ -2305,6 +2307,110 @@ app.get("/api/attendance/today", requireAdmin, async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Error fetching today attendance" });
+  }
+});
+
+app.get("/api/attendance/totals", requireAdmin, async (req, res) => {
+  try {
+    const result = await query(`
+      WITH AdjustedAttendance AS (
+          SELECT 
+              "workDuration",
+              (CASE 
+                  WHEN EXTRACT(HOUR FROM "clockInTime") >= 12 THEN CAST("clockInTime" AS DATE)
+                  ELSE CAST("clockInTime" - INTERVAL '1 day' AS DATE)
+              END) as shift_date
+          FROM attendance
+          WHERE status = 'completed'
+      ),
+      CurrentShift AS (
+          SELECT CASE 
+              WHEN EXTRACT(HOUR FROM CURRENT_TIMESTAMP) >= 12 THEN CAST(CURRENT_TIMESTAMP AS DATE) 
+              ELSE CAST(CURRENT_TIMESTAMP - INTERVAL '1 day' AS DATE) 
+          END as today_date
+      )
+      SELECT 
+          COALESCE(SUM(CASE WHEN shift_date = (SELECT today_date FROM CurrentShift) THEN "workDuration" ELSE 0 END) / 60.0, 0) as today,
+          COALESCE(SUM(CASE WHEN shift_date >= date_trunc('week', (SELECT today_date FROM CurrentShift)) THEN "workDuration" ELSE 0 END) / 60.0, 0) as week,
+          COALESCE(SUM(CASE WHEN shift_date >= date_trunc('month', (SELECT today_date FROM CurrentShift)) THEN "workDuration" ELSE 0 END) / 60.0, 0) as month
+      FROM AdjustedAttendance
+    `);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error fetching attendance totals" });
+  }
+});
+
+app.get("/api/attendance/employee-totals", requireAdmin, async (req, res) => {
+  try {
+    const result = await query(`
+      WITH AdjustedAttendance AS (
+          SELECT 
+              a.*,
+              u.name as "userName",
+              (CASE 
+                  WHEN EXTRACT(HOUR FROM a."clockInTime") >= 12 THEN CAST(a."clockInTime" AS DATE)
+                  ELSE CAST(a."clockInTime" - INTERVAL '1 day' AS DATE)
+              END) as shift_date
+          FROM attendance a
+          JOIN users u ON a."userId" = u.id
+          WHERE a.status = 'completed'
+      ),
+      CurrentShift AS (
+          SELECT CASE 
+              WHEN EXTRACT(HOUR FROM CURRENT_TIMESTAMP) >= 12 THEN CAST(CURRENT_TIMESTAMP AS DATE) 
+              ELSE CAST(CURRENT_TIMESTAMP - INTERVAL '1 day' AS DATE) 
+          END as today_date
+      )
+      SELECT 
+          "userName",
+          COALESCE(SUM(CASE WHEN shift_date >= date_trunc('month', (SELECT today_date FROM CurrentShift)) THEN "workDuration" ELSE 0 END) / 60.0, 0) as "monthHours",
+          COALESCE(SUM(CASE WHEN shift_date >= date_trunc('week', (SELECT today_date FROM CurrentShift)) THEN "workDuration" ELSE 0 END) / 60.0, 0) as "weekHours"
+      FROM AdjustedAttendance
+      GROUP BY "userName"
+      ORDER BY "monthHours" DESC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error fetching employee totals" });
+  }
+});
+
+app.get("/api/attendance/client-totals", requireAdmin, async (req, res) => {
+  try {
+    const result = await query(`
+      WITH AdjustedAttendance AS (
+          SELECT 
+              a.*,
+              c.name as "clientName",
+              (CASE 
+                  WHEN EXTRACT(HOUR FROM a."clockInTime") >= 12 THEN CAST(a."clockInTime" AS DATE)
+                  ELSE CAST(a."clockInTime" - INTERVAL '1 day' AS DATE)
+              END) as shift_date
+          FROM attendance a
+          JOIN clients c ON a."clientId" = c.id
+          WHERE a.status = 'completed'
+      ),
+      CurrentShift AS (
+          SELECT CASE 
+              WHEN EXTRACT(HOUR FROM CURRENT_TIMESTAMP) >= 12 THEN CAST(CURRENT_TIMESTAMP AS DATE) 
+              ELSE CAST(CURRENT_TIMESTAMP - INTERVAL '1 day' AS DATE) 
+          END as today_date
+      )
+      SELECT 
+          "clientName",
+          COALESCE(SUM(CASE WHEN shift_date >= date_trunc('month', (SELECT today_date FROM CurrentShift)) THEN "workDuration" ELSE 0 END) / 60.0, 0) as "monthHours",
+          COALESCE(SUM(CASE WHEN shift_date >= date_trunc('week', (SELECT today_date FROM CurrentShift)) THEN "workDuration" ELSE 0 END) / 60.0, 0) as "weekHours"
+      FROM AdjustedAttendance
+      GROUP BY "clientName"
+      ORDER BY "monthHours" DESC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error fetching client totals" });
   }
 });
 
