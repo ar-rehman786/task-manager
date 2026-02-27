@@ -18,7 +18,7 @@ const next = require("next");
 
 console.log("🔹 SERVER.JS: Next.js module loaded");
 
-const dev = true; 
+const dev = false; 
 let nextApp;
 try {
   console.log("🔹 SERVER.JS: Initializing Next.js app...");
