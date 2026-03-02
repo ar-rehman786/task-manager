@@ -170,7 +170,7 @@ function AttendanceContent() {
                     <h1 className="text-2xl font-bold tracking-tight">Attendance</h1>
                     <p className="text-muted-foreground text-sm mt-1">Track your work hours and project activities.</p>
                 </div>
-                <div className="hidden sm:flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-full border text-[13px] font-medium">
+                <div className="hidden sm:flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-full border border-border dark:border-white/[0.08] text-[13px] font-medium">
                     <Calendar className="w-4 h-4 text-primary" />
                     {new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
                 </div>
@@ -178,7 +178,7 @@ function AttendanceContent() {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Clock Card */}
-                <Card className="lg:col-span-8 overflow-hidden border shadow-sm">
+                <Card className="lg:col-span-8 overflow-hidden border dark:border-white/[0.06] shadow-sm">
                     <div className="p-8 h-full flex flex-col items-center justify-center space-y-8 relative">
                         {/* Status Chip */}
                         <div className={cn(
@@ -199,7 +199,7 @@ function AttendanceContent() {
 
                         {/* Counter Section */}
                         {isClockedIn && activeSession && (
-                            <div className="w-full max-w-md bg-muted/20 backdrop-blur-sm border rounded-2xl p-6 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500 relative z-10">
+                            <div className="w-full max-w-md bg-muted/20 backdrop-blur-sm border border-border dark:border-white/[0.08] rounded-2xl p-6 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500 relative z-10">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <div className="p-2 bg-primary/10 rounded-lg">
@@ -261,14 +261,10 @@ function AttendanceContent() {
                                     if (isClockedIn) {
                                         clockOutMutation.mutate(undefined);
                                     } else {
-                                        if (!selectedClientId) {
-                                            toast.error('Initialization Failed', { description: 'Select parameter.' });
-                                            return;
-                                        }
-                                        clockInMutation.mutate({ clientId: parseInt(selectedClientId) });
+                                        clockInMutation.mutate({ clientId: selectedClientId ? parseInt(selectedClientId) : undefined });
                                     }
                                 }}
-                                disabled={clockInMutation.isPending || clockOutMutation.isPending || (!isClockedIn && !selectedClientId)}
+                                disabled={clockInMutation.isPending || clockOutMutation.isPending}
                                 className={cn(
                                     "w-full h-10 text-xs font-bold uppercase tracking-widest transition-all duration-300 shadow-sm",
                                     isClockedIn 
@@ -297,14 +293,14 @@ function AttendanceContent() {
 
                 {/* Summary Column */}
                 <div className="lg:col-span-4 space-y-6">
-                    <Card className="p-5 border-2 shadow-sm bg-muted/10">
+                    <Card className="p-5 border dark:border-white/[0.06] shadow-sm bg-muted/10">
                         <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-5 flex items-center gap-2">
                             <Activity className="w-4 h-4 text-primary" />
                             Session Overview
                         </h3>
                         
                         <div className="space-y-4">
-                            <div className="flex items-center justify-between p-3 bg-background border rounded-xl shadow-sm">
+                            <div className="flex items-center justify-between p-3 bg-background border border-border dark:border-white/[0.06] rounded-xl">
                                 <div className="flex items-center gap-3">
                                     <div className={cn("p-2 rounded-lg", isClockedIn ? "bg-emerald-500/10" : "bg-muted")}>
                                         <Users className={cn("w-4 h-4", isClockedIn ? "text-emerald-500" : "text-muted-foreground")} />
@@ -319,7 +315,7 @@ function AttendanceContent() {
                                 {isClockedIn && <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
                             </div>
 
-                            <div className="flex items-center justify-between p-3 bg-background border rounded-xl shadow-sm">
+                            <div className="flex items-center justify-between p-3 bg-background border border-border dark:border-white/[0.06] rounded-xl">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-blue-500/10 rounded-lg">
                                         <Clock className="w-4 h-4 text-blue-500" />
@@ -333,7 +329,7 @@ function AttendanceContent() {
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-between p-3 bg-background border rounded-xl shadow-sm">
+                            <div className="flex items-center justify-between p-3 bg-background border border-border dark:border-white/[0.06] rounded-xl">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-purple-500/10 rounded-lg">
                                         <Timer className="w-4 h-4 text-purple-500" />
@@ -370,7 +366,7 @@ function AttendanceContent() {
             </div>
 
             {/* History Table */}
-            <Card className="border shadow-sm overflow-hidden">
+            <Card className="border dark:border-white/[0.06] shadow-sm overflow-hidden">
                 <div className="p-5 border-b bg-muted/10 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-primary/10 rounded-lg">
@@ -386,7 +382,7 @@ function AttendanceContent() {
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead className="bg-muted/30">
-                            <tr className="border-b">
+                            <tr className="border-b dark:border-white/[0.06]">
                                 <th className="text-left font-bold uppercase tracking-widest text-[10px] text-muted-foreground py-4 px-6">Entry Date</th>
                                 <th className="text-left font-bold uppercase tracking-widest text-[10px] text-muted-foreground py-4 px-6">Project</th>
                                 <th className="text-center font-bold uppercase tracking-widest text-[10px] text-muted-foreground py-4 px-6">Clock In</th>
@@ -395,7 +391,7 @@ function AttendanceContent() {
                                 <th className="text-right font-bold uppercase tracking-widest text-[10px] text-muted-foreground py-4 px-6">Verification</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y">
+                        <tbody className="divide-y dark:divide-white/[0.06]">
                             {history.length === 0 ? (
                                 <tr>
                                     <td colSpan={6} className="py-12 text-center text-muted-foreground italic font-medium">No archived records detected in system.</td>

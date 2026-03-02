@@ -53,12 +53,14 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
         }, 100);
     };
 
-    // Keep editor content in sync when content changes from outside (and we are editing)
     useEffect(() => {
-        if (editor && isEditing && editor.getHTML() !== content) {
-            editor.commands.setContent(content);
+        if (editor && isEditing) {
+            // setContent with emitUpdate=false skips triggering onUpdate,
+            // so the initial load doesn't fire onChange → no accidental saves.
+            editor.chain().setContent(content).run();
         }
-    }, [isEditing, editor, content]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [editor, isEditing]); // intentionally omit `content` — only sync on open
 
     const addImage = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -123,9 +125,10 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
                 </div>
             </div>
 
-            <div className="border rounded-md focus-within:ring-1 focus-within:ring-ring transition-all overflow-hidden">
-                <div className="flex flex-wrap gap-1 p-1 bg-muted/50 border-b items-center">
+            <div className="border border-border dark:border-white/[0.1] rounded-md focus-within:ring-1 focus-within:ring-ring transition-all overflow-hidden">
+                <div className="flex flex-wrap gap-1 p-1 bg-muted/50 border-b border-border dark:border-white/[0.08] items-center">
                     <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         className={`h-8 w-8 p-0 ${editor?.isActive('bold') ? 'bg-accent' : ''}`}
@@ -135,6 +138,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
                         <Bold className="h-4 w-4" />
                     </Button>
                     <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         className={`h-8 w-8 p-0 ${editor?.isActive('italic') ? 'bg-accent' : ''}`}
@@ -144,6 +148,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
                         <Italic className="h-4 w-4" />
                     </Button>
                     <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         className={`h-8 w-8 p-0 ${editor?.isActive('heading', { level: 1 }) ? 'bg-accent' : ''}`}
@@ -153,6 +158,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
                         <Heading1 className="h-4 w-4" />
                     </Button>
                     <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         className={`h-8 w-8 p-0 ${editor?.isActive('heading', { level: 2 }) ? 'bg-accent' : ''}`}
@@ -162,6 +168,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
                         <Heading2 className="h-4 w-4" />
                     </Button>
                     <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         className={`h-8 w-8 p-0 ${editor?.isActive('bulletList') ? 'bg-accent' : ''}`}
@@ -171,6 +178,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
                         <List className="h-4 w-4" />
                     </Button>
                     <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         className={`h-8 w-8 p-0 ${editor?.isActive('orderedList') ? 'bg-accent' : ''}`}
@@ -180,6 +188,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
                         <ListOrdered className="h-4 w-4" />
                     </Button>
                     <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         className={`h-8 w-8 p-0 ${editor?.isActive('blockquote') ? 'bg-accent' : ''}`}
@@ -191,7 +200,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
 
                     <div className="w-[1px] h-4 bg-border mx-1" />
 
-                    <Button variant="ghost" size="sm" asChild className="h-8 w-8 p-0">
+                    <Button type="button" variant="ghost" size="sm" asChild className="h-8 w-8 p-0">
                         <label className="cursor-pointer flex items-center justify-center">
                             <ImageIcon className="h-4 w-4" />
                             <input type="file" accept="image/*" className="hidden" onChange={addImage} />
@@ -201,6 +210,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
                     <div className="flex-grow" />
 
                     <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         className="h-8 w-8 p-0"
@@ -210,6 +220,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
                         <Undo className="h-4 w-4" />
                     </Button>
                     <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         className="h-8 w-8 p-0"

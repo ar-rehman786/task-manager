@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Edit3, Calendar, User2, Building, FolderKanban, AlertCircle } from 'lucide-react';
+import { Edit3, Calendar, User2, Building, FolderKanban, AlertCircle, Search, Plus, ArrowUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import React from 'react';
 
@@ -28,6 +28,28 @@ const safeFormatDate = (dateStr: string | undefined | null) => {
     if (isNaN(date.getTime())) return 'Invalid Date';
     return date.toLocaleDateString();
 };
+
+// ─── Status config ────────────────────────────────────────────────────────────
+const STATUS_CONFIG: Record<string, { label: string; dot: string; text: string; bg: string }> = {
+    active:                      { label: 'Active',    dot: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20' },
+    on_hold:                     { label: 'On Hold',   dot: 'bg-amber-500',   text: 'text-amber-700 dark:text-amber-400',   bg: 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20' },
+    paused:                      { label: 'On Hold',   dot: 'bg-amber-500',   text: 'text-amber-700 dark:text-amber-400',   bg: 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20' },
+    completed:                   { label: 'Completed', dot: 'bg-blue-500',    text: 'text-blue-700 dark:text-blue-400',    bg: 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20' },
+    waiting_for_client_response: { label: 'Waiting',   dot: 'bg-violet-500',  text: 'text-violet-700 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-500/10 border-violet-200 dark:border-violet-500/20' },
+    closed:                      { label: 'Closed',    dot: 'bg-slate-400',   text: 'text-slate-600 dark:text-slate-400',  bg: 'bg-slate-100 dark:bg-slate-500/10 border-slate-200 dark:border-slate-500/20' },
+};
+
+const getStatusConfig = (status?: string) =>
+    STATUS_CONFIG[status || ''] ?? { label: status ?? 'Unknown', dot: 'bg-primary', text: 'text-primary', bg: 'bg-primary/5 border-primary/20' };
+
+function Avatar({ name, colorClass = 'bg-violet-500' }: { name: string; colorClass?: string }) {
+    const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    return (
+        <div className={`w-5 h-5 ${colorClass} rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0`}>
+            {initials}
+        </div>
+    );
+}
 
 export default function ProjectsPage() {
     return (
@@ -44,6 +66,9 @@ function ProjectsContent() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingProject, setEditingProject] = useState<Project | null>(null);
     const [isArchiveExpanded, setIsArchiveExpanded] = useState(false);
+    const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [sortBy, setSortBy] = useState('name');
 
     const { data: projects = [], isLoading } = useQuery({
         queryKey: ['projects'],
@@ -107,6 +132,31 @@ function ProjectsContent() {
         );
     }
 
+    const activeProjects = projects.filter(p => p.status !== 'archived');
+    const archivedProjects = projects.filter(p => p.status === 'archived');
+
+    const filteredProjects = (() => {
+        let result = activeProjects;
+        if (statusFilter !== 'all') {
+            const normalized = statusFilter === 'on_hold' ? ['on_hold', 'paused'] : [statusFilter];
+            result = result.filter(p => normalized.includes(p.status || ''));
+        }
+        if (search.trim()) {
+            const q = search.toLowerCase();
+            result = result.filter(p =>
+                p.name.toLowerCase().includes(q) ||
+                (p.client || '').toLowerCase().includes(q) ||
+                (p.description || '').replace(/<[^>]*>/g, ' ').toLowerCase().includes(q)
+            );
+        }
+        return [...result].sort((a, b) => {
+            if (sortBy === 'name') return a.name.localeCompare(b.name);
+            if (sortBy === 'status') return (a.status || '').localeCompare(b.status || '');
+            if (sortBy === 'date') return new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime();
+            return 0;
+        });
+    })();
+
     return (
         <>
             {selectedProject ? (
@@ -118,161 +168,191 @@ function ProjectsContent() {
                     onArchive={() => archiveMutation.mutate(selectedProject.id)}
                 />
             ) : (
-                <div className="p-4 space-y-4">
-                    <div className="flex justify-between items-center">
-                        <h1 className="text-xl font-bold">Projects</h1>
+                <div className="p-6 space-y-6">
+                    {/* ─── Toolbar ─────────────────────────────────────────────── */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h1 className="text-2xl font-bold tracking-tight">Projects</h1>
+                            <p className="text-sm text-muted-foreground mt-0.5">{filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''}</p>
+                        </div>
                         {user?.role === 'admin' && (
-                            <Button onClick={handleCreateProject}>+ New Project</Button>
+                            <Button onClick={handleCreateProject} className="flex items-center gap-2 shrink-0">
+                                <Plus className="w-4 h-4" />
+                                New Project
+                            </Button>
                         )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {projects.filter(p => p.status !== 'archived').map((project) => {
-                            const statusConfig: Record<string, { color: string; dot: string; bg: string }> = {
-                                active: { color: 'text-emerald-600', dot: 'bg-emerald-500', bg: 'bg-emerald-500' },
-                                paused: { color: 'text-amber-600', dot: 'bg-amber-500', bg: 'bg-amber-500' },
-                                on_hold: { color: 'text-amber-600', dot: 'bg-amber-500', bg: 'bg-amber-500' },
-                                completed: { color: 'text-blue-600', dot: 'bg-blue-500', bg: 'bg-blue-500' },
-                                waiting_for_client_response: { color: 'text-purple-600', dot: 'bg-purple-500', bg: 'bg-purple-500' },
-                                closed: { color: 'text-slate-500', dot: 'bg-slate-400', bg: 'bg-slate-400' },
-                            };
-                            const sc = statusConfig[project.status || ''] || { color: 'text-primary', dot: 'bg-primary', bg: 'bg-primary' };
-                            const initials = project.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
-                            const pendingCount = Number(project.pendingAccessCount || 0);
+                    {/* ─── Search + Filters ────────────────────────────────────── */}
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <div className="relative flex-1 max-w-sm">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search projects..."
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                className="pl-9 h-9"
+                            />
+                        </div>
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                            <SelectTrigger className="h-9 w-[150px]">
+                                <SelectValue placeholder="All statuses" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Statuses</SelectItem>
+                                <SelectItem value="active">Active</SelectItem>
+                                <SelectItem value="on_hold">On Hold</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                                <SelectItem value="waiting_for_client_response">Waiting</SelectItem>
+                                <SelectItem value="closed">Closed</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select value={sortBy} onValueChange={setSortBy}>
+                            <SelectTrigger className="h-9 w-[140px]">
+                                <ArrowUpDown className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
+                                <SelectValue placeholder="Sort by" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="name">Name (A–Z)</SelectItem>
+                                <SelectItem value="status">Status</SelectItem>
+                                <SelectItem value="date">Start Date</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
 
-                            return (
-                                <div
-                                    key={project.id}
-                                    onClick={() => setSelectedProject(project)}
-                                    className="group relative bg-card border border-border rounded-xl overflow-hidden cursor-pointer hover:shadow-lg hover:shadow-black/5 hover:-translate-y-0.5 transition-all duration-200"
-                                >
-                                    {/* Colored top accent bar */}
-                                    <div className={`h-1 w-full ${sc.bg}`} />
+                    {/* ─── Project Grid ─────────────────────────────────────────── */}
+                    {filteredProjects.length === 0 ? (
+                        <div className="text-center py-20 border-2 border-dashed rounded-2xl">
+                            <FolderKanban className="w-10 h-10 text-muted-foreground/40 mx-auto mb-4" />
+                            <p className="text-base font-medium text-muted-foreground">No projects found</p>
+                            <p className="text-sm text-muted-foreground/60 mt-1">Try adjusting your search or filters</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            {filteredProjects.map((project) => {
+                                const sc = getStatusConfig(project.status);
+                                const pendingCount = Number(project.pendingAccessCount || 0);
+                                const dateOpts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: '2-digit' };
+                                const plainDesc = (project.description || '').replace(/<[^>]*>/g, ' ').trim();
 
-                                    <div className="p-5">
-                                        {/* Header row */}
-                                        <div className="flex items-start gap-3 mb-3">
-                                            {/* Project avatar */}
-                                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold text-white flex-shrink-0 ${sc.bg}`}>
-                                                {initials}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <h3 className="font-semibold text-foreground text-[15px] leading-snug truncate group-hover:text-primary transition-colors">{project.name}</h3>
-                                                {project.client && (
-                                                    <div className="flex items-center gap-1 mt-0.5">
-                                                        <Building className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                                                        <span className="text-xs text-muted-foreground truncate">{project.client}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            {/* Status badge */}
-                                            <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border flex-shrink-0 ${sc.color} border-current/20 bg-current/5`}>
-                                                <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-                                                {(project.status || 'active').replace(/_/g, ' ')}
+                                return (
+                                    <div
+                                        key={project.id}
+                                        onClick={() => setSelectedProject(project)}
+                                        className="group bg-card border border-border rounded-2xl cursor-pointer transition-all duration-200 hover:shadow-lg hover:shadow-black/[0.06] hover:-translate-y-0.5 hover:border-primary/20 flex flex-col"
+                                        style={{ padding: '24px' }}
+                                    >
+                                        {/* ── Top Row: Name + Status ── */}
+                                        <div className="flex items-start justify-between gap-2 mb-1.5">
+                                            <h3 className="text-[15px] font-semibold text-foreground leading-snug group-hover:text-primary transition-colors line-clamp-2 flex-1">
+                                                {project.name}
+                                            </h3>
+                                            <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border flex-shrink-0 whitespace-nowrap ${sc.text} ${sc.bg}`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${sc.dot} flex-shrink-0`} />
+                                                {sc.label}
                                             </span>
                                         </div>
 
-                                        {/* Description */}
-                                        {project.description && (
-                                            <div
-                                                className="text-xs text-muted-foreground line-clamp-2 mb-3 prose prose-xs dark:prose-invert max-w-none leading-relaxed"
-                                                dangerouslySetInnerHTML={{ __html: project.description.replace(/<[^>]*>/g, ' ').slice(0, 120) }}
-                                            />
-                                        )}
+                                        {/* ── Client name ── */}
+                                        {project.client ? (
+                                            <p className="text-xs text-muted-foreground mb-2.5 flex items-center gap-1.5">
+                                                <Building className="w-3 h-3 shrink-0" />
+                                                <span className="truncate">{project.client}</span>
+                                            </p>
+                                        ) : <div className="mb-2.5" />}
 
-                                        {/* Team row */}
-                                        {(project.managerName || project.assignedUserName) && (
-                                            <div className="flex items-center gap-3 mb-3 py-2.5 px-3 bg-muted/40 rounded-lg">
-                                                {project.managerName && (
-                                                    <div className="flex items-center gap-1.5 min-w-0">
-                                                        <div className="w-5 h-5 rounded-full bg-violet-500 flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0">
-                                                            {project.managerName.charAt(0)}
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <p className="text-[9px] text-muted-foreground leading-none">Manager</p>
-                                                            <p className="text-[11px] font-medium text-foreground truncate">{project.managerName}</p>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {project.managerName && project.assignedUserName && (
-                                                    <div className="w-px h-6 bg-border flex-shrink-0" />
-                                                )}
-                                                {project.assignedUserName && (
-                                                    <div className="flex items-center gap-1.5 min-w-0">
-                                                        <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0">
-                                                            {project.assignedUserName.charAt(0)}
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <p className="text-[9px] text-muted-foreground leading-none">Assigned</p>
-                                                            <p className="text-[11px] font-medium text-foreground truncate">{project.assignedUserName}</p>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
+                                        {/* ── Description — fills remaining space ── */}
+                                        <p
+                                            className="text-xs text-muted-foreground line-clamp-3 flex-1 mb-3 leading-relaxed min-h-[3.75rem]"
+                                            title={plainDesc}
+                                        >
+                                            {plainDesc || '\u00a0'}
+                                        </p>
 
-                                        {/* Pending access warning */}
+                                        {/* ── Pending access warning ── */}
                                         {pendingCount > 0 && (
-                                            <div className="flex items-center gap-1.5 text-amber-600 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg px-2.5 py-1.5 mb-3">
+                                            <div className="flex items-center gap-1.5 text-amber-600 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg px-2.5 py-1.5 mb-3 text-[11px] font-medium">
                                                 <AlertCircle className="w-3 h-3 flex-shrink-0" />
-                                                <span className="text-[11px] font-medium">{pendingCount} pending access request{pendingCount > 1 ? 's' : ''}</span>
+                                                {pendingCount} pending access request{pendingCount > 1 ? 's' : ''}
                                             </div>
                                         )}
 
-                                        {/* Date footer */}
-                                        <div className="flex items-center justify-between pt-3 border-t border-border">
-                                            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                                                <Calendar className="w-3 h-3" />
-                                                <span suppressHydrationWarning>{project.startDate ? new Date(project.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : 'No start'}</span>
-                                            </div>
-                                            <span className="text-[10px] text-muted-foreground">→</span>
-                                            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                                                <Calendar className="w-3 h-3" />
-                                                <span suppressHydrationWarning>{project.endDate ? new Date(project.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : 'No end'}</span>
+
+
+                                        {/* ── Meta Row ── */}
+                                        <div className="pt-3 mt-3 border-t border-border space-y-2.5">
+                                            {(project.managerName || project.assignedUserName) && (
+                                                <div className="flex items-center gap-3">
+                                                    {project.managerName && (
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                            <Avatar name={project.managerName} colorClass="bg-violet-500" />
+                                                            <div className="min-w-0">
+                                                                <p className="text-[9px] text-muted-foreground leading-none uppercase tracking-wide">Manager</p>
+                                                                <p className="text-[11px] font-medium text-foreground truncate">{project.managerName}</p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {project.managerName && project.assignedUserName && (
+                                                        <div className="w-px h-6 bg-border flex-shrink-0" />
+                                                    )}
+                                                    {project.assignedUserName && (
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                            <Avatar name={project.assignedUserName} colorClass="bg-blue-500" />
+                                                            <div className="min-w-0">
+                                                                <p className="text-[9px] text-muted-foreground leading-none uppercase tracking-wide">Assigned</p>
+                                                                <p className="text-[11px] font-medium text-foreground truncate">{project.assignedUserName}</p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                                <Calendar className="w-3 h-3 flex-shrink-0" />
+                                                <span suppressHydrationWarning>
+                                                    {project.startDate ? new Date(project.startDate).toLocaleDateString('en-US', dateOpts) : 'No start'}
+                                                </span>
+                                                <span className="mx-0.5 opacity-40">—</span>
+                                                <span suppressHydrationWarning>
+                                                    {project.endDate ? new Date(project.endDate).toLocaleDateString('en-US', dateOpts) : 'No deadline'}
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {projects.some(p => p.status === 'archived') && (
-                        <div className="pt-8 border-t">
-                            <Button
-                                variant="ghost"
-                                className="w-full flex justify-between items-center text-muted-foreground hover:text-foreground hover:bg-muted/30"
-                                onClick={() => setIsArchiveExpanded(!isArchiveExpanded)}
-                            >
-                                <span className="font-semibold">Archived Projects ({projects.filter(p => p.status === 'archived').length})</span>
-                                <span>{isArchiveExpanded ? 'Hide' : 'Show'}</span>
-                            </Button>
-
-                            {isArchiveExpanded && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
-                                    {projects.filter(p => p.status === 'archived').map((project) => (
-                                        <Card
-                                            key={project.id}
-                                            className="p-6 cursor-pointer hover:shadow-lg transition-shadow opacity-70 grayscale-[0.5]"
-                                            onClick={() => setSelectedProject(project)}
-                                        >
-                                            <div className="flex justify-between items-start mb-4">
-                                                <h3 className="text-xl font-semibold">{project.name}</h3>
-                                                <Badge variant="outline" className="uppercase text-[10px]">Archived</Badge>
-                                            </div>
-                                            <div className="flex justify-between text-xs text-muted-foreground mt-auto pt-4 border-t">
-                                                <span>Client: {project.client || 'N/A'}</span>
-                                            </div>
-                                        </Card>
-                                    ))}
-                                </div>
-                            )}
+                                );
+                            })}
                         </div>
                     )}
 
-                    {projects.length === 0 && (
-                        <div className="text-center py-12">
-                            <p className="text-muted-foreground">No projects yet. Create one to get started!</p>
+                    {/* ─── Archived Section ─────────────────────────────────────── */}
+                    {archivedProjects.length > 0 && (
+                        <div className="pt-6 border-t">
+                            <Button
+                                variant="ghost"
+                                className="w-full flex justify-between items-center text-muted-foreground hover:text-foreground hover:bg-muted/30 mb-4"
+                                onClick={() => setIsArchiveExpanded(!isArchiveExpanded)}
+                            >
+                                <span className="font-semibold">Archived Projects ({archivedProjects.length})</span>
+                                <span className="text-xs">{isArchiveExpanded ? 'Hide' : 'Show'}</span>
+                            </Button>
+                            {isArchiveExpanded && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                    {archivedProjects.map((project) => (
+                                        <div
+                                            key={project.id}
+                                            className="bg-card border border-border rounded-2xl p-6 cursor-pointer opacity-60 hover:opacity-80 transition-opacity grayscale-[0.3]"
+                                            onClick={() => setSelectedProject(project)}
+                                        >
+                                            <div className="flex justify-between items-start mb-1.5">
+                                                <h3 className="font-semibold text-foreground truncate flex-1">{project.name}</h3>
+                                                <Badge variant="outline" className="text-[10px] uppercase ml-2 shrink-0">Archived</Badge>
+                                            </div>
+                                            {project.client && (
+                                                <p className="text-xs text-muted-foreground truncate">{project.client}</p>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

@@ -51,8 +51,8 @@
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 12%;
-    --input: 217.2 32.6% 12%;
+    --border: 217.2 32.6% 18%;
+    --input: 217.2 32.6% 18%;
     --ring: 250 95% 64%;
   }
 }
@@ -87,5 +87,35 @@
     max-width: 100%;
     height: auto;
     border-radius: var(--radius);
+  }
+
+  /* Dark mode: replace white Tailwind shadows with subtle dark-friendly ones */
+  .dark .shadow {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+  }
+  .dark .shadow-sm {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  }
+  .dark .shadow-md {
+    box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.5);
+  }
+  .dark .shadow-lg {
+    box-shadow: 0 8px 24px 0 rgba(0, 0, 0, 0.6);
+  }
+  .dark .shadow-xl {
+    box-shadow: 0 16px 40px 0 rgba(0, 0, 0, 0.7);
+  }
+  .dark .shadow-2xl {
+    box-shadow: 0 24px 48px 0 rgba(0, 0, 0, 0.8);
+  }
+  /* Dark mode hover shadows */
+  .dark .hover\:shadow-sm:hover {
+    box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.5);
+  }
+  .dark .hover\:shadow-md:hover {
+    box-shadow: 0 6px 18px 0 rgba(0, 0, 0, 0.6);
+  }
+  .dark .hover\:shadow-lg:hover {
+    box-shadow: 0 10px 28px 0 rgba(0, 0, 0, 0.7);
   }
 }

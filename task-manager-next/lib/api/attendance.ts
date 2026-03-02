@@ -19,8 +19,8 @@ export const attendanceApi = {
         return response.data;
     },
 
-    clockIn: async (data: { clientId: number, notes?: string }) => {
-        const response = await api.post<AttendanceStatus>('/api/attendance/clock-in', data);
+    clockIn: async (data?: { clientId?: number, notes?: string }) => {
+        const response = await api.post<AttendanceStatus>('/api/attendance/clock-in', data || {});
         return response.data;
     },
 

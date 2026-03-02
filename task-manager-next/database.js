@@ -379,6 +379,11 @@ if (isMock) {
           ALTER TABLE attendance ADD COLUMN "clientId" INTEGER REFERENCES clients(id) ON DELETE SET NULL;
         END IF;
 
+        -- Drop existing FK if it's there (since we're using it for projects now)
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'attendance_clientId_fkey') THEN
+          ALTER TABLE attendance DROP CONSTRAINT "attendance_clientId_fkey";
+        END IF;
+
         -- Seed initial clients if empty
         IF (SELECT count(*) FROM clients) = 0 THEN
           INSERT INTO clients (name) VALUES ('Internal Work'), ('Client Alpha'), ('Project X'), ('Global Solutions');

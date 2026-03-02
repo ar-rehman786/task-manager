@@ -233,14 +233,14 @@ function DashboardContent() {
             {/* Team Availability */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Available Members */}
-                <Card className="p-6 border-l-4 border-l-green-500">
+                <Card className="p-6">
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                         <span>🟢</span> Available Team Members
                     </h2>
                     <div className="space-y-3">
                         {teamWorkload.filter((u: any) => u.activeProjects.length === 0).length > 0 ? (
                             teamWorkload.filter((u: any) => u.activeProjects.length === 0).map((u: any) => (
-                                <div key={u.id} className="flex items-center justify-between p-3 bg-green-50/10 rounded-lg border border-green-100/20">
+                                <div key={u.id} className="flex items-center justify-between p-3 rounded-lg hover:shadow-sm hover:bg-muted/30 transition-all duration-150">
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-700 dark:text-green-300 font-bold text-xs">
                                             {u.profilePicture ? (
@@ -266,15 +266,15 @@ function DashboardContent() {
                 </Card>
 
                 {/* Busy Members */}
-                <Card className="p-6 border-l-4 border-l-orange-500">
+                <Card className="p-6">
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                         <span>🔴</span> Busy Team Members
                     </h2>
                     <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
                         {teamWorkload.filter((u: any) => u.activeProjects.length > 0).length > 0 ? (
                             teamWorkload.filter((u: any) => u.activeProjects.length > 0).map((u: any) => (
-                                <div key={u.id} className="p-3 bg-orange-50/5 rounded-lg border border-orange-100/20">
-                                    <div className="flex items-center justify-between mb-3 border-b border-orange-100/20 pb-2">
+                                <div key={u.id} className="p-3 rounded-lg hover:shadow-sm hover:bg-muted/30 transition-all duration-150">
+                                    <div className="flex items-center justify-between mb-3 pb-2 border-b border-border/40">
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-700 dark:text-orange-300 font-bold text-xs">
                                                 {u.profilePicture ? (

@@ -81,7 +81,7 @@ export function TaskDialog({ task, open, onOpenChange, onSubmit, userRole }: Tas
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-[min(900px,calc(100vw-40px))] max-h-[calc(100vh-32px)] w-full flex flex-col p-0 overflow-hidden border-none shadow-2xl">
-                <DialogHeader className="p-4 lg:p-6 pb-2 border-b flex-none bg-background z-20">
+                <DialogHeader className="p-4 lg:p-6 pb-2 border-b border-border dark:border-white/[0.08] flex-none bg-background z-20">
                     <DialogTitle className="text-xl lg:text-2xl font-bold truncate pr-8">{task ? 'Edit Task' : 'Add New Task'}</DialogTitle>
                 </DialogHeader>
                 <form 
@@ -236,7 +236,7 @@ export function TaskDialog({ task, open, onOpenChange, onSubmit, userRole }: Tas
                         </div>
                     )}
                 </form>
-                <DialogFooter className="p-4 lg:p-6 pt-2 border-t bg-muted/20 flex-none z-10">
+                <DialogFooter className="p-4 lg:p-6 pt-2 border-t border-border dark:border-white/[0.08] bg-muted/20 flex-none z-10">
                     <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                         Cancel
                     </Button>

@@ -18,7 +18,7 @@ const next = require("next");
 
 console.log("🔹 SERVER.JS: Next.js module loaded");
 
-const dev = false; 
+const dev = process.env.NODE_ENV !== "production";
 let nextApp;
 try {
   console.log("🔹 SERVER.JS: Initializing Next.js app...");
@@ -2004,7 +2004,12 @@ app.get("/api/projects/:projectId/logs", requireAuth, async (req, res) => {
 app.get("/api/attendance/status", requireAuth, async (req, res) => {
   try {
     const result = await query(
-      "SELECT * FROM attendance WHERE \"userId\" = $1 AND status = 'active'",
+      `
+            SELECT a.*, p.name as "clientName"
+            FROM attendance a
+            LEFT JOIN projects p ON a."clientId" = p.id
+            WHERE a."userId" = $1 AND a.status = 'active'
+        `,
       [req.session.userId],
     );
     res.json(result.rows[0] || null);
@@ -2043,7 +2048,8 @@ app.post("/api/attendance/clock-in", requireAuth, async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: "Clock in error" });
+    console.error("Clock in error:", error);
+    res.status(500).json({ error: "Clock in error", details: error.message });
   }
 });
 
@@ -2272,9 +2278,11 @@ app.get("/api/attendance/history", requireAuth, async (req, res) => {
   try {
     const history = await query(
       `
-            SELECT * FROM attendance 
-            WHERE "userId" = $1 
-            ORDER BY "clockInTime" DESC 
+            SELECT a.*, p.name as "clientName"
+            FROM attendance a
+            LEFT JOIN projects p ON a."clientId" = p.id
+            WHERE a."userId" = $1 
+            ORDER BY a."clockInTime" DESC 
             LIMIT $2
         `,
       [userId, limit],
