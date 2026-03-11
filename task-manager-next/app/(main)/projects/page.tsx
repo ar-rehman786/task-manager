@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Edit3, Calendar, User2, Building, FolderKanban, AlertCircle, Search, Plus, ArrowUpDown } from 'lucide-react';
+import { Edit3, Calendar, User2, Building, FolderKanban, AlertCircle, Search, Plus, ArrowUpDown, ArrowLeft, ArrowRight, FileJson } from 'lucide-react';
 import { toast } from 'sonner';
 import React from 'react';
 
@@ -537,8 +537,8 @@ function ProjectDetail({
     return (
         <div className="p-6 space-y-6">
             <div className="flex justify-between items-center">
-                <Button variant="secondary" onClick={onBack}>
-                    ← Back to Projects
+                <Button variant="secondary" onClick={onBack} className="gap-2">
+                    <ArrowLeft className="w-4 h-4" /> Back to Projects
                 </Button>
                 <div className="flex gap-2">
                     {isAdmin && project.status !== 'archived' && (
@@ -778,7 +778,7 @@ function ProjectDetail({
                             files.map((file: any) => (
                                 <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
                                     <div className="flex items-center gap-3">
-                                        <span className="text-xl">📄</span>
+                                        <FileJson className="w-5 h-5 text-blue-500" />
                                         <div>
                                             <p className="font-medium text-sm">{file.name}</p>
                                             <p className="text-[10px] text-muted-foreground">

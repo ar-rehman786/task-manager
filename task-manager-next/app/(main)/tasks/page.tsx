@@ -11,7 +11,7 @@ import { useAuthStore } from '@/lib/store/authStore';
 import { Button } from '@/components/ui/button';
 import ProtectedRoute from '@/components/protected-route';
 import api from '@/lib/api/client';
-import { Trash2 } from 'lucide-react';
+import { Trash2, ClipboardList, Flag, Circle } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function TasksPage() {
@@ -284,7 +284,9 @@ function TasksContent() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold">Tasks</h1>
-                <Button onClick={() => setShowTaskModal(true)} size="sm">+ New Task</Button>
+                <Button onClick={() => setShowTaskModal(true)} size="sm" className="gap-2">
+                    <ClipboardList className="w-4 h-4" /> New Task
+                </Button>
             </div>
 
             {/* Team Availability — simple inline row */}
@@ -292,7 +294,7 @@ function TasksContent() {
                 <span className="text-muted-foreground font-medium">Available:</span>
                 {availableUsers.length > 0 ? availableUsers.map(u => (
                     <span key={u.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                        <Circle className="w-1.5 h-1.5 fill-emerald-500 text-emerald-500 flex-shrink-0" />
                         {u.name}
                     </span>
                 )) : <span className="text-muted-foreground text-xs">—</span>}
@@ -300,7 +302,7 @@ function TasksContent() {
                 <span className="text-muted-foreground font-medium">Busy:</span>
                 {busyUsers.length > 0 ? busyUsers.map(u => (
                     <span key={u.id} className="flex items-center gap-1 text-amber-600 font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                        <Circle className="w-1.5 h-1.5 fill-amber-500 text-amber-500 inline-block" />
                         {u.name}
                         <span className="text-xs text-muted-foreground">({activeTaskCountMap[u.id] || 0})</span>
                     </span>
@@ -425,7 +427,9 @@ function TasksContent() {
                                                     <span className="text-[10px] text-primary bg-primary/8 px-1.5 py-0.5 rounded">{task.projectName}</span>
                                                 )}
                                                 {task.milestoneTitle && (
-                                                    <span className="text-[10px] text-orange-600 bg-orange-50 dark:bg-orange-500/10 px-1.5 py-0.5 rounded">{task.milestoneTitle}</span>
+                                                    <span className="text-[10px] text-orange-600 bg-orange-50 dark:bg-orange-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                                        <Flag className="w-2.5 h-2.5" /> {task.milestoneTitle}
+                                                    </span>
                                                 )}
                                             </div>
                                         )}

@@ -8,7 +8,7 @@ import api from '@/lib/api/client';
 import { io, Socket } from 'socket.io-client';
 import { useQuery } from '@tanstack/react-query';
 import { usersApi } from '@/lib/api/users';
-import { Send, MessageSquare, Check, CheckCheck, Users, ChevronUp, AtSign } from 'lucide-react';
+import { Send, MessageSquare, Check, CheckCheck, Users, ChevronUp, AtSign, Hand } from 'lucide-react';
 
 export default function ChatPage() {
     return (
@@ -365,7 +365,7 @@ function ChatContent() {
                 {messages.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-full gap-3 py-20 opacity-50">
                         <MessageSquare className="w-12 h-12 text-muted-foreground" />
-                        <p className="text-muted-foreground text-sm">No messages yet. Say hello! 👋</p>
+                        <p className="text-muted-foreground text-sm">No messages yet. Say hello! <Hand className="w-4 h-4 inline-block text-amber-400 rotate-12" /></p>
                     </div>
                 )}
 

@@ -1084,9 +1084,8 @@ app.put("/api/tasks/:id", requireAuth, async (req, res) => {
 
     // --- Notification Logic ---
     let notificationMessage = "";
+    let notifyId = null;
     const targetUserId = Number(assignedUserId);
-    const currentUserId = req.session.userId;
-    const currentUserName = req.session.userName || "Someone";
 
     // 1. Assignment Change
     if (oldTask.assignedUserId != assignedUserId) {
@@ -1106,15 +1105,7 @@ app.put("/api/tasks/:id", requireAuth, async (req, res) => {
         done: "Done",
       };
       notificationMessage = `${currentUserName} moved task '${newTask.title}' from ${statusMap[oldTask.status]} to ${statusMap[status]}`;
-
-      const notifyId =
-        oldTask.assignedUserId ||
-        (oldTask.createdBy !== currentUserId ? oldTask.createdBy : null);
-      if (notifyId && notifyId !== currentUserId) {
-        await sendNotification(notifyId, "info", notificationMessage, {
-          taskId: newTask.id,
-        });
-      }
+      notifyId = oldTask.assignedUserId || (oldTask.createdBy !== currentUserId ? oldTask.createdBy : null);
     }
     // 3. Priority Change (notify current assignee or creator)
     else if (oldTask.priority !== priority) {
@@ -1134,26 +1125,26 @@ app.put("/api/tasks/:id", requireAuth, async (req, res) => {
       notificationMessage = `${currentUserName} updated details for task: ${newTask.title}`;
 
       if (oldTask.assignedUserId && oldTask.assignedUserId !== currentUserId) {
-        notifyUserId = oldTask.assignedUserId;
+        notifyId = oldTask.assignedUserId;
       } else if (
         !oldTask.assignedUserId &&
         oldTask.createdBy !== currentUserId
       ) {
-        notifyUserId = oldTask.createdBy;
+        notifyId = oldTask.createdBy;
       }
     }
 
     // Send Notification if we have a message and a target user
-    if (notificationMessage && notifyUserId) {
+    if (notificationMessage && notifyId && notifyId !== currentUserId) {
       console.log(
-        `[TASK_UPDATE] Sending notification to user ${notifyUserId}: ${notificationMessage}`,
+        `[TASK_UPDATE] Sending notification to user ${notifyId}: ${notificationMessage}`,
       );
-      sendNotification(notifyUserId, "info", notificationMessage, {
+      sendNotification(notifyId, "info", notificationMessage, {
         taskId: id,
       });
     } else if (notificationMessage) {
       console.log(
-        `[TASK_UPDATE] Notification message created but no target user: "${notificationMessage}"`,
+        `[TASK_UPDATE] Notification message created but no target user or user is self: "${notificationMessage}"`,
       );
     }
 

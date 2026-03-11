@@ -25,7 +25,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Circle } from 'lucide-react';
 
 export default function TeamPage() {
     return (
@@ -184,7 +184,9 @@ function TeamContent() {
                                         </span>
                                     </td>
                                     <td className="py-3 px-4">
-                                        <span className="text-green-600">● Active</span>
+                                        <span className="text-green-600 flex items-center gap-1.5 font-medium">
+                                            <Circle className="w-2 h-2 fill-green-600" /> Active
+                                        </span>
                                     </td>
                                     <td className="py-3 px-4 text-muted-foreground">
                                         {user.createdAt
