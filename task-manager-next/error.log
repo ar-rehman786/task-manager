@@ -1,30 +1,7 @@
 {
-  "stack": "AggregateError: \n    at C:\\Users\\Asad\\Desktop\\task-manager\\task-manager-next\\node_modules\\pg-pool\\index.js:45:11\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at async initializeDatabase (C:\\Users\\Asad\\Desktop\\task-manager\\task-manager-next\\database.js:78:20)\n    at async Server.<anonymous> (C:\\Users\\Asad\\Desktop\\task-manager\\task-manager-next\\server.js:2791:9)",
-  "errors": [
-    {
-      "stack": "Error: connect ECONNREFUSED ::1:5432\n    at createConnectionError (node:net:1678:14)\n    at afterConnectMultiple (node:net:1708:16)",
-      "code": "ECONNREFUSED"
-    },
-    {
-      "stack": "Error: connect ECONNREFUSED 127.0.0.1:5432\n    at createConnectionError (node:net:1678:14)\n    at afterConnectMultiple (node:net:1708:16)",
-      "code": "ECONNREFUSED"
-    }
-  ],
-  "code": "ECONNREFUSED"
+  "stack": "Error: read ECONNRESET\n    at E:\\task-manager\\task-manager-next\\node_modules\\pg-pool\\index.js:45:11\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at async initializeDatabase (E:\\task-manager\\task-manager-next\\database.js:78:20)\n    at async Server.<anonymous> (E:\\task-manager\\task-manager-next\\server.js:3187:9)",
+  "message": "read ECONNRESET",
+  "errno": -4077,
+  "code": "ECONNRESET",
+  "syscall": "read"
 }
-[
-  {
-    "errno": -4078,
-    "code": "ECONNREFUSED",
-    "syscall": "connect",
-    "address": "::1",
-    "port": 5432
-  },
-  {
-    "errno": -4078,
-    "code": "ECONNREFUSED",
-    "syscall": "connect",
-    "address": "127.0.0.1",
-    "port": 5432
-  }
-]

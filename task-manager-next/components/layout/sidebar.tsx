@@ -18,6 +18,7 @@ import {
     StickyNote,
     Building2,
     MessageSquare,
+    Code2,
 } from 'lucide-react';
 import { useStickyStore } from '@/lib/store/stickyStore';
 
@@ -31,6 +32,7 @@ const navigation = [
     { name: 'Team', href: '/team', icon: Users },
     { name: 'Attendance', href: '/attendance', icon: Clock },
     { name: 'Profile', href: '/profile', icon: UserCircle },
+    { name: 'Apis', href: '/api-docs', icon: Code2, adminOnly: true },
 ];
 
 export default function Sidebar() {
@@ -63,7 +65,7 @@ export default function Sidebar() {
             {/* Navigation */}
             <nav className="flex-1 px-2.5 py-2.5 space-y-0.5 overflow-y-auto">
                 {navigation.map((item) => {
-                    if (item.name === 'Team' && user?.role !== 'admin') return null;
+                    if (item.adminOnly && user?.role !== 'admin') return null;
 
                     const isActive = pathname === item.href;
                     const Icon = item.icon;

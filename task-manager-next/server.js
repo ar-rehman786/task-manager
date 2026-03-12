@@ -212,6 +212,18 @@ app.use((req, res, next) => {
 app.use(bodyParser.json({ limit: "50mb" }));
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
 
+// REST API AUTHENTICATION MIDDLEWARE
+const API_KEY = "your-secret"; // In production, this should be in .env
+
+function requireApiKey(req, res, next) {
+  const apiKey = req.headers["x-api-key"];
+  if (!apiKey || apiKey !== API_KEY) {
+    console.warn(`[API] Unauthorized access attempt with key: ${apiKey}`);
+    return res.status(401).json({ error: "Unauthorized - Invalid or missing X-API-Key header" });
+  }
+  next();
+}
+
 app.set("trust proxy", 1); // Trust first proxy (Railway)
 
 // Check if we are mocking (using dummy URL)
@@ -350,6 +362,186 @@ async function requireAdmin(req, res, next) {
     res.status(500).json({ error: "Server error checking permissions" });
   }
 }
+
+// ============= REST API ENDPOINTS =============
+
+// --- PROJECTS ---
+
+// GET /api/projects — list all projects
+app.get("/api/projects", requireApiKey, async (req, res) => {
+  try {
+    const result = await query("SELECT * FROM projects ORDER BY \"createdAt\" DESC");
+    res.json(result.rows);
+  } catch (error) {
+    console.error("API Fetch projects error:", error);
+    res.status(500).json({ error: "Failed to fetch projects" });
+  }
+});
+
+// GET /api/projects/:id — single project details
+app.get("/api/projects/:id", requireApiKey, async (req, res) => {
+  try {
+    const result = await query("SELECT * FROM projects WHERE id = $1", [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: "Project not found" });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("API Fetch project error:", error);
+    res.status(500).json({ error: "Failed to fetch project" });
+  }
+});
+
+// POST /api/projects — create project
+app.post("/api/projects", requireApiKey, async (req, res) => {
+  const { title, description } = req.body;
+  if (!title) return res.status(400).json({ error: "Title is required" });
+
+  try {
+    const result = await query(
+      "INSERT INTO projects (name, description) VALUES ($1, $2) RETURNING *",
+      [title, description]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error("API Create project error:", error);
+    res.status(500).json({ error: "Failed to create project" });
+  }
+});
+
+// PATCH /api/projects/:id — update project
+app.patch("/api/projects/:id", requireApiKey, async (req, res) => {
+  const { title, description } = req.body;
+  
+  try {
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    if (title) { fields.push(`name = $${idx++}`); values.push(title); }
+    if (description !== undefined) { fields.push(`description = $${idx++}`); values.push(description); }
+
+    if (fields.length === 0) return res.status(400).json({ error: "No fields to update" });
+
+    values.push(req.params.id);
+    const result = await query(
+      `UPDATE projects SET ${fields.join(", ")}, "updatedAt" = CURRENT_TIMESTAMP WHERE id = $${idx} RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) return res.status(404).json({ error: "Project not found" });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("API Update project error:", error);
+    res.status(500).json({ error: "Failed to update project" });
+  }
+});
+
+// DELETE /api/projects/:id — delete a project
+app.delete("/api/projects/:id", requireApiKey, async (req, res) => {
+  try {
+    const result = await query("DELETE FROM projects WHERE id = $1 RETURNING *", [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: "Project not found" });
+    res.json({ message: "Project deleted successfully" });
+  } catch (error) {
+    console.error("API Delete project error:", error);
+    res.status(500).json({ error: "Failed to delete project" });
+  }
+});
+
+// --- TASKS ---
+
+// GET /api/tasks — list tasks, filterable
+app.get("/api/tasks", requireApiKey, async (req, res) => {
+  const { project, status, assignee } = req.query;
+  
+  try {
+    const filters = [];
+    const params = [];
+    let idx = 1;
+
+    if (project) { filters.push(`"projectId" = $${idx++}`); params.push(project); }
+    if (status) { filters.push(`status = $${idx++}`); params.push(status); }
+    if (assignee) { filters.push(`"assignedUserId" = $${idx++}`); params.push(assignee); }
+
+    const whereClause = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
+    const result = await query(`SELECT * FROM tasks ${whereClause} ORDER BY "createdAt" DESC`, params);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("API Fetch tasks error:", error);
+    res.status(500).json({ error: "Failed to fetch tasks" });
+  }
+});
+
+// POST /api/tasks — create task
+app.post("/api/tasks", requireApiKey, async (req, res) => {
+  const { title, description, projectId, assigneeId, status } = req.body;
+  if (!title || !projectId) return res.status(400).json({ error: "Title and projectId are required" });
+
+  try {
+    const result = await query(
+      `INSERT INTO tasks (title, description, "projectId", "assignedUserId", status, "createdBy") 
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [title, description, projectId, assigneeId || null, status || 'todo', 1] // Assuming system/admin creator (ID 1)
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error("API Create task error:", error);
+    res.status(500).json({ error: "Failed to create task" });
+  }
+});
+
+// PATCH /api/tasks/:id — update task
+app.patch("/api/tasks/:id", requireApiKey, async (req, res) => {
+  const { title, description, status } = req.body;
+
+  try {
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    if (title) { fields.push(`title = $${idx++}`); values.push(title); }
+    if (description !== undefined) { fields.push(`description = $${idx++}`); values.push(description); }
+    if (status) { fields.push(`status = $${idx++}`); values.push(status); }
+
+    if (fields.length === 0) return res.status(400).json({ error: "No fields to update" });
+
+    values.push(req.params.id);
+    const result = await query(
+      `UPDATE tasks SET ${fields.join(", ")}, "updatedAt" = CURRENT_TIMESTAMP WHERE id = $${idx} RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) return res.status(404).json({ error: "Task not found" });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("API Update task error:", error);
+    res.status(500).json({ error: "Failed to update task" });
+  }
+});
+
+// DELETE /api/tasks/:id — delete a task
+app.delete("/api/tasks/:id", requireApiKey, async (req, res) => {
+  try {
+    const result = await query("DELETE FROM tasks WHERE id = $1 RETURNING *", [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: "Task not found" });
+    res.json({ message: "Task deleted successfully" });
+  } catch (error) {
+    console.error("API Delete task error:", error);
+    res.status(500).json({ error: "Failed to delete task" });
+  }
+});
+
+// --- TEAM MEMBERS ---
+
+// GET /api/team-members — list all team members
+app.get("/api/team-members", requireApiKey, async (req, res) => {
+  try {
+    const result = await query("SELECT id, name, email, role, title, department FROM users WHERE active = 1");
+    res.json(result.rows);
+  } catch (error) {
+    console.error("API Fetch team members error:", error);
+    res.status(500).json({ error: "Failed to fetch team members" });
+  }
+});
 
 // ============= AUTH ROUTES =============
 
