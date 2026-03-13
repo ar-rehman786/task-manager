@@ -331,6 +331,14 @@ app.get("/api/debug/init-notifications", async (req, res) => {
 
 // Auth middleware
 function requireAuth(req, res, next) {
+  // Allow access if API key is provided
+  const apiKey = req.headers["x-api-key"];
+  if (apiKey && apiKey === API_KEY) {
+    req.session.userId = 1; // Inject mock admin session for API usage
+    req.session.userRole = 'admin';
+    return next();
+  }
+
   if (!req.session.userId) {
     console.log(
       `[AUTH] Unauthorized access to ${req.originalUrl}. Session ID: ${req.sessionID}`,
@@ -341,6 +349,14 @@ function requireAuth(req, res, next) {
 }
 
 async function requireAdmin(req, res, next) {
+  // Allow access if API key is provided
+  const apiKey = req.headers["x-api-key"];
+  if (apiKey && apiKey === API_KEY) {
+    req.session.userId = 1; // Inject mock admin session for API usage
+    req.session.userRole = 'admin';
+    return next();
+  }
+
   console.log(`[AUTH] requireAdmin check for ${req.originalUrl}`);
   console.log(`[AUTH] SessionID: ${req.sessionID}`);
   console.log(`[AUTH] userId: ${req.session?.userId}`);
