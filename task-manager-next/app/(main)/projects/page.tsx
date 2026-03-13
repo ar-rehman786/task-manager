@@ -18,7 +18,13 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Edit3, Calendar, User2, Building, FolderKanban, AlertCircle, Search, Plus, ArrowUpDown, ArrowLeft, ArrowRight, FileJson } from 'lucide-react';
+import {
+    Terminal, Globe, Shield, Copy, Check, ChevronRight,
+    BookOpen, ArrowRight, Code2, Zap, Lock, Search,
+    ChevronDown, ChevronUp, AlertCircle, CheckCircle2,
+    Hash, ExternalLink, Eye, EyeOff, FileText, Image as ImageIcon,
+    Plus, ArrowUpDown, FolderKanban, Building, Calendar, Edit3, FileJson, ArrowLeft
+} from 'lucide-react';
 import { toast } from 'sonner';
 import React from 'react';
 
@@ -423,6 +429,17 @@ function ProjectDetail({
         },
     });
 
+    const getFileIcon = (fileName: string) => {
+        const ext = fileName.split('.').pop()?.toLowerCase() || '';
+        if (['jpg', 'jpeg', 'png', 'gif', 'svg'].includes(ext)) {
+            return <ImageIcon className="w-5 h-5 text-purple-500" />;
+        }
+        if (ext === 'json') {
+            return <FileJson className="w-5 h-5 text-blue-500" />;
+        }
+        return <FileText className="w-5 h-5 text-emerald-500" />;
+    };
+
     const { data: projectTasks = [] } = useQuery({
         queryKey: ['tasks', 'project', project.id],
         queryFn: () => projectsApi.getProjectTasks(project.id),
@@ -527,8 +544,14 @@ function ProjectDetail({
     };
 
     const handleUploadFile = (file: File) => {
-        if (!file.name.endsWith('.json')) {
-            alert('Please upload a JSON file');
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        const allowedExtensions = ['json', 'pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx'];
+        if (!ext || !allowedExtensions.includes(ext)) {
+            alert(`File type not supported. Please upload one of: ${allowedExtensions.join(', ')}`);
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) { // Front-end 10MB check
+            alert('File is too large. Maximum size is 10MB.');
             return;
         }
         uploadFileMutation.mutate(file);
@@ -647,7 +670,7 @@ function ProjectDetail({
                     </div>
                 </Card>
 
-                <Card className="p-6">
+                <Card className="p-6 order-3">
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-semibold">Client Access Required</h3>
                         <Button size="sm" variant="outline" onClick={() => setIsAccessDialogOpen(true)}>
@@ -751,21 +774,22 @@ function ProjectDetail({
                         )}
                     </div>
                 </Card>
-                <Card className="p-6">
+                <Card className="p-6 order-2">
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-semibold">Project JSON Files</h3>
+                        <h3 className="text-lg font-semibold">Project Files & Documents</h3>
                         <div className="relative">
                             <Button size="sm" variant="outline" asChild>
                                 <label className="cursor-pointer">
-                                    + Upload JSON
+                                    + Upload File
                                     <input
                                         type="file"
-                                        accept=".json"
+                                        accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.json"
                                         className="hidden"
                                         onChange={(e) => {
                                             const file = e.target.files?.[0];
                                             if (file) handleUploadFile(file);
                                         }}
+                                        onClick={(e) => { (e.target as HTMLInputElement).value = ''; }} // Reset to allow re-uploading same file
                                     />
                                 </label>
                             </Button>
@@ -777,10 +801,10 @@ function ProjectDetail({
                         ) : (
                             files.map((file: any) => (
                                 <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
-                                    <div className="flex items-center gap-3">
-                                        <FileJson className="w-5 h-5 text-blue-500" />
-                                        <div>
-                                            <p className="font-medium text-sm">{file.name}</p>
+                                    <div className="flex items-center gap-3 min-w-0 pr-4">
+                                        {getFileIcon(file.name)}
+                                        <div className="min-w-0">
+                                            <p className="font-medium text-sm truncate">{file.name}</p>
                                             <p className="text-[10px] text-muted-foreground">
                                                 Added by {file.userName} on {new Date(file.createdAt).toLocaleDateString()}
                                             </p>

@@ -1,15 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
     Terminal, Globe, Shield, Copy, Check, ChevronRight,
     BookOpen, ArrowRight, Code2, Zap, Lock, Search,
     ChevronDown, ChevronUp, AlertCircle, CheckCircle2,
-    Hash, ExternalLink
+    Hash, ExternalLink, Eye, EyeOff
 } from 'lucide-react';
 
 const BASE_URL = 'https://task-manager-production-563b.up.railway.app';
-const API_KEY = 'your-secret';
 
 // ─── Types ─────────────────────────────────────────────
 interface QueryParam { name: string; type: string; required: boolean; description: string; example?: string; }
@@ -18,200 +18,9 @@ interface Endpoint {
     path: string; description: string; summary: string;
     queryParams?: QueryParam[];
     body?: { [key: string]: { type: string; required: boolean; description: string; example?: string } };
-    responses: { [code: string]: { description: string; example?: object } };
-    example: { curl: string; response: object };
+    responses: { [code: string]: { description: string; example?: any } };
+    example: { curl: string; response: any };
 }
-
-// ─── Data ───────────────────────────────────────────────
-const endpoints: Endpoint[] = [
-    {
-        id: 'get-projects',
-        method: 'GET',
-        path: '/api/projects',
-        summary: 'List all projects',
-        description: 'Returns a list of all projects in the workspace, ordered by creation date (newest first).',
-        responses: {
-            '200': {
-                description: 'An array of project objects.',
-                example: [{ id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', createdAt: '2025-03-01T10:00:00Z' }]
-            },
-            '401': { description: 'Invalid or missing API key.' }
-        },
-        example: {
-            curl: `curl -X GET "${BASE_URL}/api/projects" \\\n  -H "X-API-Key: ${API_KEY}"`,
-            response: [{ id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', createdAt: '2025-03-01T10:00:00Z' }, { id: 2, name: 'Mobile App', description: 'iOS & Android companion app', status: 'active', createdAt: '2025-02-15T09:00:00Z' }]
-        }
-    },
-    {
-        id: 'get-project',
-        method: 'GET',
-        path: '/api/projects/:id',
-        summary: 'Get single project',
-        description: 'Returns full details for a specific project identified by its ID.',
-        responses: {
-            '200': { description: 'A single project object.', example: { id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', createdAt: '2025-03-01T10:00:00Z' } },
-            '401': { description: 'Invalid or missing API key.' },
-            '404': { description: 'Project not found.' }
-        },
-        example: {
-            curl: `curl -X GET "${BASE_URL}/api/projects/1" \\\n  -H "X-API-Key: ${API_KEY}"`,
-            response: { id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', createdAt: '2025-03-01T10:00:00Z' }
-        }
-    },
-    {
-        id: 'create-project',
-        method: 'POST',
-        path: '/api/projects',
-        summary: 'Create a project',
-        description: 'Creates a new project in the workspace. The title field is required.',
-        body: {
-            title: { type: 'string', required: true, description: 'The name/title of the project.', example: 'Website Redesign' },
-            description: { type: 'string', required: false, description: 'A detailed description of the project.', example: 'Complete overhaul of company website' }
-        },
-        responses: {
-            '201': { description: 'The newly created project object.', example: { id: 3, name: 'Website Redesign', description: 'Complete overhaul', status: 'active', createdAt: '2025-03-13T01:00:00Z' } },
-            '400': { description: 'Missing required fields (title).' },
-            '401': { description: 'Invalid or missing API key.' }
-        },
-        example: {
-            curl: `curl -X POST "${BASE_URL}/api/projects" \\\n  -H "X-API-Key: ${API_KEY}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"Website Redesign","description":"Complete overhaul"}'`,
-            response: { id: 3, name: 'Website Redesign', description: 'Complete overhaul', status: 'active', createdAt: '2025-03-13T01:00:00Z' }
-        }
-    },
-    {
-        id: 'update-project',
-        method: 'PATCH',
-        path: '/api/projects/:id',
-        summary: 'Update a project',
-        description: 'Partially updates an existing project. Only send the fields you want to change.',
-        body: {
-            title: { type: 'string', required: false, description: 'New name for the project.', example: 'Website Redesign v2' },
-            description: { type: 'string', required: false, description: 'Updated project description.', example: 'Phase 2 redesign' }
-        },
-        responses: {
-            '200': { description: 'The updated project object.' },
-            '400': { description: 'No valid fields provided.' },
-            '401': { description: 'Invalid or missing API key.' },
-            '404': { description: 'Project not found.' }
-        },
-        example: {
-            curl: `curl -X PATCH "${BASE_URL}/api/projects/1" \\\n  -H "X-API-Key: ${API_KEY}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"Website Redesign v2"}'`,
-            response: { id: 1, name: 'Website Redesign v2', description: 'Complete overhaul', status: 'active', updatedAt: '2025-03-13T01:30:00Z' }
-        }
-    },
-    {
-        id: 'delete-project',
-        method: 'DELETE',
-        path: '/api/projects/:id',
-        summary: 'Delete a project',
-        description: 'Permanently deletes a project and all associated data. This action is irreversible.',
-        responses: {
-            '200': { description: 'Success confirmation message.', example: { message: 'Project deleted successfully' } },
-            '401': { description: 'Invalid or missing API key.' },
-            '404': { description: 'Project not found.' }
-        },
-        example: {
-            curl: `curl -X DELETE "${BASE_URL}/api/projects/1" \\\n  -H "X-API-Key: ${API_KEY}"`,
-            response: { message: 'Project deleted successfully' }
-        }
-    },
-    {
-        id: 'get-tasks',
-        method: 'GET',
-        path: '/api/tasks',
-        summary: 'List all tasks',
-        description: 'Returns a list of tasks. Supports powerful filtering via query parameters.',
-        queryParams: [
-            { name: 'project', type: 'integer', required: false, description: 'Filter tasks by project ID.', example: '1' },
-            { name: 'status', type: 'string', required: false, description: 'Filter by status. One of: todo, in_progress, blocked, done.', example: 'in_progress' },
-            { name: 'assignee', type: 'integer', required: false, description: 'Filter tasks assigned to a specific user ID.', example: '3' }
-        ],
-        responses: {
-            '200': { description: 'An array of task objects.' },
-            '401': { description: 'Invalid or missing API key.' }
-        },
-        example: {
-            curl: `curl -X GET "${BASE_URL}/api/tasks?project=1&status=in_progress" \\\n  -H "X-API-Key: ${API_KEY}"`,
-            response: [{ id: 5, title: 'Design homepage', description: 'Create wireframes', status: 'in_progress', projectId: 1, assignedUserId: 2, createdAt: '2025-03-10T08:00:00Z' }]
-        }
-    },
-    {
-        id: 'create-task',
-        method: 'POST',
-        path: '/api/tasks',
-        summary: 'Create a task',
-        description: 'Creates a new task. Both title and projectId are required. If no status is provided, it defaults to "todo".',
-        body: {
-            title: { type: 'string', required: true, description: 'The task title.', example: 'Design homepage mockup' },
-            description: { type: 'string', required: false, description: 'Detailed description of the task.', example: 'Create lo-fi and hi-fi wireframes' },
-            projectId: { type: 'integer', required: true, description: 'ID of the project this task belongs to.', example: '1' },
-            assigneeId: { type: 'integer', required: false, description: 'User ID of the team member to assign this task to.', example: '3' },
-            status: { type: 'string', required: false, description: 'Initial status. One of: todo, in_progress, blocked, done. Defaults to "todo".', example: 'todo' }
-        },
-        responses: {
-            '201': { description: 'The newly created task object.' },
-            '400': { description: 'Missing required fields (title or projectId).' },
-            '401': { description: 'Invalid or missing API key.' }
-        },
-        example: {
-            curl: `curl -X POST "${BASE_URL}/api/tasks" \\\n  -H "X-API-Key: ${API_KEY}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"Design homepage","projectId":1,"assigneeId":2,"status":"todo"}'`,
-            response: { id: 6, title: 'Design homepage', description: null, status: 'todo', projectId: 1, assignedUserId: 2, createdAt: '2025-03-13T02:00:00Z' }
-        }
-    },
-    {
-        id: 'update-task',
-        method: 'PATCH',
-        path: '/api/tasks/:id',
-        summary: 'Update a task',
-        description: 'Partially updates an existing task. Common use case: changing the status as a task progresses.',
-        body: {
-            title: { type: 'string', required: false, description: 'Updated task title.', example: 'Design homepage v2' },
-            description: { type: 'string', required: false, description: 'Updated task description.' },
-            status: { type: 'string', required: false, description: 'New status. One of: todo, in_progress, blocked, done.', example: 'done' }
-        },
-        responses: {
-            '200': { description: 'The updated task object.' },
-            '400': { description: 'No valid fields provided.' },
-            '401': { description: 'Invalid or missing API key.' },
-            '404': { description: 'Task not found.' }
-        },
-        example: {
-            curl: `curl -X PATCH "${BASE_URL}/api/tasks/5" \\\n  -H "X-API-Key: ${API_KEY}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"status":"done"}'`,
-            response: { id: 5, title: 'Design homepage', status: 'done', updatedAt: '2025-03-13T03:00:00Z' }
-        }
-    },
-    {
-        id: 'delete-task',
-        method: 'DELETE',
-        path: '/api/tasks/:id',
-        summary: 'Delete a task',
-        description: 'Permanently deletes a task. This cannot be undone.',
-        responses: {
-            '200': { description: 'Success confirmation message.', example: { message: 'Task deleted successfully' } },
-            '401': { description: 'Invalid or missing API key.' },
-            '404': { description: 'Task not found.' }
-        },
-        example: {
-            curl: `curl -X DELETE "${BASE_URL}/api/tasks/5" \\\n  -H "X-API-Key: ${API_KEY}"`,
-            response: { message: 'Task deleted successfully' }
-        }
-    },
-    {
-        id: 'get-team',
-        method: 'GET',
-        path: '/api/team-members',
-        summary: 'List team members',
-        description: 'Returns all active team members and their public profile information. Useful for populating assignee dropdowns.',
-        responses: {
-            '200': { description: 'An array of team member objects.', example: [{ id: 1, name: 'John Doe', email: 'john@example.com', role: 'admin', title: 'Engineering Lead', department: 'Engineering' }] },
-            '401': { description: 'Invalid or missing API key.' }
-        },
-        example: {
-            curl: `curl -X GET "${BASE_URL}/api/team-members" \\\n  -H "X-API-Key: ${API_KEY}"`,
-            response: [{ id: 1, name: 'John Doe', email: 'john@example.com', role: 'admin', title: 'Engineering Lead', department: 'Engineering' }, { id: 2, name: 'Jane Smith', email: 'jane@example.com', role: 'member', title: 'Designer', department: 'Design' }]
-        }
-    }
-];
 
 // ─── Component Helpers ───────────────────────────────────
 const methodColors: Record<string, string> = {
@@ -236,10 +45,17 @@ const groups = [
     { label: 'Team', ids: ['get-team'] },
 ];
 
-function CodeBlock({ code, lang = 'bash', id }: { code: string; lang?: string; id: string }) {
+function CodeBlock({ code, lang = 'bash', id, copyValue, onToggleVisibility, isRevealed }: {
+    code: string;
+    lang?: string;
+    id: string;
+    copyValue?: string;
+    onToggleVisibility?: () => void;
+    isRevealed?: boolean;
+}) {
     const [copied, setCopied] = useState(false);
     const copy = () => {
-        navigator.clipboard.writeText(code);
+        navigator.clipboard.writeText(copyValue ?? code);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
@@ -247,16 +63,29 @@ function CodeBlock({ code, lang = 'bash', id }: { code: string; lang?: string; i
         <div className="relative group rounded-xl overflow-hidden border border-white/5">
             <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
                 <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider">{lang}</span>
-                <button onClick={copy} className="flex items-center gap-1.5 text-[11px] text-zinc-400 hover:text-white transition-colors">
-                    {copied ? <><Check size={12} className="text-emerald-400" /><span className="text-emerald-400">Copied!</span></> : <><Copy size={12} /><span>Copy</span></>}
-                </button>
+                <div className="flex items-center gap-3">
+                    {onToggleVisibility && (
+                        <button onClick={onToggleVisibility} className="flex items-center gap-1.5 text-[11px] text-zinc-400 hover:text-white transition-colors">
+                            {isRevealed ? <><EyeOff size={12} /><span>Hide</span></> : <><Eye size={12} /><span>Show</span></>}
+                        </button>
+                    )}
+                    <button onClick={copy} className="flex items-center gap-1.5 text-[11px] text-zinc-400 hover:text-white transition-colors">
+                        {copied ? <><Check size={12} className="text-emerald-400" /><span className="text-emerald-400">Copied!</span></> : <><Copy size={12} /><span>Copy</span></>}
+                    </button>
+                </div>
             </div>
             <pre className="p-4 text-sm font-mono text-zinc-300 overflow-x-auto bg-zinc-950 leading-relaxed">{code}</pre>
         </div>
     );
 }
 
-function EndpointCard({ ep }: { ep: Endpoint }) {
+function EndpointCard({ ep, apiKey, maskKey, onToggleVisibility, isKeyRevealed }: {
+    ep: Endpoint;
+    apiKey: string;
+    maskKey: (k: string) => string;
+    onToggleVisibility: () => void;
+    isKeyRevealed: boolean;
+}) {
     const [open, setOpen] = useState(false);
     const [tab, setTab] = useState<'example' | 'response' | 'params'>('example');
 
@@ -299,7 +128,14 @@ function EndpointCard({ ep }: { ep: Endpoint }) {
                         {tab === 'example' && (
                             <div className="space-y-3">
                                 <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">cURL Request</p>
-                                <CodeBlock code={ep.example.curl} lang="bash" id={ep.id + '-curl'} />
+                                <CodeBlock
+                                    code={apiKey ? ep.example.curl.replace(apiKey, maskKey(apiKey)) : ep.example.curl.replace(/\${apiKey}/g, maskKey(''))}
+                                    copyValue={apiKey ? ep.example.curl : undefined}
+                                    lang="bash"
+                                    id={ep.id + '-curl'}
+                                    onToggleVisibility={apiKey ? onToggleVisibility : undefined}
+                                    isRevealed={isKeyRevealed}
+                                />
                             </div>
                         )}
 
@@ -412,12 +248,226 @@ function EndpointCard({ ep }: { ep: Endpoint }) {
 export default function ApiDocsPage() {
     const [activeSection, setActiveSection] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [apiKey, setApiKey] = useState('');
+    const [isKeyRevealed, setIsKeyRevealed] = useState(false);
+    const [hasError, setHasError] = useState(false);
+
+    useEffect(() => {
+        axios.get('/api/admin/api-key', { withCredentials: true })
+            .then(res => {
+                if (res.data.apiKey) {
+                    setApiKey(res.data.apiKey);
+                } else {
+                    console.error('API key missing in response');
+                    setHasError(true);
+                }
+            })
+            .catch(err => {
+                console.error('Failed to fetch API key', err);
+                setHasError(true);
+            });
+    }, []);
+
+    const endpoints: Endpoint[] = [
+        {
+            id: 'get-projects',
+            method: 'GET',
+            path: '/api/projects',
+            summary: 'List all projects',
+            description: 'Returns a list of all projects in the workspace, ordered by creation date (newest first).',
+            responses: {
+                '200': {
+                    description: 'An array of project objects.',
+                    example: [{ id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', createdAt: '2025-03-01T10:00:00Z' }]
+                },
+                '401': { description: 'Invalid or missing API key.' }
+            },
+            example: {
+                curl: `curl -X GET "${BASE_URL}/api/projects" \\\n  -H "X-API-Key: ${apiKey}"`,
+                response: [{ id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', createdAt: '2025-03-01T10:00:00Z' }, { id: 2, name: 'Mobile App', description: 'iOS & Android companion app', status: 'active', createdAt: '2025-02-15T09:00:00Z' }]
+            }
+        },
+        {
+            id: 'get-project',
+            method: 'GET',
+            path: '/api/projects/:id',
+            summary: 'Get single project',
+            description: 'Returns full details for a specific project identified by its ID.',
+            responses: {
+                '200': { description: 'A single project object.', example: { id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', createdAt: '2025-03-01T10:00:00Z' } },
+                '401': { description: 'Invalid or missing API key.' },
+                '404': { description: 'Project not found.' }
+            },
+            example: {
+                curl: `curl -X GET "${BASE_URL}/api/projects/1" \\\n  -H "X-API-Key: ${apiKey}"`,
+                response: { id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', createdAt: '2025-03-01T10:00:00Z' }
+            }
+        },
+        {
+            id: 'create-project',
+            method: 'POST',
+            path: '/api/projects',
+            summary: 'Create a project',
+            description: 'Creates a new project in the workspace. The title field is required.',
+            body: {
+                title: { type: 'string', required: true, description: 'The name/title of the project.', example: 'Website Redesign' },
+                description: { type: 'string', required: false, description: 'A detailed description of the project.', example: 'Complete overhaul of company website' }
+            },
+            responses: {
+                '201': { description: 'The newly created project object.', example: { id: 3, name: 'Website Redesign', description: 'Complete overhaul', status: 'active', createdAt: '2025-03-13T01:00:00Z' } },
+                '400': { description: 'Missing required fields (title).' },
+                '401': { description: 'Invalid or missing API key.' }
+            },
+            example: {
+                curl: `curl -X POST "${BASE_URL}/api/projects" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"Website Redesign","description":"Complete overhaul"}'`,
+                response: { id: 3, name: 'Website Redesign', description: 'Complete overhaul', status: 'active', createdAt: '2025-03-13T01:00:00Z' }
+            }
+        },
+        {
+            id: 'update-project',
+            method: 'PATCH',
+            path: '/api/projects/:id',
+            summary: 'Update a project',
+            description: 'Partially updates an existing project. Only send the fields you want to change.',
+            body: {
+                title: { type: 'string', required: false, description: 'New name for the project.', example: 'Website Redesign v2' },
+                description: { type: 'string', required: false, description: 'Updated project description.', example: 'Phase 2 redesign' }
+            },
+            responses: {
+                '200': { description: 'The updated project object.' },
+                '400': { description: 'No valid fields provided.' },
+                '401': { description: 'Invalid or missing API key.' },
+                '404': { description: 'Project not found.' }
+            },
+            example: {
+                curl: `curl -X PATCH "${BASE_URL}/api/projects/1" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"Website Redesign v2"}'`,
+                response: { id: 1, name: 'Website Redesign v2', description: 'Complete overhaul', status: 'active', updatedAt: '2025-03-13T01:30:00Z' }
+            }
+        },
+        {
+            id: 'delete-project',
+            method: 'DELETE',
+            path: '/api/projects/:id',
+            summary: 'Delete a project',
+            description: 'Permanently deletes a project and all associated data. This action is irreversible.',
+            responses: {
+                '200': { description: 'Success confirmation message.', example: { message: 'Project deleted successfully' } },
+                '401': { description: 'Invalid or missing API key.' },
+                '404': { description: 'Project not found.' }
+            },
+            example: {
+                curl: `curl -X DELETE "${BASE_URL}/api/projects/1" \\\n  -H "X-API-Key: ${apiKey}"`,
+                response: { message: 'Project deleted successfully' }
+            }
+        },
+        {
+            id: 'get-tasks',
+            method: 'GET',
+            path: '/api/tasks',
+            summary: 'List all tasks',
+            description: 'Returns a list of tasks. Supports powerful filtering via query parameters.',
+            queryParams: [
+                { name: 'project', type: 'integer', required: false, description: 'Filter tasks by project ID.', example: '1' },
+                { name: 'status', type: 'string', required: false, description: 'Filter by status. One of: todo, in_progress, blocked, done.', example: 'in_progress' },
+                { name: 'assignee', type: 'integer', required: false, description: 'Filter tasks assigned to a specific user ID.', example: '3' }
+            ],
+            responses: {
+                '200': { description: 'An array of task objects.' },
+                '401': { description: 'Invalid or missing API key.' }
+            },
+            example: {
+                curl: `curl -X GET "${BASE_URL}/api/tasks?project=1&status=in_progress" \\\n  -H "X-API-Key: ${apiKey}"`,
+                response: [{ id: 5, title: 'Design homepage', description: 'Create wireframes', status: 'in_progress', projectId: 1, assignedUserId: 2, createdAt: '2025-03-10T08:00:00Z' }]
+            }
+        },
+        {
+            id: 'create-task',
+            method: 'POST',
+            path: '/api/tasks',
+            summary: 'Create a task',
+            description: 'Creates a new task. Both title and projectId are required. If no status is provided, it defaults to "todo".',
+            body: {
+                title: { type: 'string', required: true, description: 'The task title.', example: 'Design homepage mockup' },
+                description: { type: 'string', required: false, description: 'Detailed description of the task.', example: 'Create lo-fi and hi-fi wireframes' },
+                projectId: { type: 'integer', required: true, description: 'ID of the project this task belongs to.', example: '1' },
+                assigneeId: { type: 'integer', required: false, description: 'User ID of the team member to assign this task to.', example: '3' },
+                status: { type: 'string', required: false, description: 'Initial status. One of: todo, in_progress, blocked, done. Defaults to "todo".', example: 'todo' }
+            },
+            responses: {
+                '201': { description: 'The newly created task object.' },
+                '400': { description: 'Missing required fields (title or projectId).' },
+                '401': { description: 'Invalid or missing API key.' }
+            },
+            example: {
+                curl: `curl -X POST "${BASE_URL}/api/tasks" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"Design homepage","projectId":1,"assigneeId":2,"status":"todo"}'`,
+                response: { id: 6, title: 'Design homepage', description: null, status: 'todo', projectId: 1, assignedUserId: 2, createdAt: '2025-03-13T02:00:00Z' }
+            }
+        },
+        {
+            id: 'update-task',
+            method: 'PATCH',
+            path: '/api/tasks/:id',
+            summary: 'Update a task',
+            description: 'Partially updates an existing task. Common use case: changing the status as a task progresses.',
+            body: {
+                title: { type: 'string', required: false, description: 'Updated task title.', example: 'Design homepage v2' },
+                description: { type: 'string', required: false, description: 'Updated task description.' },
+                status: { type: 'string', required: false, description: 'New status. One of: todo, in_progress, blocked, done.', example: 'done' }
+            },
+            responses: {
+                '200': { description: 'The updated task object.' },
+                '400': { description: 'No valid fields provided.' },
+                '401': { description: 'Invalid or missing API key.' },
+                '404': { description: 'Task not found.' }
+            },
+            example: {
+                curl: `curl -X PATCH "${BASE_URL}/api/tasks/5" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"status":"done"}'`,
+                response: { id: 5, title: 'Design homepage', status: 'done', updatedAt: '2025-03-13T03:00:00Z' }
+            }
+        },
+        {
+            id: 'delete-task',
+            method: 'DELETE',
+            path: '/api/tasks/:id',
+            summary: 'Delete a task',
+            description: 'Permanently deletes a task. This cannot be undone.',
+            responses: {
+                '200': { description: 'Success confirmation message.', example: { message: 'Task deleted successfully' } },
+                '401': { description: 'Invalid or missing API key.' },
+                '404': { description: 'Project not found.' }
+            },
+            example: {
+                curl: `curl -X DELETE "${BASE_URL}/api/tasks/5" \\\n  -H "X-API-Key: ${apiKey}"`,
+                response: { message: 'Task deleted successfully' }
+            }
+        },
+        {
+            id: 'get-team',
+            method: 'GET',
+            path: '/api/team-members',
+            summary: 'List team members',
+            description: 'Returns all active team members and their public profile information. Useful for populating assignee dropdowns.',
+            responses: {
+                '200': { description: 'An array of team member objects.', example: [{ id: 1, name: 'John Doe', email: 'john@example.com', role: 'admin', title: 'Engineering Lead', department: 'Engineering' }] },
+                '401': { description: 'Invalid or missing API key.' }
+            },
+            example: {
+                curl: `curl -X GET "${BASE_URL}/api/team-members" \\\n  -H "X-API-Key: ${apiKey}"`,
+                response: [{ id: 1, name: 'John Doe', email: 'john@example.com', role: 'admin', title: 'Engineering Lead', department: 'Engineering' }, { id: 2, name: 'Jane Smith', email: 'jane@example.com', role: 'member', title: 'Designer', department: 'Design' }]
+            }
+        }
+    ];
 
     const filtered = endpoints.filter(ep =>
         ep.path.toLowerCase().includes(searchQuery.toLowerCase()) ||
         ep.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
         ep.method.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    const maskKey = (key: string) => {
+        if (!key) return hasError ? 'Error loading key' : 'Loading...';
+        return isKeyRevealed ? key : '••••••••••••••••';
+    };
 
     return (
         <div className="flex h-full min-h-screen">
@@ -502,8 +552,17 @@ export default function ApiDocsPage() {
                         <CodeBlock
                             id="auth-header"
                             lang="http"
-                            code={`X-API-Key: your-secret`}
+                            code={`X-API-Key: ${maskKey(apiKey)}`}
+                            copyValue={`X-API-Key: ${apiKey || 'N/A'}`}
+                            onToggleVisibility={apiKey ? () => setIsKeyRevealed(!isKeyRevealed) : undefined}
+                            isRevealed={isKeyRevealed}
                         />
+                        {hasError && (
+                            <p className="text-xs text-rose-400 mt-2">
+                                <AlertCircle size={10} className="inline mr-1" />
+                                Failed to fetch API key. Make sure you are logged in as an administrator.
+                            </p>
+                        )}
                         <div className="grid md:grid-cols-2 gap-4">
                             <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 flex gap-3">
                                 <CheckCircle2 size={18} className="text-emerald-400 mt-0.5 shrink-0" />
@@ -567,7 +626,16 @@ export default function ApiDocsPage() {
                         <div className="space-y-3">
                             {filtered.length === 0
                                 ? <p className="text-muted-foreground text-sm text-center py-8">No endpoints match your search.</p>
-                                : filtered.map(ep => <EndpointCard key={ep.id} ep={ep} />)
+                                : filtered.map(ep => (
+                                    <EndpointCard
+                                        key={ep.id}
+                                        ep={ep}
+                                        apiKey={apiKey}
+                                        maskKey={maskKey}
+                                        onToggleVisibility={() => setIsKeyRevealed(!isKeyRevealed)}
+                                        isKeyRevealed={isKeyRevealed}
+                                    />
+                                ))
                             }
                         </div>
                     ) : (
@@ -578,7 +646,14 @@ export default function ApiDocsPage() {
                                 </h3>
                                 <div className="space-y-3">
                                     {endpoints.filter(ep => group.ids.includes(ep.id)).map(ep => (
-                                        <EndpointCard key={ep.id} ep={ep} />
+                                        <EndpointCard
+                                            key={ep.id}
+                                            ep={ep}
+                                            apiKey={apiKey}
+                                            maskKey={maskKey}
+                                            onToggleVisibility={() => setIsKeyRevealed(!isKeyRevealed)}
+                                            isKeyRevealed={isKeyRevealed}
+                                        />
                                     ))}
                                 </div>
                             </div>
@@ -607,7 +682,14 @@ export default function ApiDocsPage() {
                                 </div>
                                 <div className="flex-1 space-y-2">
                                     <p className="text-sm font-semibold text-white">{item.title}</p>
-                                    <CodeBlock code={item.code} lang="bash" id={`qs-${item.step}`} />
+                                    <CodeBlock
+                                        code={apiKey ? item.code.replace(/your-secret/g, maskKey(apiKey)) : item.code.replace(/your-secret/g, maskKey(''))}
+                                        copyValue={apiKey ? item.code.replace(/your-secret/g, apiKey) : undefined}
+                                        lang="bash"
+                                        id={`qs-${item.step}`}
+                                        onToggleVisibility={apiKey ? () => setIsKeyRevealed(!isKeyRevealed) : undefined}
+                                        isRevealed={isKeyRevealed}
+                                    />
                                 </div>
                             </div>
                         ))}
@@ -615,7 +697,7 @@ export default function ApiDocsPage() {
                 </section>
 
                 <footer className="text-center text-xs text-muted-foreground pt-4 pb-10">
-                    Project Management API · All requests must include <code className="bg-muted px-1 rounded">X-API-Key: your-secret</code>
+                    Project Management API · All requests must include <code className="bg-muted px-1 rounded">X-API-Key: {maskKey(apiKey)}</code>
                 </footer>
             </main>
         </div>

@@ -213,7 +213,7 @@ app.use(bodyParser.json({ limit: "50mb" }));
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
 
 // REST API AUTHENTICATION MIDDLEWARE
-const API_KEY = "your-secret"; // In production, this should be in .env
+const API_KEY = process.env.X_API_KEY || "your-secret"; 
 
 function requireApiKey(req, res, next) {
   const apiKey = req.headers["x-api-key"];
@@ -242,14 +242,19 @@ if (isMock) {
     });
 }
 
+const isSecure = process.env.NODE_ENV === 'production' && process.env.DISABLE_SECURE_COOKIES !== 'true';
+console.log(`🔹 SERVER.JS: Session Security - NODE_ENV: ${process.env.NODE_ENV}, DISABLE_SECURE_COOKIES: ${process.env.DISABLE_SECURE_COOKIES}, Resulting Secure: ${isSecure}`);
+
 app.use(session({
     store: sessionStore,
     secret: 'task-manager-secret-key-change-in-production',
     resave: false,
     saveUninitialized: false,
     cookie: {
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-        secure: process.env.NODE_ENV === 'production' // Secure in production
+        secure: isSecure,
+        httpOnly: true,
+        sameSite: isSecure ? 'none' : 'lax',
+        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
     }
 }));
 
@@ -336,12 +341,16 @@ function requireAuth(req, res, next) {
 }
 
 async function requireAdmin(req, res, next) {
+  console.log(`[AUTH] requireAdmin check for ${req.originalUrl}`);
+  console.log(`[AUTH] SessionID: ${req.sessionID}`);
+  console.log(`[AUTH] userId: ${req.session?.userId}`);
+
   if (!req.session.userId) {
+    console.warn(`[AUTH] No userId found in session for ${req.originalUrl}`);
     return res.status(401).json({ error: "Unauthorized" });
   }
 
   try {
-    // Double check role from DB to ensure security and prevent session sync issues
     const result = await query("SELECT role FROM users WHERE id = $1", [
       req.session.userId,
     ]);
@@ -349,16 +358,16 @@ async function requireAdmin(req, res, next) {
 
     if (!user || user.role !== "admin") {
       console.warn(
-        `Admin access denied for User ${req.session.userId}. Role: ${user ? user.role : "none"}`,
+        `[AUTH] Admin access denied for User ${req.session.userId}. Role in DB: ${user ? user.role : "none"}`,
       );
       return res.status(403).json({ error: "Forbidden - Admin only" });
     }
 
-    // Refresh session role
+    console.log(`[AUTH] Admin access GRANTED for User ${req.session.userId}`);
     req.session.userRole = user.role;
     next();
   } catch (error) {
-    console.error("Admin check error:", error);
+    console.error("[AUTH] Admin check error:", error);
     res.status(500).json({ error: "Server error checking permissions" });
   }
 }
@@ -535,6 +544,12 @@ app.get("/api/setup-super-user", async (req, res) => {
     console.error("Setup error:", error);
     res.status(500).json({ error: "Setup failed: " + error.message });
   }
+});
+
+// Admin-only: Get API Key for documentation
+app.get("/api/admin/api-key", requireAdmin, (req, res) => {
+  console.log(`[DOCS] API Key requested by User ${req.session.userId}`);
+  res.json({ apiKey: API_KEY });
 });
 
 // ============= USER ROUTES =============
