@@ -310,6 +310,7 @@ export default function ApiDocsPage() {
             summary: 'Create a project',
             description: 'Creates a new project in the workspace. The title field is required.',
             body: {
+                name: { type: 'string', required: true, description: 'The name of the project.', example: 'Website Redesign' },
                 title: { type: 'string', required: true, description: 'The name/title of the project.', example: 'Website Redesign' },
                 description: { type: 'string', required: false, description: 'A detailed description of the project.', example: 'Complete overhaul of company website' }
             },
@@ -319,7 +320,7 @@ export default function ApiDocsPage() {
                 '401': { description: 'Invalid or missing API key.' }
             },
             example: {
-                curl: `curl -X POST "${BASE_URL}/api/projects" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"Website Redesign","description":"Complete overhaul"}'`,
+                curl: `curl -X POST "${BASE_URL}/api/projects" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"name":"Website Redesign","title":"Website Redesign","description":"Complete overhaul"}'`,
                 response: { id: 3, name: 'Website Redesign', description: 'Complete overhaul', status: 'active', createdAt: '2025-03-13T01:00:00Z' }
             }
         },
