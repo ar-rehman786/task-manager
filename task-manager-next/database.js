@@ -336,12 +336,15 @@ if (isMock) {
       $$;
     `);
 
-    // Add managerId to projects
+    // Add managerId and assignedUserId to projects
     await client.query(`
       DO $$
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='projects' AND column_name='managerId') THEN
           ALTER TABLE projects ADD COLUMN "managerId" INTEGER REFERENCES users(id) ON DELETE SET NULL;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='projects' AND column_name='assignedUserId') THEN
+          ALTER TABLE projects ADD COLUMN "assignedUserId" INTEGER REFERENCES users(id) ON DELETE SET NULL;
         END IF;
       END
       $$;
