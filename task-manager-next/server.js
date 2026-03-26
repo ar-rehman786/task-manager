@@ -587,6 +587,22 @@ app.get("/api/users", requireAuth, async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+app.get("/api/team-members", requireAuth, async (req, res) => {
+  try {
+    const result = await query(`
+            SELECT u.id, u.name, u.email, u.role, u.active, u."createdAt", u.title, u.department, u.location, u.phone, u."employeeId", u."profilePicture", u."coverImage", u."managerId",
+                   (CASE WHEN a.id IS NOT NULL THEN true ELSE false END) as "isWorking"
+            FROM users u
+            LEFT JOIN attendance a ON u.id = a."userId" AND a.status = 'active'
+            WHERE u.active = 1
+            ORDER BY u.name ASC
+        `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Fetch team members error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 app.post("/api/users", requireAdmin, async (req, res) => {
   const { name, email, password, role } = req.body;
