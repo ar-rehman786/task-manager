@@ -603,7 +603,7 @@ app.get("/api/team-members", requireAuth, async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
-
+// hiiiiii
 app.get("/api/team-members", requireAuth, async (req, res) => {
   try {
     const result = await query(`
