@@ -1008,6 +1008,26 @@ app.post("/api/tasks", requireAuth, async (req, res) => {
   } = req.body;
 
   try {
+    // Validate foreign keys before inserting
+    if (projectId) {
+      const projectExists = await query("SELECT id FROM projects WHERE id = $1", [projectId]);
+      if (projectExists.rows.length === 0) {
+        return res.status(400).json({ error: `Project with ID ${projectId} not found.` });
+      }
+    }
+    if (assignedUserId) {
+      const userExists = await query("SELECT id FROM users WHERE id = $1", [assignedUserId]);
+      if (userExists.rows.length === 0) {
+        return res.status(400).json({ error: `User with ID ${assignedUserId} not found.` });
+      }
+    }
+    if (milestoneId) {
+      const milestoneExists = await query("SELECT id FROM milestones WHERE id = $1", [milestoneId]);
+      if (milestoneExists.rows.length === 0) {
+        return res.status(400).json({ error: `Milestone with ID ${milestoneId} not found.` });
+      }
+    }
+
     const result = await query(
       `
             INSERT INTO tasks (title, description, status, priority, "dueDate", "assignedUserId", "createdBy", labels, "projectId", "milestoneId", "loomVideo", "workflowLink", "workflowStatus")
@@ -1109,6 +1129,26 @@ app.put("/api/tasks/:id", requireAuth, async (req, res) => {
 
     if (!oldTask) {
       return res.status(404).json({ error: "Task not found" });
+    }
+
+    // Validate foreign keys before updating
+    if (projectId) {
+      const projectExists = await query("SELECT id FROM projects WHERE id = $1", [projectId]);
+      if (projectExists.rows.length === 0) {
+        return res.status(400).json({ error: `Project with ID ${projectId} not found.` });
+      }
+    }
+    if (assignedUserId) {
+      const userExists = await query("SELECT id FROM users WHERE id = $1", [assignedUserId]);
+      if (userExists.rows.length === 0) {
+        return res.status(400).json({ error: `User with ID ${assignedUserId} not found.` });
+      }
+    }
+    if (milestoneId) {
+      const milestoneExists = await query("SELECT id FROM milestones WHERE id = $1", [milestoneId]);
+      if (milestoneExists.rows.length === 0) {
+        return res.status(400).json({ error: `Milestone with ID ${milestoneId} not found.` });
+      }
     }
 
     // --- Member Completion Rule Validation (Disabled as requested) ---
@@ -1257,6 +1297,26 @@ app.patch("/api/tasks/:id", requireAuth, async (req, res) => {
 
     if (!oldTask) {
       return res.status(404).json({ error: "Task not found" });
+    }
+
+    // Validate foreign keys before updating
+    if (updates.projectId) {
+      const projectExists = await query("SELECT id FROM projects WHERE id = $1", [updates.projectId]);
+      if (projectExists.rows.length === 0) {
+        return res.status(400).json({ error: `Project with ID ${updates.projectId} not found.` });
+      }
+    }
+    if (updates.assignedUserId) {
+      const userExists = await query("SELECT id FROM users WHERE id = $1", [updates.assignedUserId]);
+      if (userExists.rows.length === 0) {
+        return res.status(400).json({ error: `User with ID ${updates.assignedUserId} not found.` });
+      }
+    }
+    if (updates.milestoneId) {
+      const milestoneExists = await query("SELECT id FROM milestones WHERE id = $1", [updates.milestoneId]);
+      if (milestoneExists.rows.length === 0) {
+        return res.status(400).json({ error: `Milestone with ID ${updates.milestoneId} not found.` });
+      }
     }
 
     const fields = [];
