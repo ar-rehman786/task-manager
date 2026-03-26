@@ -603,24 +603,30 @@ app.get("/api/team-members", requireAuth, async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
-// hiiiiii
-app.get("/api/team-members", requireAuth, async (req, res) => {
+
+// Get single team member
+app.get("/api/team-members/:id", requireAuth, async (req, res) => {
+  const { id } = req.params;
   try {
     const result = await query(`
             SELECT u.id, u.name, u.email, u.role, u.active, u."createdAt", u.title, u.department, u.location, u.phone, u."employeeId", u."profilePicture", u."coverImage", u."managerId",
                    (CASE WHEN a.id IS NOT NULL THEN true ELSE false END) as "isWorking"
             FROM users u
             LEFT JOIN attendance a ON u.id = a."userId" AND a.status = 'active'
-            WHERE u.active = 1
-            ORDER BY u.name ASC
-        `);
-    res.json(result.rows);
+            WHERE u.id = $1
+        `, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Team member not found" });
+    }
+
+    res.json(result.rows[0]);
   } catch (error) {
-    console.error("Fetch team members error:", error);
+    console.error("Fetch team member error:", error);
     res.status(500).json({ error: "Server error" });
   }
 });
-// hii
+
 app.post("/api/users", requireAdmin, async (req, res) => {
   const { name, email, password, role } = req.body;
 
