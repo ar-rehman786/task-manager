@@ -42,6 +42,7 @@ const statusColors: Record<string, string> = {
 const groups = [
     { label: 'Projects', ids: ['get-projects', 'get-project', 'create-project', 'update-project', 'delete-project'] },
     { label: 'Tasks', ids: ['get-tasks', 'create-task', 'update-task', 'delete-task'] },
+    { label: 'Attendance', ids: ['get-attendance'] },
     { label: 'Team', ids: ['get-team'] },
 ];
 
@@ -455,6 +456,25 @@ export default function ApiDocsPage() {
             example: {
                 curl: `curl -X DELETE "${BASE_URL}/api/tasks/5" \\\n  -H "X-API-Key: ${apiKey}"`,
                 response: { message: 'Task deleted successfully' }
+            }
+        },
+        {
+            id: 'get-attendance',
+            method: 'GET',
+            path: '/api/attendance',
+            summary: 'List attendance records',
+            description: 'Returns attendance records with user and client names. Supports optional filtering by date and member. Admin only.',
+            queryParams: [
+                { name: 'date', type: 'string', required: false, description: 'Filter by date (YYYY-MM-DD).', example: '2025-03-27' },
+                { name: 'userId', type: 'integer', required: false, description: 'Filter by team member user ID.', example: '2' }
+            ],
+            responses: {
+                '200': { description: 'An array of attendance records.' },
+                '401': { description: 'Invalid or missing API key.' }
+            },
+            example: {
+                curl: `curl -X GET "${BASE_URL}/api/attendance?date=2025-03-27&userId=2" \\\n  -H "X-API-Key: ${apiKey}"`,
+                response: [{ id: 1, userId: 2, userName: 'Jane Smith', clockInTime: '2025-03-27T09:00:00Z', clockOutTime: '2025-03-27T17:30:00Z', workDuration: 510, status: 'completed', clientName: 'Website Redesign', notes: null }]
             }
         },
         {

@@ -2323,6 +2323,45 @@ app.get("/api/projects/:projectId/logs", requireAuth, async (req, res) => {
 
 // ============= ATTENDANCE ROUTES =============
 
+app.get("/api/attendance", requireAdmin, async (req, res) => {
+  const { date, userId } = req.query;
+
+  try {
+    let whereConditions = [];
+    let params = [];
+    let idx = 1;
+
+    if (date) {
+      whereConditions.push(`CAST(a."clockInTime" AS DATE) = $${idx++}`);
+      params.push(date);
+    }
+
+    if (userId) {
+      whereConditions.push(`a."userId" = $${idx++}`);
+      params.push(userId);
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
+
+    const result = await query(
+      `
+        SELECT a.*, u.name as "userName", p.name as "clientName"
+        FROM attendance a
+        JOIN users u ON a."userId" = u.id
+        LEFT JOIN projects p ON a."clientId" = p.id
+        ${whereClause}
+        ORDER BY a."clockInTime" DESC
+      `,
+      params,
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Get attendance error:", error);
+    res.status(500).json({ error: "Failed to fetch attendance records" });
+  }
+});
+
 app.get("/api/attendance/status", requireAuth, async (req, res) => {
   try {
     const result = await query(
