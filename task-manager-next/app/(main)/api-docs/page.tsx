@@ -391,7 +391,7 @@ export default function ApiDocsPage() {
                 title: { type: 'string', required: true, description: 'The task title.', example: 'Design homepage mockup' },
                 description: { type: 'string', required: false, description: 'Detailed description of the task.', example: 'Create lo-fi and hi-fi wireframes' },
                 projectId: { type: 'integer', required: true, description: 'ID of the project this task belongs to.', example: '1' },
-                assigneeId: { type: 'integer', required: false, description: 'User ID of the team member to assign this task to.', example: '3' },
+                assignedUserId: { type: 'integer', required: false, description: 'User ID of the team member to assign this task to.', example: '3' },
                 status: { type: 'string', required: false, description: 'Initial status. One of: todo, in_progress, blocked, done. Defaults to "todo".', example: 'todo' }
             },
             responses: {
@@ -400,7 +400,7 @@ export default function ApiDocsPage() {
                 '401': { description: 'Invalid or missing API key.' }
             },
             example: {
-                curl: `curl -X POST "${BASE_URL}/api/tasks" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"Design homepage","projectId":1,"assigneeId":2,"status":"todo"}'`,
+                curl: `curl -X POST "${BASE_URL}/api/tasks" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"Design homepage","projectId":1,"assignedUserId":2,"status":"todo"}'`,
                 response: { id: 6, title: 'Design homepage', description: null, status: 'todo', projectId: 1, assignedUserId: 2, createdAt: '2025-03-13T02:00:00Z' }
             }
         },
