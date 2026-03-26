@@ -409,8 +409,8 @@ export default function ApiDocsPage() {
                 '401': { description: 'Invalid or missing API key.' }
             },
             example: {
-                curl: `curl -X POST "${BASE_URL}/api/tasks" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"Design homepage","projectId":1,"assignedUserId":2,"priority":"high"}'`,
-                response: { id: 6, title: 'Design homepage', description: null, status: 'todo', priority: 'high', projectId: 1, projectName: 'Website Redesign', assignedUserId: 2, assignedUserName: 'Jane Smith', createdAt: '2025-03-13T02:00:00Z' }
+                curl: `curl -X POST "${BASE_URL}/api/tasks" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"Design homepage","priority":"high"}'`,
+                response: { id: 6, title: 'Design homepage', description: null, status: 'todo', priority: 'high', projectId: null, projectName: null, assignedUserId: null, assignedUserName: null, createdAt: '2025-03-13T02:00:00Z' }
             }
         },
         {
