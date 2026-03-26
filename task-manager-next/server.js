@@ -2324,17 +2324,19 @@ app.get("/api/projects/:projectId/logs", requireAuth, async (req, res) => {
 // ============= ATTENDANCE ROUTES =============
 
 app.get("/api/attendance", requireAdmin, async (req, res) => {
-  const { date, userId } = req.query;
+  const { userId, from, to } = req.query;
+
+  if (!from || !to) {
+    return res.status(400).json({ error: "Both 'from' and 'to' date parameters are required (YYYY-MM-DD)." });
+  }
 
   try {
-    let whereConditions = [];
-    let params = [];
-    let idx = 1;
-
-    if (date) {
-      whereConditions.push(`CAST(a."clockInTime" AS DATE) = $${idx++}`);
-      params.push(date);
-    }
+    let whereConditions = [
+      `CAST(a."clockInTime" AS DATE) >= $1`,
+      `CAST(a."clockInTime" AS DATE) <= $2`,
+    ];
+    let params = [from, to];
+    let idx = 3;
 
     if (userId) {
       whereConditions.push(`a."userId" = $${idx++}`);
@@ -2350,12 +2352,41 @@ app.get("/api/attendance", requireAdmin, async (req, res) => {
         JOIN users u ON a."userId" = u.id
         LEFT JOIN projects p ON a."clientId" = p.id
         ${whereClause}
-        ORDER BY a."clockInTime" DESC
+        ORDER BY u.name ASC, a."clockInTime" DESC
       `,
       params,
     );
 
-    res.json(result.rows);
+    // Group by member, then by date
+    const membersMap = {};
+    for (const row of result.rows) {
+      const uid = row.userId;
+      if (!membersMap[uid]) {
+        membersMap[uid] = { userId: uid, userName: row.userName, days: {} };
+      }
+      const date = new Date(row.clockInTime).toISOString().split("T")[0];
+      if (!membersMap[uid].days[date]) {
+        membersMap[uid].days[date] = { date, totalMinutes: 0, records: [] };
+      }
+      membersMap[uid].days[date].totalMinutes += row.workDuration || 0;
+      membersMap[uid].days[date].records.push({
+        id: row.id,
+        clockInTime: row.clockInTime,
+        clockOutTime: row.clockOutTime,
+        workDuration: row.workDuration,
+        status: row.status,
+        clientName: row.clientName,
+        notes: row.notes,
+      });
+    }
+
+    // Convert to arrays
+    const response = Object.values(membersMap).map((member) => ({
+      ...member,
+      days: Object.values(member.days),
+    }));
+
+    res.json(response);
   } catch (error) {
     console.error("Get attendance error:", error);
     res.status(500).json({ error: "Failed to fetch attendance records" });

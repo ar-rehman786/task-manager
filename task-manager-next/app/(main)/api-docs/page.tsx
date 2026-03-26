@@ -463,18 +463,19 @@ export default function ApiDocsPage() {
             method: 'GET',
             path: '/api/attendance',
             summary: 'List attendance records',
-            description: 'Returns attendance records with user and client names. Supports optional filtering by date and member. Admin only.',
+            description: 'Returns attendance records grouped by member and then by date. Use userId to get a single member\'s records, or omit for all members. Supports date range filtering. Admin only.',
             queryParams: [
-                { name: 'date', type: 'string', required: false, description: 'Filter by date (YYYY-MM-DD).', example: '2025-03-27' },
-                { name: 'userId', type: 'integer', required: false, description: 'Filter by team member user ID.', example: '2' }
+                { name: 'userId', type: 'integer', required: false, description: 'Filter by team member user ID. Omit to get all members.', example: '2' },
+                { name: 'from', type: 'string', required: true, description: 'Start date for range filter (YYYY-MM-DD).', example: '2025-03-01' },
+                { name: 'to', type: 'string', required: true, description: 'End date for range filter (YYYY-MM-DD).', example: '2025-03-31' }
             ],
             responses: {
-                '200': { description: 'An array of attendance records.' },
+                '200': { description: 'An array of member objects, each containing days grouped by date.' },
                 '401': { description: 'Invalid or missing API key.' }
             },
             example: {
-                curl: `curl -X GET "${BASE_URL}/api/attendance?date=2025-03-27&userId=2" \\\n  -H "X-API-Key: ${apiKey}"`,
-                response: [{ id: 1, userId: 2, userName: 'Jane Smith', clockInTime: '2025-03-27T09:00:00Z', clockOutTime: '2025-03-27T17:30:00Z', workDuration: 510, status: 'completed', clientName: 'Website Redesign', notes: null }]
+                curl: `curl -X GET "${BASE_URL}/api/attendance?userId=2&from=2025-03-01&to=2025-03-31" \\\n  -H "X-API-Key: ${apiKey}"`,
+                response: [{ userId: 2, userName: 'Jane Smith', days: [{ date: '2025-03-27', totalMinutes: 510, records: [{ id: 1, clockInTime: '2025-03-27T09:00:00Z', clockOutTime: '2025-03-27T17:30:00Z', workDuration: 510, status: 'completed', clientName: 'Website Redesign', notes: null }] }, { date: '2025-03-26', totalMinutes: 480, records: [{ id: 2, clockInTime: '2025-03-26T09:00:00Z', clockOutTime: '2025-03-26T17:00:00Z', workDuration: 480, status: 'completed', clientName: 'Mobile App', notes: null }] }] }]
             }
         },
         {
