@@ -1238,6 +1238,104 @@ app.put("/api/tasks/:id", requireAuth, async (req, res) => {
   }
 });
 
+// PATCH task (partial update)
+app.patch("/api/tasks/:id", requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;
+  const currentUserId = req.session.userId;
+  const currentUserName = req.session.userName;
+
+  try {
+    const oldTaskResult = await query("SELECT * FROM tasks WHERE id = $1", [id]);
+    const oldTask = oldTaskResult.rows[0];
+
+    if (!oldTask) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    const allowedFields = {
+      title: "title",
+      description: "description",
+      status: "status",
+      priority: "priority",
+      dueDate: '"dueDate"',
+      assignedUserId: '"assignedUserId"',
+      labels: "labels",
+      projectId: '"projectId"',
+      milestoneId: '"milestoneId"',
+      loomVideo: '"loomVideo"',
+      workflowLink: '"workflowLink"',
+      workflowStatus: '"workflowStatus"',
+    };
+
+    for (const [key, dbCol] of Object.entries(allowedFields)) {
+      if (updates[key] !== undefined) {
+        let val = updates[key];
+        if (key === "dueDate" && (val === "" || !val)) val = null;
+        fields.push(`${dbCol} = $${idx++}`);
+        values.push(val);
+      }
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ error: "No valid fields provided for update" });
+    }
+
+    values.push(id);
+    await query(
+      `UPDATE tasks SET ${fields.join(", ")}, "updatedAt" = CURRENT_TIMESTAMP WHERE id = $${idx}`,
+      values,
+    );
+
+    const taskResult = await query(
+      `
+            SELECT t.*, u.name as "assignedUserName", c.name as "createdByName", p.name as "projectName", m.title as "milestoneTitle"
+            FROM tasks t
+            LEFT JOIN users u ON t."assignedUserId" = u.id
+            LEFT JOIN users c ON t."createdBy" = c.id
+            LEFT JOIN projects p ON t."projectId" = p.id
+            LEFT JOIN milestones m ON t."milestoneId" = m.id
+            WHERE t.id = $1
+        `,
+      [id],
+    );
+    const newTask = taskResult.rows[0];
+
+    // Notification logic
+    let notificationMessage = "";
+    let notifyId = null;
+
+    if (updates.assignedUserId !== undefined && oldTask.assignedUserId != updates.assignedUserId) {
+      const targetUserId = Number(updates.assignedUserId);
+      if (targetUserId && targetUserId !== currentUserId) {
+        notificationMessage = `${currentUserName} assigned you to task: ${newTask.title}`;
+        await sendNotification(targetUserId, "info", notificationMessage, { taskId: newTask.id });
+      }
+    } else if (updates.status !== undefined && oldTask.status !== updates.status) {
+      const statusMap = { todo: "To Do", in_progress: "In Progress", blocked: "Blocked", done: "Done" };
+      notificationMessage = `${currentUserName} moved task '${newTask.title}' from ${statusMap[oldTask.status]} to ${statusMap[updates.status]}`;
+      notifyId = oldTask.assignedUserId || (oldTask.createdBy !== currentUserId ? oldTask.createdBy : null);
+    } else if (updates.priority !== undefined && oldTask.priority !== updates.priority) {
+      notificationMessage = `${currentUserName} changed priority of '${newTask.title}' to ${updates.priority}`;
+      notifyId = oldTask.assignedUserId || (oldTask.createdBy !== currentUserId ? oldTask.createdBy : null);
+    }
+
+    if (notificationMessage && notifyId && notifyId !== currentUserId) {
+      sendNotification(notifyId, "info", notificationMessage, { taskId: id });
+    }
+
+    io.emit("dataUpdate", { type: "tasks" });
+    res.json(newTask);
+  } catch (error) {
+    console.error("Patch task error:", error);
+    res.status(500).json({ error: "Failed to update task" });
+  }
+});
+
 app.get("/api/tasks/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
@@ -1513,6 +1611,93 @@ app.put("/api/projects/:id", requireAdmin, async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error("Error updating project:", error);
+    res.status(500).json({ error: "Error updating project" });
+  }
+});
+
+// Get single project
+app.get("/api/projects/:id", requireAuth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await query(
+      `
+            SELECT p.*,
+                   u.name as "managerName",
+                   ua.name as "assignedUserName",
+                   (SELECT COUNT(*) FROM project_access_items pai WHERE pai."projectId" = p.id AND pai."isGranted" = 0)::int as "pendingAccessCount"
+            FROM projects p
+            LEFT JOIN users u ON p."managerId" = u.id
+            LEFT JOIN users ua ON p."assignedUserId" = ua.id
+            WHERE p.id = $1
+        `,
+      [id],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: "Error fetching project" });
+  }
+});
+
+// PATCH project (partial update)
+app.patch("/api/projects/:id", requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;
+
+  try {
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    const allowedFields = {
+      name: "name",
+      client: "client",
+      status: "status",
+      startDate: '"startDate"',
+      endDate: '"endDate"',
+      description: "description",
+      managerId: '"managerId"',
+      assignedUserId: '"assignedUserId"',
+    };
+
+    for (const [key, dbCol] of Object.entries(allowedFields)) {
+      if (updates[key] !== undefined) {
+        fields.push(`${dbCol} = $${idx++}`);
+        values.push(updates[key]);
+      }
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ error: "No valid fields provided for update" });
+    }
+
+    values.push(id);
+    const updateQuery = `
+            UPDATE projects
+            SET ${fields.join(", ")}, "updatedAt" = CURRENT_TIMESTAMP
+            WHERE id = $${idx}
+            RETURNING *
+        `;
+
+    const result = await query(updateQuery, values);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    await query(
+      `INSERT INTO project_logs ("projectId", type, message, "createdBy") VALUES ($1, 'project_update', $2, $3)`,
+      [id, `Project updated: ${Object.keys(updates).join(", ")}`, req.session.userId],
+    );
+
+    io.emit("dataUpdate", { type: "projects" });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error patching project:", error);
     res.status(500).json({ error: "Error updating project" });
   }
 });
