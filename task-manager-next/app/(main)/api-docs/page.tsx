@@ -277,14 +277,14 @@ export default function ApiDocsPage() {
             description: 'Returns a list of all projects in the workspace, ordered by creation date (newest first).',
             responses: {
                 '200': {
-                    description: 'An array of project objects.',
-                    example: [{ id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', createdAt: '2025-03-01T10:00:00Z' }]
+                    description: 'An array of project objects with manager and assignee names.',
+                    example: [{ id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', managerName: 'John Doe', assignedUserName: 'Jane Smith', pendingAccessCount: 0, createdAt: '2025-03-01T10:00:00Z' }]
                 },
                 '401': { description: 'Invalid or missing API key.' }
             },
             example: {
                 curl: `curl -X GET "${BASE_URL}/api/projects" \\\n  -H "X-API-Key: ${apiKey}"`,
-                response: [{ id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', createdAt: '2025-03-01T10:00:00Z' }, { id: 2, name: 'Mobile App', description: 'iOS & Android companion app', status: 'active', createdAt: '2025-02-15T09:00:00Z' }]
+                response: [{ id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', managerName: 'John Doe', assignedUserName: 'Jane Smith', pendingAccessCount: 0, createdAt: '2025-03-01T10:00:00Z' }, { id: 2, name: 'Mobile App', description: 'iOS & Android companion app', status: 'active', managerName: null, assignedUserName: null, pendingAccessCount: 2, createdAt: '2025-02-15T09:00:00Z' }]
             }
         },
         {
@@ -294,13 +294,13 @@ export default function ApiDocsPage() {
             summary: 'Get single project',
             description: 'Returns full details for a specific project identified by its ID.',
             responses: {
-                '200': { description: 'A single project object.', example: { id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', createdAt: '2025-03-01T10:00:00Z' } },
+                '200': { description: 'A single project object with manager and assignee names.', example: { id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', managerName: 'John Doe', assignedUserName: 'Jane Smith', pendingAccessCount: 0, createdAt: '2025-03-01T10:00:00Z' } },
                 '401': { description: 'Invalid or missing API key.' },
                 '404': { description: 'Project not found.' }
             },
             example: {
                 curl: `curl -X GET "${BASE_URL}/api/projects/1" \\\n  -H "X-API-Key: ${apiKey}"`,
-                response: { id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', createdAt: '2025-03-01T10:00:00Z' }
+                response: { id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', managerName: 'John Doe', assignedUserName: 'Jane Smith', pendingAccessCount: 0, createdAt: '2025-03-01T10:00:00Z' }
             }
         },
         {
@@ -308,19 +308,24 @@ export default function ApiDocsPage() {
             method: 'POST',
             path: '/api/projects',
             summary: 'Create a project',
-            description: 'Creates a new project in the workspace. The title field is required.',
+            description: 'Creates a new project in the workspace. The name field is required. Defaults to "active" status if not provided.',
             body: {
                 name: { type: 'string', required: true, description: 'The name of the project.', example: 'Website Redesign' },
-                title: { type: 'string', required: true, description: 'The name/title of the project.', example: 'Website Redesign' },
-                description: { type: 'string', required: false, description: 'A detailed description of the project.', example: 'Complete overhaul of company website' }
+                description: { type: 'string', required: false, description: 'A detailed description of the project.', example: 'Complete overhaul of company website' },
+                client: { type: 'string', required: false, description: 'Client name for the project.', example: 'Acme Corp' },
+                status: { type: 'string', required: false, description: 'Project status. Defaults to "active".', example: 'active' },
+                startDate: { type: 'string', required: false, description: 'Project start date (ISO format).', example: '2025-03-01' },
+                endDate: { type: 'string', required: false, description: 'Project end date (ISO format).', example: '2025-06-01' },
+                managerId: { type: 'integer', required: false, description: 'User ID of the project manager.', example: '1' },
+                assignedUserId: { type: 'integer', required: false, description: 'User ID of the assigned team member.', example: '2' }
             },
             responses: {
                 '201': { description: 'The newly created project object.', example: { id: 3, name: 'Website Redesign', description: 'Complete overhaul', status: 'active', createdAt: '2025-03-13T01:00:00Z' } },
-                '400': { description: 'Missing required fields (title).' },
+                '400': { description: 'Missing required fields (name).' },
                 '401': { description: 'Invalid or missing API key.' }
             },
             example: {
-                curl: `curl -X POST "${BASE_URL}/api/projects" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"name":"Website Redesign","title":"Website Redesign","description":"Complete overhaul"}'`,
+                curl: `curl -X POST "${BASE_URL}/api/projects" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"name":"Website Redesign","description":"Complete overhaul"}'`,
                 response: { id: 3, name: 'Website Redesign', description: 'Complete overhaul', status: 'active', createdAt: '2025-03-13T01:00:00Z' }
             }
         },
@@ -331,8 +336,14 @@ export default function ApiDocsPage() {
             summary: 'Update a project',
             description: 'Partially updates an existing project. Only send the fields you want to change.',
             body: {
-                title: { type: 'string', required: false, description: 'New name for the project.', example: 'Website Redesign v2' },
-                description: { type: 'string', required: false, description: 'Updated project description.', example: 'Phase 2 redesign' }
+                name: { type: 'string', required: false, description: 'New name for the project.', example: 'Website Redesign v2' },
+                description: { type: 'string', required: false, description: 'Updated project description.', example: 'Phase 2 redesign' },
+                client: { type: 'string', required: false, description: 'Updated client name.', example: 'Acme Corp' },
+                status: { type: 'string', required: false, description: 'New project status.', example: 'completed' },
+                startDate: { type: 'string', required: false, description: 'Updated start date (ISO format).', example: '2025-03-01' },
+                endDate: { type: 'string', required: false, description: 'Updated end date (ISO format).', example: '2025-06-01' },
+                managerId: { type: 'integer', required: false, description: 'User ID of the project manager.', example: '1' },
+                assignedUserId: { type: 'integer', required: false, description: 'User ID of the assigned team member.', example: '2' }
             },
             responses: {
                 '200': { description: 'The updated project object.' },
@@ -341,7 +352,7 @@ export default function ApiDocsPage() {
                 '404': { description: 'Project not found.' }
             },
             example: {
-                curl: `curl -X PATCH "${BASE_URL}/api/projects/1" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"Website Redesign v2"}'`,
+                curl: `curl -X PATCH "${BASE_URL}/api/projects/1" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"name":"Website Redesign v2"}'`,
                 response: { id: 1, name: 'Website Redesign v2', description: 'Complete overhaul', status: 'active', updatedAt: '2025-03-13T01:30:00Z' }
             }
         },
@@ -366,19 +377,14 @@ export default function ApiDocsPage() {
             method: 'GET',
             path: '/api/tasks',
             summary: 'List all tasks',
-            description: 'Returns a list of tasks. Supports powerful filtering via query parameters.',
-            queryParams: [
-                { name: 'project', type: 'integer', required: false, description: 'Filter tasks by project ID.', example: '1' },
-                { name: 'status', type: 'string', required: false, description: 'Filter by status. One of: todo, in_progress, blocked, done.', example: 'in_progress' },
-                { name: 'assignee', type: 'integer', required: false, description: 'Filter tasks assigned to a specific user ID.', example: '3' }
-            ],
+            description: 'Returns a list of all tasks. Admins see all tasks; members see only tasks assigned to or created by them.',
             responses: {
                 '200': { description: 'An array of task objects.' },
                 '401': { description: 'Invalid or missing API key.' }
             },
             example: {
-                curl: `curl -X GET "${BASE_URL}/api/tasks?project=1&status=in_progress" \\\n  -H "X-API-Key: ${apiKey}"`,
-                response: [{ id: 5, title: 'Design homepage', description: 'Create wireframes', status: 'in_progress', projectId: 1, assignedUserId: 2, createdAt: '2025-03-10T08:00:00Z' }]
+                curl: `curl -X GET "${BASE_URL}/api/tasks" \\\n  -H "X-API-Key: ${apiKey}"`,
+                response: [{ id: 5, title: 'Design homepage', description: 'Create wireframes', status: 'in_progress', priority: 'medium', projectId: 1, projectName: 'Website Redesign', assignedUserId: 2, assignedUserName: 'Jane Smith', dueDate: '2025-03-20', createdAt: '2025-03-10T08:00:00Z' }]
             }
         },
         {
@@ -386,22 +392,25 @@ export default function ApiDocsPage() {
             method: 'POST',
             path: '/api/tasks',
             summary: 'Create a task',
-            description: 'Creates a new task. Both title and projectId are required. If no status is provided, it defaults to "todo".',
+            description: 'Creates a new task. Title is required. Defaults to "todo" status and "medium" priority if not provided.',
             body: {
                 title: { type: 'string', required: true, description: 'The task title.', example: 'Design homepage mockup' },
-                description: { type: 'string', required: false, description: 'Detailed description of the task.', example: 'Create lo-fi and hi-fi wireframes' },
-                projectId: { type: 'integer', required: true, description: 'ID of the project this task belongs to.', example: '1' },
-                assignedUserId: { type: 'integer', required: false, description: 'User ID of the team member to assign this task to.', example: '3' },
-                status: { type: 'string', required: false, description: 'Initial status. One of: todo, in_progress, blocked, done. Defaults to "todo".', example: 'todo' }
+                description: { type: 'string', required: false, description: 'Detailed description of the task (supports HTML).', example: 'Create lo-fi and hi-fi wireframes' },
+                status: { type: 'string', required: false, description: 'Initial status. One of: todo, in_progress, blocked, done. Defaults to "todo".', example: 'todo' },
+                priority: { type: 'string', required: false, description: 'Task priority. One of: low, medium, high. Defaults to "medium".', example: 'high' },
+                assignedUserId: { type: 'integer', required: false, description: 'User ID of the team member to assign this task to.', example: '2' },
+                projectId: { type: 'integer', required: false, description: 'ID of the project this task belongs to.', example: '1' },
+                milestoneId: { type: 'integer', required: false, description: 'ID of the milestone within the project.', example: '3' },
+                dueDate: { type: 'string', required: false, description: 'Due date (ISO format).', example: '2025-04-01' },
+                labels: { type: 'string', required: false, description: 'Comma-separated labels for the task.', example: 'design,urgent' }
             },
             responses: {
-                '201': { description: 'The newly created task object.' },
-                '400': { description: 'Missing required fields (title or projectId).' },
+                '201': { description: 'The newly created task object with joined names.' },
                 '401': { description: 'Invalid or missing API key.' }
             },
             example: {
-                curl: `curl -X POST "${BASE_URL}/api/tasks" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"Design homepage","projectId":1,"assignedUserId":2,"status":"todo"}'`,
-                response: { id: 6, title: 'Design homepage', description: null, status: 'todo', projectId: 1, assignedUserId: 2, createdAt: '2025-03-13T02:00:00Z' }
+                curl: `curl -X POST "${BASE_URL}/api/tasks" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"Design homepage","projectId":1,"assignedUserId":2,"priority":"high"}'`,
+                response: { id: 6, title: 'Design homepage', description: null, status: 'todo', priority: 'high', projectId: 1, projectName: 'Website Redesign', assignedUserId: 2, assignedUserName: 'Jane Smith', createdAt: '2025-03-13T02:00:00Z' }
             }
         },
         {
@@ -409,21 +418,27 @@ export default function ApiDocsPage() {
             method: 'PATCH',
             path: '/api/tasks/:id',
             summary: 'Update a task',
-            description: 'Partially updates an existing task. Common use case: changing the status as a task progresses.',
+            description: 'Partially updates an existing task. Only send the fields you want to change.',
             body: {
                 title: { type: 'string', required: false, description: 'Updated task title.', example: 'Design homepage v2' },
-                description: { type: 'string', required: false, description: 'Updated task description.' },
-                status: { type: 'string', required: false, description: 'New status. One of: todo, in_progress, blocked, done.', example: 'done' }
+                description: { type: 'string', required: false, description: 'Updated task description (supports HTML).' },
+                status: { type: 'string', required: false, description: 'New status. One of: todo, in_progress, blocked, done.', example: 'done' },
+                priority: { type: 'string', required: false, description: 'New priority. One of: low, medium, high.', example: 'high' },
+                assignedUserId: { type: 'integer', required: false, description: 'User ID to reassign the task to.', example: '3' },
+                projectId: { type: 'integer', required: false, description: 'Move task to a different project.', example: '2' },
+                milestoneId: { type: 'integer', required: false, description: 'Assign to a milestone within the project.', example: '5' },
+                dueDate: { type: 'string', required: false, description: 'Updated due date (ISO format).', example: '2025-04-15' },
+                labels: { type: 'string', required: false, description: 'Updated comma-separated labels.', example: 'design,review' }
             },
             responses: {
-                '200': { description: 'The updated task object.' },
+                '200': { description: 'The updated task object with joined names.' },
                 '400': { description: 'No valid fields provided.' },
                 '401': { description: 'Invalid or missing API key.' },
                 '404': { description: 'Task not found.' }
             },
             example: {
                 curl: `curl -X PATCH "${BASE_URL}/api/tasks/5" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"status":"done"}'`,
-                response: { id: 5, title: 'Design homepage', status: 'done', updatedAt: '2025-03-13T03:00:00Z' }
+                response: { id: 5, title: 'Design homepage', status: 'done', priority: 'medium', projectId: 1, projectName: 'Website Redesign', assignedUserId: 2, assignedUserName: 'Jane Smith', updatedAt: '2025-03-13T03:00:00Z' }
             }
         },
         {
@@ -435,7 +450,7 @@ export default function ApiDocsPage() {
             responses: {
                 '200': { description: 'Success confirmation message.', example: { message: 'Task deleted successfully' } },
                 '401': { description: 'Invalid or missing API key.' },
-                '404': { description: 'Project not found.' }
+                '404': { description: 'Task not found.' }
             },
             example: {
                 curl: `curl -X DELETE "${BASE_URL}/api/tasks/5" \\\n  -H "X-API-Key: ${apiKey}"`,
@@ -675,7 +690,7 @@ export default function ApiDocsPage() {
                         {[
                             { step: '1', title: 'Get your API key', code: `# Your API key:\nX-API-Key: your-secret` },
                             { step: '2', title: 'Fetch your projects', code: `curl -X GET "${BASE_URL}/api/projects" \\\n  -H "X-API-Key: your-secret"` },
-                            { step: '3', title: 'Create a task', code: `curl -X POST "${BASE_URL}/api/tasks" \\\n  -H "X-API-Key: your-secret" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"My first task","projectId":1}'` },
+                            { step: '3', title: 'Create a task', code: `curl -X POST "${BASE_URL}/api/tasks" \\\n  -H "X-API-Key: your-secret" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"My first task","priority":"medium"}'` },
                         ].map(item => (
                             <div key={item.step} className="flex gap-4">
                                 <div className="shrink-0 w-7 h-7 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center border border-primary/30">
