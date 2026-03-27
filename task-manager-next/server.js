@@ -3366,18 +3366,22 @@ app.get("/api/daily-reports", requireAuth, async (req, res) => {
     let result;
     if (isAdmin) {
       result = await query(`
-        SELECT dcr.*, u.name as "userName"
+        SELECT dcr.id, dcr.user_id as "userId", dcr.report_date as "reportDate",
+               dcr.calls_made as "callsMade", dcr.created_at as "createdAt",
+               u.name as "userName"
         FROM daily_call_reports dcr
-        JOIN users u ON dcr."userId" = u.id
-        ORDER BY dcr."reportDate" DESC, dcr."createdAt" DESC
+        JOIN users u ON dcr.user_id = u.id
+        ORDER BY dcr.report_date DESC, dcr.created_at DESC
       `);
     } else {
       result = await query(`
-        SELECT dcr.*, u.name as "userName"
+        SELECT dcr.id, dcr.user_id as "userId", dcr.report_date as "reportDate",
+               dcr.calls_made as "callsMade", dcr.created_at as "createdAt",
+               u.name as "userName"
         FROM daily_call_reports dcr
-        JOIN users u ON dcr."userId" = u.id
-        WHERE dcr."userId" = $1
-        ORDER BY dcr."reportDate" DESC, dcr."createdAt" DESC
+        JOIN users u ON dcr.user_id = u.id
+        WHERE dcr.user_id = $1
+        ORDER BY dcr.report_date DESC, dcr.created_at DESC
       `, [req.session.userId]);
     }
     res.json(result.rows);
@@ -3395,11 +3399,11 @@ app.post("/api/daily-reports", requireAuth, async (req, res) => {
   }
   try {
     const result = await query(
-      `INSERT INTO daily_call_reports ("userId", "reportDate", "callsMade")
-       VALUES ($1, $2, $3) RETURNING *`,
+      `INSERT INTO daily_call_reports (user_id, report_date, calls_made)
+       VALUES ($1, $2, $3)
+       RETURNING id, user_id as "userId", report_date as "reportDate", calls_made as "callsMade", created_at as "createdAt"`,
       [req.session.userId, reportDate, callsMade]
     );
-    // Attach userName for immediate UI use
     const userResult = await query("SELECT name FROM users WHERE id = $1", [req.session.userId]);
     const row = result.rows[0];
     row.userName = userResult.rows[0]?.name;
@@ -3429,27 +3433,34 @@ app.get("/api/appointments", requireAuth, async (req, res) => {
     const userResult = await query("SELECT role FROM users WHERE id = $1", [req.session.userId]);
     const isAdmin = userResult.rows[0]?.role === "admin";
 
+    const selectCols = `
+      a.id, a.business_name as "businessName", a.owner_name as "ownerName",
+      a.phone, a.email, a.address,
+      a.appointment_date as "appointmentDate",
+      a.assigned_closer_id as "assignedCloserId",
+      a.notes, a.status,
+      a.created_by as "createdBy", a.created_at as "createdAt",
+      creator.name as "creatorName",
+      closer.name as "assignedCloserName"
+    `;
+
     let result;
     if (isAdmin) {
       result = await query(`
-        SELECT a.*,
-          creator.name as "creatorName",
-          closer.name as "assignedCloserName"
+        SELECT ${selectCols}
         FROM appointments a
-        JOIN users creator ON a."createdBy" = creator.id
-        LEFT JOIN users closer ON a."assignedCloserId" = closer.id
-        ORDER BY a."appointmentDate" DESC
+        JOIN users creator ON a.created_by = creator.id
+        LEFT JOIN users closer ON a.assigned_closer_id = closer.id
+        ORDER BY a.appointment_date DESC
       `);
     } else {
       result = await query(`
-        SELECT a.*,
-          creator.name as "creatorName",
-          closer.name as "assignedCloserName"
+        SELECT ${selectCols}
         FROM appointments a
-        JOIN users creator ON a."createdBy" = creator.id
-        LEFT JOIN users closer ON a."assignedCloserId" = closer.id
-        WHERE a."createdBy" = $1 OR a."assignedCloserId" = $1
-        ORDER BY a."appointmentDate" DESC
+        JOIN users creator ON a.created_by = creator.id
+        LEFT JOIN users closer ON a.assigned_closer_id = closer.id
+        WHERE a.created_by = $1 OR a.assigned_closer_id = $1
+        ORDER BY a.appointment_date DESC
       `, [req.session.userId]);
     }
     res.json(result.rows);
@@ -3467,16 +3478,21 @@ app.post("/api/appointments", requireAuth, async (req, res) => {
   }
   try {
     const result = await query(
-      `INSERT INTO appointments ("businessName", "ownerName", phone, email, address, "appointmentDate", "assignedCloserId", notes, "createdBy")
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      `INSERT INTO appointments (business_name, owner_name, phone, email, address, appointment_date, assigned_closer_id, notes, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
       [businessName, ownerName, phone, email || null, address || null, appointmentDate, assignedCloserId || null, notes || null, req.session.userId]
     );
-    // Fetch with joins for immediate display
     const full = await query(`
-      SELECT a.*, creator.name as "creatorName", closer.name as "assignedCloserName"
+      SELECT a.id, a.business_name as "businessName", a.owner_name as "ownerName",
+             a.phone, a.email, a.address,
+             a.appointment_date as "appointmentDate",
+             a.assigned_closer_id as "assignedCloserId",
+             a.notes, a.status,
+             a.created_by as "createdBy", a.created_at as "createdAt",
+             creator.name as "creatorName", closer.name as "assignedCloserName"
       FROM appointments a
-      JOIN users creator ON a."createdBy" = creator.id
-      LEFT JOIN users closer ON a."assignedCloserId" = closer.id
+      JOIN users creator ON a.created_by = creator.id
+      LEFT JOIN users closer ON a.assigned_closer_id = closer.id
       WHERE a.id = $1
     `, [result.rows[0].id]);
     res.status(201).json(full.rows[0]);
@@ -3494,7 +3510,11 @@ app.patch("/api/appointments/:id", requireAuth, async (req, res) => {
   }
   try {
     const result = await query(
-      `UPDATE appointments SET status = $1 WHERE id = $2 RETURNING *`,
+      `UPDATE appointments SET status = $1 WHERE id = $2
+       RETURNING id, business_name as "businessName", owner_name as "ownerName",
+                 phone, email, address, appointment_date as "appointmentDate",
+                 assigned_closer_id as "assignedCloserId", notes, status,
+                 created_by as "createdBy", created_at as "createdAt"`,
       [status, req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: "Appointment not found" });
@@ -3524,21 +3544,29 @@ app.get("/api/closed-deals", requireAuth, async (req, res) => {
     const userResult = await query("SELECT role FROM users WHERE id = $1", [req.session.userId]);
     const isAdmin = userResult.rows[0]?.role === "admin";
 
+    const selectCols = `
+      cd.id, cd.business_name as "businessName", cd.owner_name as "ownerName",
+      cd.phone, cd.email, cd.address,
+      cd.package_sold as "packageSold", cd.monthly_plan as "monthlyPlan",
+      cd.notes, cd.closed_by as "closedBy", cd.created_at as "createdAt",
+      u.name as "closerName"
+    `;
+
     let result;
     if (isAdmin) {
       result = await query(`
-        SELECT cd.*, u.name as "closerName"
+        SELECT ${selectCols}
         FROM closed_deals cd
-        JOIN users u ON cd."closedBy" = u.id
-        ORDER BY cd."createdAt" DESC
+        JOIN users u ON cd.closed_by = u.id
+        ORDER BY cd.created_at DESC
       `);
     } else {
       result = await query(`
-        SELECT cd.*, u.name as "closerName"
+        SELECT ${selectCols}
         FROM closed_deals cd
-        JOIN users u ON cd."closedBy" = u.id
-        WHERE cd."closedBy" = $1
-        ORDER BY cd."createdAt" DESC
+        JOIN users u ON cd.closed_by = u.id
+        WHERE cd.closed_by = $1
+        ORDER BY cd.created_at DESC
       `, [req.session.userId]);
     }
     res.json(result.rows);
@@ -3556,8 +3584,12 @@ app.post("/api/closed-deals", requireAuth, async (req, res) => {
   }
   try {
     const result = await query(
-      `INSERT INTO closed_deals ("businessName", "ownerName", phone, email, address, "packageSold", "monthlyPlan", notes, "closedBy")
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      `INSERT INTO closed_deals (business_name, owner_name, phone, email, address, package_sold, monthly_plan, notes, closed_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING id, business_name as "businessName", owner_name as "ownerName",
+                 phone, email, address, package_sold as "packageSold",
+                 monthly_plan as "monthlyPlan", notes, closed_by as "closedBy",
+                 created_at as "createdAt"`,
       [businessName, ownerName, phone, email || null, address || null, packageSold, monthlyPlan, notes || null, req.session.userId]
     );
     const userResult = await query("SELECT name FROM users WHERE id = $1", [req.session.userId]);
@@ -3591,19 +3623,19 @@ app.get("/api/outreach/stats", requireAdmin, async (req, res) => {
     const weekStart = startOfWeek.toISOString().split("T")[0];
 
     const [callsToday, appointmentsWeek, dealsWeek, revenueWeek] = await Promise.all([
-      query(`SELECT COALESCE(SUM("callsMade"), 0) as total FROM daily_call_reports WHERE "reportDate" = $1`, [today]),
-      query(`SELECT COUNT(*) as total FROM appointments WHERE "appointmentDate" >= $1`, [weekStart]),
-      query(`SELECT COUNT(*) as total FROM closed_deals WHERE "createdAt" >= $1`, [weekStart]),
+      query(`SELECT COALESCE(SUM(calls_made), 0) as total FROM daily_call_reports WHERE report_date = $1`, [today]),
+      query(`SELECT COUNT(*) as total FROM appointments WHERE appointment_date >= $1`, [weekStart]),
+      query(`SELECT COUNT(*) as total FROM closed_deals WHERE created_at >= $1`, [weekStart]),
       query(`
         SELECT COALESCE(SUM(
-          CASE "packageSold"
+          CASE package_sold
             WHEN 'Starter $297' THEN 297
             WHEN 'Pro $597' THEN 597
             WHEN 'Full AI $997' THEN 997
             ELSE 0
           END
         ), 0) as total
-        FROM closed_deals WHERE "createdAt" >= $1
+        FROM closed_deals WHERE created_at >= $1
       `, [weekStart]),
     ]);
 
