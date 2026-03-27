@@ -279,13 +279,13 @@ export default function ApiDocsPage() {
             responses: {
                 '200': {
                     description: 'An array of project objects with manager and assignee names.',
-                    example: [{ id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', managerName: 'John Doe', assignedUserName: 'Jane Smith', pendingAccessCount: 0, createdAt: '2025-03-01T10:00:00Z' }]
+                    example: [{ id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', managerName: 'John Doe', assignedUserName: 'Jane Smith', pendingAccessCount: 0, createdAt: '2026-03-01T10:00:00Z' }]
                 },
                 '401': { description: 'Invalid or missing API key.' }
             },
             example: {
                 curl: `curl -X GET "${BASE_URL}/api/projects" \\\n  -H "X-API-Key: ${apiKey}"`,
-                response: [{ id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', managerName: 'John Doe', assignedUserName: 'Jane Smith', pendingAccessCount: 0, createdAt: '2025-03-01T10:00:00Z' }, { id: 2, name: 'Mobile App', description: 'iOS & Android companion app', status: 'active', managerName: null, assignedUserName: null, pendingAccessCount: 2, createdAt: '2025-02-15T09:00:00Z' }]
+                response: [{ id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', managerName: 'John Doe', assignedUserName: 'Jane Smith', pendingAccessCount: 0, createdAt: '2026-03-01T10:00:00Z' }, { id: 2, name: 'Mobile App', description: 'iOS & Android companion app', status: 'active', managerName: null, assignedUserName: null, pendingAccessCount: 2, createdAt: '2026-02-15T09:00:00Z' }]
             }
         },
         {
@@ -295,13 +295,13 @@ export default function ApiDocsPage() {
             summary: 'Get single project',
             description: 'Returns full details for a specific project identified by its ID.',
             responses: {
-                '200': { description: 'A single project object with manager and assignee names.', example: { id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', managerName: 'John Doe', assignedUserName: 'Jane Smith', pendingAccessCount: 0, createdAt: '2025-03-01T10:00:00Z' } },
+                '200': { description: 'A single project object with manager and assignee names.', example: { id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', managerName: 'John Doe', assignedUserName: 'Jane Smith', pendingAccessCount: 0, createdAt: '2026-03-01T10:00:00Z' } },
                 '401': { description: 'Invalid or missing API key.' },
                 '404': { description: 'Project not found.' }
             },
             example: {
                 curl: `curl -X GET "${BASE_URL}/api/projects/1" \\\n  -H "X-API-Key: ${apiKey}"`,
-                response: { id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', managerName: 'John Doe', assignedUserName: 'Jane Smith', pendingAccessCount: 0, createdAt: '2025-03-01T10:00:00Z' }
+                response: { id: 1, name: 'Website Redesign', description: 'Complete overhaul of company website', status: 'active', managerName: 'John Doe', assignedUserName: 'Jane Smith', pendingAccessCount: 0, createdAt: '2026-03-01T10:00:00Z' }
             }
         },
         {
@@ -315,19 +315,19 @@ export default function ApiDocsPage() {
                 description: { type: 'string', required: false, description: 'A detailed description of the project.', example: 'Complete overhaul of company website' },
                 client: { type: 'string', required: false, description: 'Client name for the project.', example: 'Acme Corp' },
                 status: { type: 'string', required: false, description: 'Project status. Defaults to "active".', example: 'active' },
-                startDate: { type: 'string', required: false, description: 'Project start date (ISO format).', example: '2025-03-01' },
-                endDate: { type: 'string', required: false, description: 'Project end date (ISO format).', example: '2025-06-01' },
+                startDate: { type: 'string', required: false, description: 'Project start date (ISO format).', example: '2026-03-01' },
+                endDate: { type: 'string', required: false, description: 'Project end date (ISO format).', example: '2026-06-01' },
                 managerId: { type: 'integer', required: false, description: 'User ID of the project manager.', example: '1' },
                 assignedUserId: { type: 'integer', required: false, description: 'User ID of the assigned team member.', example: '2' }
             },
             responses: {
-                '201': { description: 'The newly created project object.', example: { id: 3, name: 'Website Redesign', description: 'Complete overhaul', status: 'active', createdAt: '2025-03-13T01:00:00Z' } },
+                '201': { description: 'The newly created project object.', example: { id: 3, name: 'Website Redesign', description: 'Complete overhaul', status: 'active', createdAt: '2026-03-13T01:00:00Z' } },
                 '400': { description: 'Missing required fields (name).' },
                 '401': { description: 'Invalid or missing API key.' }
             },
             example: {
                 curl: `curl -X POST "${BASE_URL}/api/projects" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"name":"Website Redesign","description":"Complete overhaul"}'`,
-                response: { id: 3, name: 'Website Redesign', description: 'Complete overhaul', status: 'active', createdAt: '2025-03-13T01:00:00Z' }
+                response: { id: 3, name: 'Website Redesign', description: 'Complete overhaul', status: 'active', createdAt: '2026-03-13T01:00:00Z' }
             }
         },
         {
@@ -341,8 +341,8 @@ export default function ApiDocsPage() {
                 description: { type: 'string', required: false, description: 'Updated project description.', example: 'Phase 2 redesign' },
                 client: { type: 'string', required: false, description: 'Updated client name.', example: 'Acme Corp' },
                 status: { type: 'string', required: false, description: 'New project status.', example: 'completed' },
-                startDate: { type: 'string', required: false, description: 'Updated start date (ISO format).', example: '2025-03-01' },
-                endDate: { type: 'string', required: false, description: 'Updated end date (ISO format).', example: '2025-06-01' },
+                startDate: { type: 'string', required: false, description: 'Updated start date (ISO format).', example: '2026-03-01' },
+                endDate: { type: 'string', required: false, description: 'Updated end date (ISO format).', example: '2026-06-01' },
                 managerId: { type: 'integer', required: false, description: 'User ID of the project manager.', example: '1' },
                 assignedUserId: { type: 'integer', required: false, description: 'User ID of the assigned team member.', example: '2' }
             },
@@ -354,7 +354,7 @@ export default function ApiDocsPage() {
             },
             example: {
                 curl: `curl -X PATCH "${BASE_URL}/api/projects/1" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"name":"Website Redesign v2"}'`,
-                response: { id: 1, name: 'Website Redesign v2', description: 'Complete overhaul', status: 'active', updatedAt: '2025-03-13T01:30:00Z' }
+                response: { id: 1, name: 'Website Redesign v2', description: 'Complete overhaul', status: 'active', updatedAt: '2026-03-13T01:30:00Z' }
             }
         },
         {
@@ -385,7 +385,7 @@ export default function ApiDocsPage() {
             },
             example: {
                 curl: `curl -X GET "${BASE_URL}/api/tasks" \\\n  -H "X-API-Key: ${apiKey}"`,
-                response: [{ id: 5, title: 'Design homepage', description: 'Create wireframes', status: 'in_progress', priority: 'medium', projectId: 1, projectName: 'Website Redesign', assignedUserId: 2, assignedUserName: 'Jane Smith', dueDate: '2025-03-20', createdAt: '2025-03-10T08:00:00Z' }]
+                response: [{ id: 5, title: 'Design homepage', description: 'Create wireframes', status: 'in_progress', priority: 'medium', projectId: 1, projectName: 'Website Redesign', assignedUserId: 2, assignedUserName: 'Jane Smith', dueDate: '2026-03-20', createdAt: '2026-03-10T08:00:00Z' }]
             }
         },
         {
@@ -402,7 +402,7 @@ export default function ApiDocsPage() {
                 assignedUserId: { type: 'integer', required: false, description: 'User ID of the team member to assign this task to.', example: '2' },
                 projectId: { type: 'integer', required: false, description: 'ID of the project this task belongs to.', example: '1' },
                 milestoneId: { type: 'integer', required: false, description: 'ID of the milestone within the project.', example: '3' },
-                dueDate: { type: 'string', required: false, description: 'Due date (ISO format).', example: '2025-04-01' },
+                dueDate: { type: 'string', required: false, description: 'Due date (ISO format).', example: '2026-04-01' },
                 labels: { type: 'string', required: false, description: 'Comma-separated labels for the task.', example: 'design,urgent' }
             },
             responses: {
@@ -411,7 +411,7 @@ export default function ApiDocsPage() {
             },
             example: {
                 curl: `curl -X POST "${BASE_URL}/api/tasks" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"title":"Design homepage","priority":"high"}'`,
-                response: { id: 6, title: 'Design homepage', description: null, status: 'todo', priority: 'high', projectId: null, projectName: null, assignedUserId: null, assignedUserName: null, createdAt: '2025-03-13T02:00:00Z' }
+                response: { id: 6, title: 'Design homepage', description: null, status: 'todo', priority: 'high', projectId: null, projectName: null, assignedUserId: null, assignedUserName: null, createdAt: '2026-03-13T02:00:00Z' }
             }
         },
         {
@@ -428,7 +428,7 @@ export default function ApiDocsPage() {
                 assignedUserId: { type: 'integer', required: false, description: 'User ID to reassign the task to.', example: '3' },
                 projectId: { type: 'integer', required: false, description: 'Move task to a different project.', example: '2' },
                 milestoneId: { type: 'integer', required: false, description: 'Assign to a milestone within the project.', example: '5' },
-                dueDate: { type: 'string', required: false, description: 'Updated due date (ISO format).', example: '2025-04-15' },
+                dueDate: { type: 'string', required: false, description: 'Updated due date (ISO format).', example: '2026-04-15' },
                 labels: { type: 'string', required: false, description: 'Updated comma-separated labels.', example: 'design,review' }
             },
             responses: {
@@ -439,7 +439,7 @@ export default function ApiDocsPage() {
             },
             example: {
                 curl: `curl -X PATCH "${BASE_URL}/api/tasks/5" \\\n  -H "X-API-Key: ${apiKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"status":"done"}'`,
-                response: { id: 5, title: 'Design homepage', status: 'done', priority: 'medium', projectId: 1, projectName: 'Website Redesign', assignedUserId: 2, assignedUserName: 'Jane Smith', updatedAt: '2025-03-13T03:00:00Z' }
+                response: { id: 5, title: 'Design homepage', status: 'done', priority: 'medium', projectId: 1, projectName: 'Website Redesign', assignedUserId: 2, assignedUserName: 'Jane Smith', updatedAt: '2026-03-13T03:00:00Z' }
             }
         },
         {
@@ -466,16 +466,16 @@ export default function ApiDocsPage() {
             description: 'Returns attendance records grouped by member and then by date. Use userId to get a single member\'s records, or omit for all members. Supports date range filtering. Admin only.',
             queryParams: [
                 { name: 'userId', type: 'integer', required: false, description: 'Filter by team member user ID. Omit to get all members.', example: '2' },
-                { name: 'from', type: 'string', required: true, description: 'Start date for range filter (YYYY-MM-DD).', example: '2025-03-01' },
-                { name: 'to', type: 'string', required: true, description: 'End date for range filter (YYYY-MM-DD).', example: '2025-03-31' }
+                { name: 'from', type: 'string', required: true, description: 'Start date for range filter (YYYY-MM-DD).', example: '2026-03-01' },
+                { name: 'to', type: 'string', required: true, description: 'End date for range filter (YYYY-MM-DD).', example: '2026-03-31' }
             ],
             responses: {
                 '200': { description: 'An array of member objects, each containing days grouped by date.' },
                 '401': { description: 'Invalid or missing API key.' }
             },
             example: {
-                curl: `curl -X GET "${BASE_URL}/api/attendance?userId=2&from=2025-03-01&to=2025-03-31" \\\n  -H "X-API-Key: ${apiKey}"`,
-                response: [{ userId: 2, userName: 'Jane Smith', days: [{ date: '2025-03-27', totalMinutes: 510, records: [{ id: 1, clockInTime: '2025-03-27T09:00:00Z', clockOutTime: '2025-03-27T17:30:00Z', workDuration: 510, status: 'completed', clientName: 'Website Redesign', notes: null }] }, { date: '2025-03-26', totalMinutes: 480, records: [{ id: 2, clockInTime: '2025-03-26T09:00:00Z', clockOutTime: '2025-03-26T17:00:00Z', workDuration: 480, status: 'completed', clientName: 'Mobile App', notes: null }] }] }]
+                curl: `curl -X GET "${BASE_URL}/api/attendance?userId=2&from=2026-03-01&to=2026-03-31" \\\n  -H "X-API-Key: ${apiKey}"`,
+                response: [{ userId: 2, userName: 'Jane Smith', days: [{ date: '2026-03-27', totalMinutes: 510, records: [{ id: 1, clockInTime: '2026-03-27T09:00:00Z', clockOutTime: '2026-03-27T17:30:00Z', workDuration: 510, status: 'completed', clientName: 'Website Redesign', notes: null }] }, { date: '2026-03-26', totalMinutes: 480, records: [{ id: 2, clockInTime: '2026-03-26T09:00:00Z', clockOutTime: '2026-03-26T17:00:00Z', workDuration: 480, status: 'completed', clientName: 'Mobile App', notes: null }] }] }]
             }
         },
         {
