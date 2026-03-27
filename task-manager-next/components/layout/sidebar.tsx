@@ -19,6 +19,8 @@ import {
     Building2,
     MessageSquare,
     Code2,
+    Phone,
+    CalendarPlus,
 } from 'lucide-react';
 import { useStickyStore } from '@/lib/store/stickyStore';
 
@@ -31,6 +33,8 @@ const navigation = [
     { name: 'Organization', href: '/organization', icon: Building2 },
     { name: 'Team', href: '/team', icon: Users },
     { name: 'Attendance', href: '/attendance', icon: Clock },
+    { name: 'Daily Reports', href: '/daily-reports', icon: Phone },
+    { name: 'Appointments', href: '/appointments', icon: CalendarPlus },
     { name: 'Profile', href: '/profile', icon: UserCircle },
     { name: 'Apis', href: '/api-docs', icon: Code2, adminOnly: true },
 ];

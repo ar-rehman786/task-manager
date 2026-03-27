@@ -294,7 +294,59 @@ if (isMock) {
       );
     `);
 
+    // Daily call reports table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS daily_call_reports (
+        id SERIAL PRIMARY KEY,
+        "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        "reportDate" DATE NOT NULL,
+        "callsMade" INTEGER NOT NULL DEFAULT 0,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Appointments table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS appointments (
+        id SERIAL PRIMARY KEY,
+        "businessName" TEXT NOT NULL,
+        "ownerName" TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        email TEXT,
+        address TEXT,
+        "appointmentDate" TIMESTAMP NOT NULL,
+        "assignedCloserId" INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        notes TEXT,
+        status TEXT NOT NULL DEFAULT 'upcoming' CHECK(status IN ('upcoming', 'completed', 'no_show')),
+        "createdBy" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Closed deals table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS closed_deals (
+        id SERIAL PRIMARY KEY,
+        "businessName" TEXT NOT NULL,
+        "ownerName" TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        email TEXT,
+        address TEXT,
+        "packageSold" TEXT NOT NULL CHECK("packageSold" IN ('Starter $297', 'Pro $597', 'Full AI $997')),
+        "monthlyPlan" TEXT NOT NULL CHECK("monthlyPlan" IN ('$97/mo', '$197/mo', '$397/mo')),
+        notes TEXT,
+        "closedBy" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Indexes
+    await client.query('CREATE INDEX IF NOT EXISTS idx_daily_reports_user ON daily_call_reports("userId")');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_daily_reports_date ON daily_call_reports("reportDate")');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_appointments_closer ON appointments("assignedCloserId")');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_appointments_created_by ON appointments("createdBy")');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments("appointmentDate")');
+    await client.query('CREATE INDEX IF NOT EXISTS idx_closed_deals_closed_by ON closed_deals("closedBy")');
     await client.query('CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks("assignedUserId")');
     await client.query('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_tasks_milestone ON tasks("milestoneId")');

@@ -3355,6 +3355,270 @@ app.post(
   },
 );
 
+// ============= OUTREACH: DAILY CALL REPORTS =============
+
+// GET daily call reports (admin sees all, member sees own)
+app.get("/api/daily-reports", requireAuth, async (req, res) => {
+  try {
+    const userResult = await query("SELECT role FROM users WHERE id = $1", [req.session.userId]);
+    const isAdmin = userResult.rows[0]?.role === "admin";
+
+    let result;
+    if (isAdmin) {
+      result = await query(`
+        SELECT dcr.*, u.name as "userName"
+        FROM daily_call_reports dcr
+        JOIN users u ON dcr."userId" = u.id
+        ORDER BY dcr."reportDate" DESC, dcr."createdAt" DESC
+      `);
+    } else {
+      result = await query(`
+        SELECT dcr.*, u.name as "userName"
+        FROM daily_call_reports dcr
+        JOIN users u ON dcr."userId" = u.id
+        WHERE dcr."userId" = $1
+        ORDER BY dcr."reportDate" DESC, dcr."createdAt" DESC
+      `, [req.session.userId]);
+    }
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching daily reports:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST create daily call report
+app.post("/api/daily-reports", requireAuth, async (req, res) => {
+  const { reportDate, callsMade } = req.body;
+  if (!reportDate || callsMade === undefined) {
+    return res.status(400).json({ error: "reportDate and callsMade are required" });
+  }
+  try {
+    const result = await query(
+      `INSERT INTO daily_call_reports ("userId", "reportDate", "callsMade")
+       VALUES ($1, $2, $3) RETURNING *`,
+      [req.session.userId, reportDate, callsMade]
+    );
+    // Attach userName for immediate UI use
+    const userResult = await query("SELECT name FROM users WHERE id = $1", [req.session.userId]);
+    const row = result.rows[0];
+    row.userName = userResult.rows[0]?.name;
+    res.status(201).json(row);
+  } catch (error) {
+    console.error("Error creating daily report:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// DELETE daily call report (admin only)
+app.delete("/api/daily-reports/:id", requireAdmin, async (req, res) => {
+  try {
+    await query("DELETE FROM daily_call_reports WHERE id = $1", [req.params.id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting daily report:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ============= OUTREACH: APPOINTMENTS =============
+
+// GET appointments (admin sees all, member sees own created or assigned)
+app.get("/api/appointments", requireAuth, async (req, res) => {
+  try {
+    const userResult = await query("SELECT role FROM users WHERE id = $1", [req.session.userId]);
+    const isAdmin = userResult.rows[0]?.role === "admin";
+
+    let result;
+    if (isAdmin) {
+      result = await query(`
+        SELECT a.*,
+          creator.name as "creatorName",
+          closer.name as "assignedCloserName"
+        FROM appointments a
+        JOIN users creator ON a."createdBy" = creator.id
+        LEFT JOIN users closer ON a."assignedCloserId" = closer.id
+        ORDER BY a."appointmentDate" DESC
+      `);
+    } else {
+      result = await query(`
+        SELECT a.*,
+          creator.name as "creatorName",
+          closer.name as "assignedCloserName"
+        FROM appointments a
+        JOIN users creator ON a."createdBy" = creator.id
+        LEFT JOIN users closer ON a."assignedCloserId" = closer.id
+        WHERE a."createdBy" = $1 OR a."assignedCloserId" = $1
+        ORDER BY a."appointmentDate" DESC
+      `, [req.session.userId]);
+    }
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching appointments:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST create appointment
+app.post("/api/appointments", requireAuth, async (req, res) => {
+  const { businessName, ownerName, phone, email, address, appointmentDate, assignedCloserId, notes } = req.body;
+  if (!businessName || !ownerName || !phone || !appointmentDate) {
+    return res.status(400).json({ error: "businessName, ownerName, phone, and appointmentDate are required" });
+  }
+  try {
+    const result = await query(
+      `INSERT INTO appointments ("businessName", "ownerName", phone, email, address, "appointmentDate", "assignedCloserId", notes, "createdBy")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [businessName, ownerName, phone, email || null, address || null, appointmentDate, assignedCloserId || null, notes || null, req.session.userId]
+    );
+    // Fetch with joins for immediate display
+    const full = await query(`
+      SELECT a.*, creator.name as "creatorName", closer.name as "assignedCloserName"
+      FROM appointments a
+      JOIN users creator ON a."createdBy" = creator.id
+      LEFT JOIN users closer ON a."assignedCloserId" = closer.id
+      WHERE a.id = $1
+    `, [result.rows[0].id]);
+    res.status(201).json(full.rows[0]);
+  } catch (error) {
+    console.error("Error creating appointment:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// PATCH update appointment status
+app.patch("/api/appointments/:id", requireAuth, async (req, res) => {
+  const { status } = req.body;
+  if (!status || !["upcoming", "completed", "no_show"].includes(status)) {
+    return res.status(400).json({ error: "Valid status required (upcoming, completed, no_show)" });
+  }
+  try {
+    const result = await query(
+      `UPDATE appointments SET status = $1 WHERE id = $2 RETURNING *`,
+      [status, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: "Appointment not found" });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error updating appointment:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// DELETE appointment (admin only)
+app.delete("/api/appointments/:id", requireAdmin, async (req, res) => {
+  try {
+    await query("DELETE FROM appointments WHERE id = $1", [req.params.id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting appointment:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ============= OUTREACH: CLOSED DEALS =============
+
+// GET closed deals (admin sees all, member sees own)
+app.get("/api/closed-deals", requireAuth, async (req, res) => {
+  try {
+    const userResult = await query("SELECT role FROM users WHERE id = $1", [req.session.userId]);
+    const isAdmin = userResult.rows[0]?.role === "admin";
+
+    let result;
+    if (isAdmin) {
+      result = await query(`
+        SELECT cd.*, u.name as "closerName"
+        FROM closed_deals cd
+        JOIN users u ON cd."closedBy" = u.id
+        ORDER BY cd."createdAt" DESC
+      `);
+    } else {
+      result = await query(`
+        SELECT cd.*, u.name as "closerName"
+        FROM closed_deals cd
+        JOIN users u ON cd."closedBy" = u.id
+        WHERE cd."closedBy" = $1
+        ORDER BY cd."createdAt" DESC
+      `, [req.session.userId]);
+    }
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching closed deals:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST create closed deal
+app.post("/api/closed-deals", requireAuth, async (req, res) => {
+  const { businessName, ownerName, phone, email, address, packageSold, monthlyPlan, notes } = req.body;
+  if (!businessName || !ownerName || !phone || !packageSold || !monthlyPlan) {
+    return res.status(400).json({ error: "businessName, ownerName, phone, packageSold, and monthlyPlan are required" });
+  }
+  try {
+    const result = await query(
+      `INSERT INTO closed_deals ("businessName", "ownerName", phone, email, address, "packageSold", "monthlyPlan", notes, "closedBy")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [businessName, ownerName, phone, email || null, address || null, packageSold, monthlyPlan, notes || null, req.session.userId]
+    );
+    const userResult = await query("SELECT name FROM users WHERE id = $1", [req.session.userId]);
+    const row = result.rows[0];
+    row.closerName = userResult.rows[0]?.name;
+    res.status(201).json(row);
+  } catch (error) {
+    console.error("Error creating closed deal:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// DELETE closed deal (admin only)
+app.delete("/api/closed-deals/:id", requireAdmin, async (req, res) => {
+  try {
+    await query("DELETE FROM closed_deals WHERE id = $1", [req.params.id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting closed deal:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ============= OUTREACH: ADMIN STATS =============
+
+app.get("/api/outreach/stats", requireAdmin, async (req, res) => {
+  try {
+    const today = new Date().toISOString().split("T")[0];
+    const startOfWeek = new Date();
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    const weekStart = startOfWeek.toISOString().split("T")[0];
+
+    const [callsToday, appointmentsWeek, dealsWeek, revenueWeek] = await Promise.all([
+      query(`SELECT COALESCE(SUM("callsMade"), 0) as total FROM daily_call_reports WHERE "reportDate" = $1`, [today]),
+      query(`SELECT COUNT(*) as total FROM appointments WHERE "appointmentDate" >= $1`, [weekStart]),
+      query(`SELECT COUNT(*) as total FROM closed_deals WHERE "createdAt" >= $1`, [weekStart]),
+      query(`
+        SELECT COALESCE(SUM(
+          CASE "packageSold"
+            WHEN 'Starter $297' THEN 297
+            WHEN 'Pro $597' THEN 597
+            WHEN 'Full AI $997' THEN 997
+            ELSE 0
+          END
+        ), 0) as total
+        FROM closed_deals WHERE "createdAt" >= $1
+      `, [weekStart]),
+    ]);
+
+    res.json({
+      totalCallsToday: parseInt(callsToday.rows[0].total),
+      appointmentsThisWeek: parseInt(appointmentsWeek.rows[0].total),
+      dealsClosedThisWeek: parseInt(dealsWeek.rows[0].total),
+      revenueThisWeek: parseInt(revenueWeek.rows[0].total),
+    });
+  } catch (error) {
+    console.error("Error fetching outreach stats:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 // Next.js Request Handler
 app.all(/(.*)/, (req, res) => {
   return handle(req, res);
